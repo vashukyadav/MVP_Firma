@@ -2,50 +2,84 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useAuthStore } from "@/store/authStore";
 import { db } from "@/lib/db";
+import FirmaLayout from "@/components/layout/FirmaLayout";
 import {
-  Building2,
-  LayoutDashboard,
-  Building,
-  CreditCard,
   Users,
   FolderKanban,
-  BarChart3,
-  Settings,
-  HelpCircle,
-  Bell,
-  ChevronDown,
+  FileText,
   Calendar,
+  CreditCard,
+  FileCheck2,
+  ChevronDown,
   UserPlus,
   FolderPlus,
-  FileText,
+  Square,
+  CheckSquare,
   Check,
-  Eye,
-  EyeOff,
-  ShieldCheck,
-  X,
-  Sparkles,
-  LogOut,
+  ArrowRight,
+  Briefcase,
 } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { currentUser, logout } = useAuthStore();
-
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [adminName, setAdminName] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
+  const { currentUser } = useAuthStore();
 
   const [companyName, setCompanyName] = useState("ABC Solutions Pvt. Ltd.");
   const [currentPlan, setCurrentPlan] = useState("Starter");
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [createNewOpen, setCreateNewOpen] = useState(false);
 
+  // Interactive Tasks State
+  const [tasks, setTasks] = useState([
+    {
+      id: 1,
+      title: "Review quotation for Metro Heights",
+      due: "Today",
+      priority: "High",
+      priorityColor: "bg-rose-50 text-rose-600 border border-rose-100",
+      completed: false,
+    },
+    {
+      id: 2,
+      title: "Team meeting with project managers",
+      due: "Today",
+      priority: "Medium",
+      priorityColor: "bg-amber-50 text-amber-700 border border-amber-100",
+      completed: false,
+    },
+    {
+      id: 3,
+      title: "Approve new user requests",
+      due: "Tomorrow",
+      priority: "Medium",
+      priorityColor: "bg-amber-50 text-amber-700 border border-amber-100",
+      completed: false,
+    },
+    {
+      id: 4,
+      title: "Client call – GreenBuild Ltd.",
+      due: "Tomorrow",
+      priority: "Low",
+      priorityColor: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+      completed: false,
+    },
+    {
+      id: 5,
+      title: "Monthly report review",
+      due: "28 May",
+      priority: "Low",
+      priorityColor: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+      completed: false,
+    },
+  ]);
+
+  const toggleTask = (id: number) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+    );
+  };
 
   const user = currentUser || {
     id: 1,
@@ -55,9 +89,9 @@ export default function DashboardPage() {
     size: 0,
   };
 
-  const userInitial = (user.name?.charAt(0) || "R").toUpperCase();
   const firstName = user.name?.split(" ")[0] || "Rahul";
 
+  // Data Fetching Logic Preserved
   useEffect(() => {
     async function loadData() {
       if (currentUser?.id) {
@@ -77,699 +111,717 @@ export default function DashboardPage() {
     loadData();
   }, [currentUser?.id]);
 
-  const handleCreateAdmin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-
-    if (!adminName || !adminEmail || !adminPassword || !confirmPassword) {
-      alert("Please fill all fields");
-      return;
-    }
-
-    if (adminPassword !== confirmPassword) {
-      alert("Passwords do not match");
-      return;
-    }
-
-    const existingUser = await db.users
-      .where("email")
-      .equals(adminEmail)
-      .first();
-
-    if (existingUser) {
-      alert("User with this email already exists");
-      return;
-    }
-
-    await db.users.add({
-      name: adminName,
-      email: adminEmail,
-      password: adminPassword,
-      role: "ACCOUNT_ADMIN",
-      size: 0,
-    });
-
-    alert("Account Admin created successfully!");
-
-    setAdminName("");
-    setAdminEmail("");
-    setAdminPassword("");
-    setConfirmPassword("");
-
-    setAdminOpen(false);
-  };
-
-  const handleLogout = () => {
-    logout();
-    router.push("/login");
-  };
-
-
-  const todayFormatted = new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date());
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12 ? "GOOD MORNING" : hour < 17 ? "GOOD AFTERNOON" : "GOOD EVENING";
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex text-slate-800">
+    <FirmaLayout activeNav="Dashboard">
+      {/* ========================================================================= */}
+      {/* HERO / WELCOME BANNER                                                     */}
+      {/* ========================================================================= */}
+      <div className="rounded-3xl bg-[#EDEAE4] p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden shadow-2xs mt-4">
+        {/* Left Content */}
+        <div className="z-10 max-w-md">
+          <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+            {greeting}
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 tracking-tight flex items-center gap-2">
+            Welcome back, {firstName}! <span>👋</span>
+          </h1>
+          <p className="text-xs text-slate-600 mt-1">
+            Here&apos;s what&apos;s happening with your business today.
+          </p>
 
+          {/* Create New ▾ Pill Button with Dropdown */}
+          <div className="relative mt-5 inline-block">
+            <button
+              type="button"
+              onClick={() => setCreateNewOpen(!createNewOpen)}
+              className="flex items-center gap-2 rounded-xl bg-[#182E25] hover:bg-[#12231B] text-white px-4 py-2.5 text-xs font-semibold shadow-xs transition cursor-pointer"
+            >
+              <span>Create New</span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-300" />
+            </button>
 
-      <aside className="w-64 border-r border-slate-200/80 bg-white flex flex-col justify-between shrink-0 hidden lg:flex">
-        <div>
-          {/* Logo */}
-          <div className="h-16 flex items-center gap-2.5 px-6 border-b border-slate-100">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white shadow-xs">
-              <Building2 className="h-4 w-4 text-blue-400" />
-            </div>
-            <div>
-              <span className="text-sm font-extrabold tracking-tight text-slate-900 block leading-tight">
-                FIRMA
-              </span>
-              <span className="text-[10px] font-medium text-slate-400 block leading-none">
-                Build Smarter. Together.
-              </span>
-            </div>
+            {createNewOpen && (
+              <div className="absolute left-0 mt-2 w-48 rounded-xl border border-slate-100 bg-white py-1.5 shadow-xl z-30 animate-in fade-in slide-in-from-top-2 duration-150">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateNewOpen(false);
+                    router.push("/team");
+                  }}
+                  className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  <UserPlus className="h-3.5 w-3.5 text-slate-500" />
+                  Add Team Member
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateNewOpen(false);
+                    router.push("/projects");
+                  }}
+                  className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  <FolderPlus className="h-3.5 w-3.5 text-slate-500" />
+                  New Project
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateNewOpen(false);
+                    router.push("/quotations");
+                  }}
+                  className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  <FileText className="h-3.5 w-3.5 text-slate-500" />
+                  New Quotation
+                </button>
+              </div>
+            )}
           </div>
-
-          {/* Navigation Links */}
-          <nav className="p-4 space-y-1">
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-600 transition"
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              <span>Dashboard</span>
-            </button>
-
-          
-
-            <button 
-             onClick={() => router.push("/company")}
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
-            >
-              <CreditCard className="h-4 w-4 text-slate-400" />
-              <span>Company</span>
-            </button>
-
-
-
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
-            >
-              <CreditCard className="h-4 w-4 text-slate-400" />
-              <span>Subscription</span>
-            </button>
-
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
-            >
-              <Users className="h-4 w-4 text-slate-400" />
-              <span>Team &amp; Admins</span>
-            </button>
-
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
-            >
-              <FolderKanban className="h-4 w-4 text-slate-400" />
-              <span>Projects</span>
-            </button>
-
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
-            >
-              <BarChart3 className="h-4 w-4 text-slate-400" />
-              <span>Reports</span>
-            </button>
-
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
-            >
-              <Settings className="h-4 w-4 text-slate-400" />
-              <span>Settings</span>
-            </button>
-          </nav>
         </div>
 
-        {/* Bottom Sidebar Help */}
-        <div className="p-4 border-t border-slate-100">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50 transition"
-          >
-            <HelpCircle className="h-4 w-4 text-slate-400" />
-            <span>Help &amp; Support</span>
-          </button>
+        {/* Right Architectural Visual & Branding */}
+        <div className="flex items-center gap-6 z-10 self-end md:self-center">
+          <div className="relative w-48 sm:w-60 h-36 sm:h-40 rounded-2xl overflow-hidden shadow-md">
+            <Image
+              src="/images/architecture_hero.jpg"
+              alt="Modern Architecture FIRMA"
+              fill
+              className="object-cover"
+              priority
+            />
+          </div>
+
+          <div className="hidden sm:block text-left">
+            <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
+              FIRMA
+            </h3>
+            <p className="text-xs font-semibold text-slate-700 leading-tight mt-0.5">
+              Build Smarter.
+              <br />
+              Together.
+            </p>
+            <p className="text-[11px] text-slate-500 mt-3 leading-snug max-w-[120px]">
+              Turning ambition into real progress.
+            </p>
+          </div>
         </div>
-      </aside>
+      </div>
 
-      {/* 2. Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-
-        {/* Top Header */}
-        <header className="h-16 border-b border-slate-200/80 bg-white flex items-center justify-between px-6 sticky top-0 z-20">
-          {/* Mobile brand indicator */}
-          <div className="flex items-center gap-2 lg:hidden">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-900 text-white">
-              <Building2 className="h-4 w-4 text-blue-400" />
+      {/* ========================================================================= */}
+      {/* SIX STAT / KPI METRIC CARDS                                               */}
+      {/* ========================================================================= */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        {/* Card 1: Team Members */}
+        <div
+          onClick={() => router.push("/team")}
+          className="rounded-2xl bg-white p-4 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:shadow-xs transition cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E6F4EA] text-[#2E7D32]">
+              <Users className="h-4 w-4" />
             </div>
-            <span className="text-sm font-extrabold text-slate-900">FIRMA</span>
+            <span className="text-[11px] font-medium text-slate-500">
+              Team Members
+            </span>
           </div>
-
-          <div className="hidden lg:block"></div>
-
-          {/* Right Header: Notification & User Pill */}
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              className="relative rounded-full p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition"
-            >
-              <Bell className="h-4 w-4" />
-              <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-red-500" />
-            </button>
-
-            {/* Profile Dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-2.5 rounded-full border border-slate-200/80 bg-white py-1 pl-1 pr-3 shadow-2xs hover:border-slate-300 transition"
-              >
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">
-                  {userInitial}
-                </div>
-                <div className="text-left hidden sm:block">
-                  <p className="text-xs font-bold text-slate-800 leading-tight">
-                    {user.name}
-                  </p>
-                  <p className="text-[10px] font-medium text-slate-400 leading-none capitalize">
-                    {user.role?.toLowerCase() || "owner"}
-                  </p>
-                </div>
-                <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-              </button>
-
-              {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-100 bg-white py-1.5 shadow-lg z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                  <div className="px-3.5 py-2 border-b border-slate-100 sm:hidden">
-                    <p className="text-xs font-semibold text-slate-800">{user.name}</p>
-                    <p className="text-[10px] text-slate-400 capitalize">{user.role?.toLowerCase()}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50/60 transition"
-                  >
-                    <LogOut className="h-3.5 w-3.5" />
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
+          <div className="mt-3">
+            <p className="text-2xl font-extrabold text-slate-900 leading-tight">
+              12
+            </p>
+            <p className="text-[10px] font-medium text-emerald-600 mt-1 flex items-center gap-0.5">
+              <span>↗</span> +2 this month
+            </p>
           </div>
-        </header>
+        </div>
 
-        {/* Page Content Body */}
-        <main className="flex-1 p-6 sm:p-8 max-w-7xl mx-auto w-full space-y-6">
-
-          {/* Welcome Banner & Date */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-1.5">
-                Welcome back, {firstName}! 👋
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Here&apos;s an overview of your company.
-              </p>
+        {/* Card 2: Active Projects */}
+        <div
+          onClick={() => router.push("/projects")}
+          className="rounded-2xl bg-white p-4 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:shadow-xs transition cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FEF7E2] text-[#C98A19]">
+              <FolderKanban className="h-4 w-4" />
             </div>
-
-            <div className="flex items-center gap-2 self-start sm:self-auto rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-2xs">
-              <Calendar className="h-3.5 w-3.5 text-slate-400" />
-              <span>{todayFormatted}</span>
-            </div>
+            <span className="text-[11px] font-medium text-slate-500">
+              Active Projects
+            </span>
           </div>
+          <div className="mt-3">
+            <p className="text-2xl font-extrabold text-slate-900 leading-tight">
+              8
+            </p>
+            <p className="text-[10px] font-medium text-emerald-600 mt-1 flex items-center gap-0.5">
+              <span>↗</span> +2 this month
+            </p>
+          </div>
+        </div>
 
-          {/* 4 Stats KPI Cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Card 3: Open Enquiries */}
+        <div
+          onClick={() => router.push("/quotations")}
+          className="rounded-2xl bg-white p-4 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:shadow-xs transition cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FCE8E6] text-[#D84A38]">
+              <FileText className="h-4 w-4" />
+            </div>
+            <span className="text-[11px] font-medium text-slate-500">
+              Open Enquiries
+            </span>
+          </div>
+          <div className="mt-3">
+            <p className="text-2xl font-extrabold text-slate-900 leading-tight">
+              14
+            </p>
+            <p className="text-[10px] font-medium text-rose-500 mt-1 flex items-center gap-0.5">
+              <span>↗</span> +6 this week
+            </p>
+          </div>
+        </div>
 
-            {/* Card 1: Company */}
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs flex flex-col justify-between">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-xs font-semibold text-slate-500">Company</span>
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                  <Building className="h-3.5 w-3.5" />
-                </div>
+        {/* Card 4: Pending Quotations */}
+        <div
+          onClick={() => router.push("/quotations")}
+          className="rounded-2xl bg-white p-4 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:shadow-xs transition cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFF0E5] text-[#D46E2A]">
+              <FileCheck2 className="h-4 w-4" />
+            </div>
+            <span className="text-[11px] font-medium text-slate-500">
+              Pending Quotations
+            </span>
+          </div>
+          <div className="mt-3">
+            <p className="text-2xl font-extrabold text-slate-900 leading-tight">
+              6
+            </p>
+            <p className="text-[10px] font-medium text-emerald-600 mt-1 flex items-center gap-0.5">
+              <span>↗</span> +2 this week
+            </p>
+          </div>
+        </div>
+
+        {/* Card 5: Active Jobs */}
+        <div
+          onClick={() => router.push("/jobs")}
+          className="rounded-2xl bg-white p-4 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:shadow-xs transition cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E8F5E9] text-[#2E7D32]">
+              <Calendar className="h-4 w-4" />
+            </div>
+            <span className="text-[11px] font-medium text-slate-500">
+              Active Jobs
+            </span>
+          </div>
+          <div className="mt-3">
+            <p className="text-2xl font-extrabold text-slate-900 leading-tight">
+              10
+            </p>
+            <p className="text-[10px] font-medium text-emerald-600 mt-1 flex items-center gap-0.5">
+              <span>↗</span> +4 this month
+            </p>
+          </div>
+        </div>
+
+        {/* Card 6: Pending Payments */}
+        <div
+          onClick={() => router.push("/subscription")}
+          className="rounded-2xl bg-white p-4 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:shadow-xs transition cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FDEFE7] text-[#D35B20] font-bold text-sm">
+              ₹
+            </div>
+            <span className="text-[11px] font-medium text-slate-500">
+              Pending Payments
+            </span>
+          </div>
+          <div className="mt-3">
+            <p className="text-xl font-extrabold text-slate-900 leading-tight">
+              ₹2,48,000
+            </p>
+            <p className="text-[10px] font-medium text-rose-500 mt-1 flex items-center gap-0.5">
+              <span>↗</span> +12% from last month
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MIDDLE ROW: CHARTS & FEATURE PROMO CARD                                   */}
+      {/* ========================================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* Project Progress (Stacked Bar Chart) */}
+        <div className="lg:col-span-5 rounded-2xl bg-white p-5 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Project Progress
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Track the status of your projects
+                </p>
               </div>
-              <p className="mt-3 text-sm font-bold text-slate-900 truncate">
-                {companyName}
-              </p>
-            </div>
-
-            {/* Card 2: Plan */}
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs flex flex-col justify-between">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-xs font-semibold text-slate-500">Plan</span>
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                  <CreditCard className="h-3.5 w-3.5" />
-                </div>
-              </div>
-              <div className="mt-3 flex items-center">
-                <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700">
-                  {currentPlan}
+              <div className="flex items-center gap-2.5 flex-wrap text-[10px] text-slate-500">
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-[#418654]" />
+                  Completed
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-[#EAB340]" />
+                  In Progress
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-[#E06A3B]" />
+                  At Risk
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-[#C84334]" />
+                  Delayed
                 </span>
               </div>
             </div>
 
-            {/* Card 3: Team Members */}
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs flex flex-col justify-between">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-xs font-semibold text-slate-500">Team Members</span>
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
-                  <Users className="h-3.5 w-3.5" />
+            <div className="mt-6">
+              <div className="h-44 w-full flex items-end">
+                <div className="flex flex-col justify-between h-36 text-[9px] text-slate-400 pr-2 select-none">
+                  <span>20</span>
+                  <span>15</span>
+                  <span>10</span>
+                  <span>5</span>
+                  <span>0</span>
+                </div>
+
+                <div className="flex-1 h-36 relative flex items-end justify-between px-2 sm:px-4 border-b border-slate-200">
+                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-40">
+                    <div className="border-b border-dashed border-slate-200 w-full" />
+                    <div className="border-b border-dashed border-slate-200 w-full" />
+                    <div className="border-b border-dashed border-slate-200 w-full" />
+                    <div className="border-b border-dashed border-slate-200 w-full" />
+                    <div className="w-full" />
+                  </div>
+
+                  {/* Jan */}
+                  <div className="flex flex-col items-center gap-1 z-10 w-6 sm:w-8">
+                    <div className="w-full flex flex-col-reverse rounded-t-sm overflow-hidden shadow-2xs">
+                      <div className="bg-[#418654] w-full" style={{ height: "26px" }} />
+                      <div className="bg-[#EAB340] w-full" style={{ height: "20px" }} />
+                      <div className="bg-[#E06A3B] w-full" style={{ height: "18px" }} />
+                    </div>
+                    <span className="text-[10px] text-slate-400">Jan</span>
+                  </div>
+
+                  {/* Feb */}
+                  <div className="flex flex-col items-center gap-1 z-10 w-6 sm:w-8">
+                    <div className="w-full flex flex-col-reverse rounded-t-sm overflow-hidden shadow-2xs">
+                      <div className="bg-[#418654] w-full" style={{ height: "32px" }} />
+                      <div className="bg-[#EAB340] w-full" style={{ height: "24px" }} />
+                      <div className="bg-[#E06A3B] w-full" style={{ height: "16px" }} />
+                    </div>
+                    <span className="text-[10px] text-slate-400">Feb</span>
+                  </div>
+
+                  {/* Mar */}
+                  <div className="flex flex-col items-center gap-1 z-10 w-6 sm:w-8">
+                    <div className="w-full flex flex-col-reverse rounded-t-sm overflow-hidden shadow-2xs">
+                      <div className="bg-[#418654] w-full" style={{ height: "48px" }} />
+                      <div className="bg-[#EAB340] w-full" style={{ height: "26px" }} />
+                      <div className="bg-[#E06A3B] w-full" style={{ height: "16px" }} />
+                      <div className="bg-[#C84334] w-full" style={{ height: "10px" }} />
+                    </div>
+                    <span className="text-[10px] text-slate-400">Mar</span>
+                  </div>
+
+                  {/* Apr */}
+                  <div className="flex flex-col items-center gap-1 z-10 w-6 sm:w-8">
+                    <div className="w-full flex flex-col-reverse rounded-t-sm overflow-hidden shadow-2xs">
+                      <div className="bg-[#418654] w-full" style={{ height: "40px" }} />
+                      <div className="bg-[#EAB340] w-full" style={{ height: "24px" }} />
+                      <div className="bg-[#E06A3B] w-full" style={{ height: "16px" }} />
+                    </div>
+                    <span className="text-[10px] text-slate-400">Apr</span>
+                  </div>
+
+                  {/* May */}
+                  <div className="flex flex-col items-center gap-1 z-10 w-6 sm:w-8">
+                    <div className="w-full flex flex-col-reverse rounded-t-sm overflow-hidden shadow-2xs">
+                      <div className="bg-[#418654] w-full" style={{ height: "30px" }} />
+                      <div className="bg-[#EAB340] w-full" style={{ height: "24px" }} />
+                      <div className="bg-[#E06A3B] w-full" style={{ height: "18px" }} />
+                    </div>
+                    <span className="text-[10px] text-slate-400">May</span>
+                  </div>
+
+                  {/* Jun */}
+                  <div className="flex flex-col items-center gap-1 z-10 w-6 sm:w-8">
+                    <div className="w-full flex flex-col-reverse rounded-t-sm overflow-hidden shadow-2xs">
+                      <div className="bg-[#418654] w-full" style={{ height: "54px" }} />
+                      <div className="bg-[#EAB340] w-full" style={{ height: "28px" }} />
+                      <div className="bg-[#E06A3B] w-full" style={{ height: "18px" }} />
+                      <div className="bg-[#C84334] w-full" style={{ height: "14px" }} />
+                    </div>
+                    <span className="text-[10px] text-slate-400">Jun</span>
+                  </div>
                 </div>
               </div>
-              <p className="mt-3 text-2xl font-bold text-slate-900">
-                0
-              </p>
             </div>
-
-            {/* Card 4: Active Projects */}
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs flex flex-col justify-between">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-xs font-semibold text-slate-500">Active Projects</span>
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-                  <FolderKanban className="h-3.5 w-3.5" />
-                </div>
-              </div>
-              <p className="mt-3 text-2xl font-bold text-slate-900">
-                0
-              </p>
-            </div>
-
-          </div>
-
-          {/* Main 2-Column Split Layout */}
-          <div className="grid gap-6 lg:grid-cols-12">
-
-            {/* Left Column (8 cols): Quick Actions & Getting Started */}
-            <div className="lg:col-span-8 space-y-6">
-
-              {/* Quick Actions Card */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
-                <h2 className="text-sm font-bold text-slate-900">
-                  Quick Actions
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Get started with the key features.
-                </p>
-
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-
-                  {/* Action 1: Add Admin (Special Red/Accent focus outline as in screenshot) */}
-                  <button
-                    type="button"
-                    onClick={() => setAdminOpen(true)}
-                    className="flex flex-col items-center justify-center rounded-xl border border-red-300 bg-red-50/20 p-4 text-center transition hover:bg-red-50/40 cursor-pointer shadow-2xs group"
-                  >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 group-hover:scale-105 transition">
-                      <UserPlus className="h-4 w-4" />
-                    </div>
-                    <span className="mt-2 text-xs font-bold text-slate-900">
-                      Add Admin
-                    </span>
-                    <span className="text-[10px] text-slate-500 mt-0.5">
-                      Create your first account admin
-                    </span>
-                  </button>
-
-                  {/* Action 2: Invite Team */}
-                  <button
-                    type="button"
-                    className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 text-center transition hover:bg-slate-50 cursor-pointer shadow-2xs group"
-                  >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 group-hover:scale-105 transition">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <span className="mt-2 text-xs font-bold text-slate-900">
-                      Invite Team
-                    </span>
-                    <span className="text-[10px] text-slate-500 mt-0.5">
-                      Add team members
-                    </span>
-                  </button>
-
-                  {/* Action 3: Create Project */}
-                  <button
-                    type="button"
-                    className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 text-center transition hover:bg-slate-50 cursor-pointer shadow-2xs group"
-                  >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 group-hover:scale-105 transition">
-                      <FolderPlus className="h-4 w-4" />
-                    </div>
-                    <span className="mt-2 text-xs font-bold text-slate-900">
-                      Create Project
-                    </span>
-                    <span className="text-[10px] text-slate-500 mt-0.5">
-                      Start a new project
-                    </span>
-                  </button>
-
-                  {/* Action 4: View Reports */}
-                  <button
-                    type="button"
-                    className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-4 text-center transition hover:bg-slate-50 cursor-pointer shadow-2xs group"
-                  >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600 group-hover:scale-105 transition">
-                      <FileText className="h-4 w-4" />
-                    </div>
-                    <span className="mt-2 text-xs font-bold text-slate-900">
-                      View Reports
-                    </span>
-                    <span className="text-[10px] text-slate-500 mt-0.5">
-                      Track your business
-                    </span>
-                  </button>
-
-                </div>
-              </div>
-
-              {/* Getting Started Checklist Card */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
-                <h2 className="text-sm font-bold text-slate-900">
-                  Getting Started
-                </h2>
-
-                <div className="mt-4 space-y-3.5">
-                  {/* Step 1: Completed */}
-                  <div className="flex items-center gap-3 text-xs text-slate-700">
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shrink-0">
-                      <Check className="h-3 w-3 stroke-[2.5]" />
-                    </div>
-                    <span className="font-medium">Company setup completed</span>
-                  </div>
-
-                  {/* Step 2: Completed */}
-                  <div className="flex items-center gap-3 text-xs text-slate-700">
-                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shrink-0">
-                      <Check className="h-3 w-3 stroke-[2.5]" />
-                    </div>
-                    <span className="font-medium">Subscription activated</span>
-                  </div>
-
-                  {/* Step 3: Pending with Add Admin button */}
-                  <div className="flex items-center justify-between gap-3 text-xs text-slate-700">
-                    <div className="flex items-center gap-3">
-                      <div className="h-5 w-5 rounded-full border border-slate-300 bg-white shrink-0" />
-                      <span className="font-medium">Add your first account admin</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAdminOpen(true)}
-                      className="rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 transition cursor-pointer"
-                    >
-                      Add Admin
-                    </button>
-                  </div>
-
-                  {/* Step 4: Pending */}
-                  <div className="flex items-center gap-3 text-xs text-slate-700">
-                    <div className="h-5 w-5 rounded-full border border-slate-300 bg-white shrink-0" />
-                    <span className="font-medium text-slate-600">Invite your team members</span>
-                  </div>
-
-                  {/* Step 5: Pending */}
-                  <div className="flex items-center gap-3 text-xs text-slate-700">
-                    <div className="h-5 w-5 rounded-full border border-slate-300 bg-white shrink-0" />
-                    <span className="font-medium text-slate-600">Create your first project</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Right Column (4 cols): Your Plan & Need Help */}
-            <div className="lg:col-span-4 space-y-6">
-
-              {/* Your Plan Card */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Your Plan
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => router.push("/onboarding/plan")}
-                    className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
-                  >
-                    Manage Plan
-                  </button>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      {currentPlan} Plan
-                    </h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      Valid till 26 May 2026
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                      Active
-                    </span>
-                    <p className="text-xs font-bold text-slate-900 mt-1">
-                      ₹4,999 / year
-                    </p>
-                  </div>
-                </div>
-
-                <div className="my-4 border-t border-slate-100" />
-
-                <div className="space-y-2.5">
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
-                    <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 stroke-[2.5]" />
-                    <span>Up to 50 team members</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
-                    <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 stroke-[2.5]" />
-                    <span>Project management</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
-                    <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 stroke-[2.5]" />
-                    <span>Basic reporting</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
-                    <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 stroke-[2.5]" />
-                    <span>Email support</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Need Help? Card */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-2xs flex flex-col justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Need Help?
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Our team is here to help you.
-                  </p>
-                </div>
-
-                {/* Friendly Support Avatar Graphic */}
-                <div className="my-4 flex items-center justify-center">
-                  <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-blue-50">
-                    <svg viewBox="0 0 100 100" className="h-16 w-16" fill="none">
-                      <circle cx="50" cy="40" r="18" fill="#FDBA74" />
-                      {/* Hair */}
-                      <path d="M32 38C32 26 40 20 50 20C60 20 68 26 68 38C68 39 67 42 66 43C64 36 60 30 50 30C40 30 36 36 34 43C33 42 32 39 32 38Z" fill="#1E293B" />
-                      {/* Body */}
-                      <path d="M28 85C28 65 38 60 50 60C62 60 72 65 72 85Z" fill="#3B82F6" />
-                      {/* Headset */}
-                      <path d="M30 40C30 25 70 25 70 40" stroke="#0F172A" strokeWidth="3" strokeLinecap="round" />
-                      <circle cx="31" cy="40" r="4" fill="#0F172A" />
-                      <circle cx="69" cy="40" r="4" fill="#0F172A" />
-                      <path d="M31 42L40 48" stroke="#0F172A" strokeWidth="2" />
-                    </svg>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
-                >
-                  <HelpCircle className="h-3.5 w-3.5 text-slate-400" />
-                  <span>Contact Support</span>
-                </button>
-              </div>
-
-            </div>
-
-          </div>
-
-        </main>
-      </div>
-
-      {/* 3. Screen 7: Add Account Admin Dialog Modal */}
-      {adminOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150 relative">
-
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={() => setAdminOpen(false)}
-              className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition cursor-pointer"
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            {/* Modal Title */}
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Add Account Admin
-              </h2>
-              <p className="mt-1 text-xs text-slate-500">
-                Create an account admin to help you manage your organization.
-              </p>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleCreateAdmin} className="mt-5 space-y-4">
-
-              {/* Row 1: Full Name & Email */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-0.5">
-                    Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={adminName}
-                    onChange={(e) => setAdminName(e.target.value)}
-                    placeholder="Pooja Verma"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-0.5">
-                    Email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={adminEmail}
-                    onChange={(e) => setAdminEmail(e.target.value)}
-                    placeholder="pooja@abcsolutions.com"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                  />
-                </div>
-              </div>
-
-              {/* Row 2: Password & Confirm Password */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-0.5">
-                    Password <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 pr-9 text-xs text-slate-800 placeholder-slate-400 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-3.5 w-3.5" />
-                      ) : (
-                        <Eye className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-0.5">
-                    Confirm Password <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showConfirmPassword ? "text" : "password"}
-                      required
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 pr-9 text-xs text-slate-800 placeholder-slate-400 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      {showConfirmPassword ? (
-                        <EyeOff className="h-3.5 w-3.5" />
-                      ) : (
-                        <Eye className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Role Info Box */}
-              <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/40 p-3.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100/70 text-blue-700 shrink-0">
-                  <ShieldCheck className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-800">
-                    Role: Account Admin
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5 leading-normal">
-                    Can manage users, teams, projects and day-to-day operations.
-                  </p>
-                </div>
-              </div>
-
-              {/* Footer Buttons */}
-              <div className="mt-6 flex items-center justify-end gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setAdminOpen(false)}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 active:scale-[0.99] transition cursor-pointer"
-                >
-                  Create Admin
-                </button>
-              </div>
-
-            </form>
-
           </div>
         </div>
-      )}
 
-    </div>
+        {/* Team Distribution (Donut Chart & Legend) */}
+        <div className="lg:col-span-4 rounded-2xl bg-white p-5 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">
+              Team Distribution
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Total 12 team members
+            </p>
+
+            <div className="mt-4 flex items-center justify-between gap-4">
+              <div className="relative flex items-center justify-center shrink-0">
+                <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="38" stroke="#F1F5F2" strokeWidth="15" fill="transparent" />
+                  <circle cx="50" cy="50" r="38" stroke="#183D2D" strokeWidth="15" strokeDasharray="59.7 179" strokeDashoffset="0" fill="transparent" />
+                  <circle cx="50" cy="50" r="38" stroke="#4E8F67" strokeWidth="15" strokeDasharray="79.5 159" strokeDashoffset="-59.7" fill="transparent" />
+                  <circle cx="50" cy="50" r="38" stroke="#F3C044" strokeWidth="15" strokeDasharray="39.8 199" strokeDashoffset="-139.2" fill="transparent" />
+                  <circle cx="50" cy="50" r="38" stroke="#7FA88B" strokeWidth="15" strokeDasharray="39.8 199" strokeDashoffset="-179" fill="transparent" />
+                  <circle cx="50" cy="50" r="38" stroke="#CAD2CC" strokeWidth="15" strokeDasharray="19.9 218" strokeDashoffset="-218.8" fill="transparent" />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-xl font-black text-slate-900 leading-none">12</span>
+                  <span className="text-[9px] font-medium text-slate-400 mt-0.5">Members</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-xs flex-1">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="flex items-center gap-1.5 text-slate-600">
+                    <span className="h-2 w-2 rounded-full bg-[#183D2D]" />
+                    Sales Manager
+                  </span>
+                  <span className="font-bold text-slate-900">3</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="flex items-center gap-1.5 text-slate-600">
+                    <span className="h-2 w-2 rounded-full bg-[#7FA88B]" />
+                    Project Manager
+                  </span>
+                  <span className="font-bold text-slate-900">2</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="flex items-center gap-1.5 text-slate-600">
+                    <span className="h-2 w-2 rounded-full bg-[#4E8F67]" />
+                    Field Worker
+                  </span>
+                  <span className="font-bold text-slate-900">4</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="flex items-center gap-1.5 text-slate-600">
+                    <span className="h-2 w-2 rounded-full bg-[#F3C044]" />
+                    Finance Manager
+                  </span>
+                  <span className="font-bold text-slate-900">2</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="flex items-center gap-1.5 text-slate-600">
+                    <span className="h-2 w-2 rounded-full bg-[#CAD2CC]" />
+                    Account Admin
+                  </span>
+                  <span className="font-bold text-slate-900">1</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Feature Promo Card ("Better teams. Brighter tomorrows.") */}
+        <div className="lg:col-span-3 rounded-2xl bg-[#182F24] p-5 text-white relative overflow-hidden flex flex-col justify-between min-h-[200px] shadow-sm group">
+          <div className="absolute inset-0 pointer-events-none opacity-45">
+            <Image
+              src="/images/tropical_leaf.jpg"
+              alt="Tropical Monstera Leaf"
+              fill
+              className="object-cover"
+            />
+          </div>
+
+          <div className="relative z-10">
+            <h3 className="text-base font-bold text-white leading-snug tracking-tight">
+              Better
+              <br />
+              teams.
+              <br />
+              Brighter
+              <br />
+              tomorrows.
+            </h3>
+          </div>
+
+          <div className="relative z-10 flex justify-end">
+            <button
+              type="button"
+              onClick={() => router.push("/team")}
+              className="w-8 h-8 rounded-full bg-white text-[#182F24] flex items-center justify-center hover:scale-110 transition shadow-md cursor-pointer"
+            >
+              <ArrowRight className="h-4 w-4 stroke-[2.5]" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* BOTTOM ROW: RECENT ACTIVITIES, UPCOMING TASKS, PLAN & SUBSCRIPTION         */}
+      {/* ========================================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Recent Activities */}
+        <div className="rounded-2xl bg-white p-5 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-900">
+                Recent Activities
+              </h2>
+              <button
+                type="button"
+                onClick={() => router.push("/reports")}
+                className="text-[11px] font-medium text-slate-500 hover:text-slate-900 transition cursor-pointer"
+              >
+                View All
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#E6F4EA] text-[#2E7D32] shrink-0">
+                    <UserPlus className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900 leading-tight">
+                      Pooja Verma
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      New account admin added
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] text-slate-400 shrink-0">
+                  Just now
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FEF7E2] text-[#C98A19] shrink-0">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-900 leading-tight">
+                      New project &quot;Riverside Apartments&quot; created
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      by Amit Kumar
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] text-slate-400 shrink-0">
+                  2h ago
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#F4ECFF] text-[#8244E3] shrink-0">
+                    <FileCheck2 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-900 leading-tight">
+                      Quotation #Q-1023 sent
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      to GreenBuild Ltd.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] text-slate-400 shrink-0">
+                  5h ago
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#E8F5E9] text-[#2E7D32] shrink-0">
+                    <CreditCard className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-900 leading-tight">
+                      Payment of ₹75,000 received
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      from Horizon Infra
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] text-slate-400 shrink-0">
+                  1d ago
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#E6F3FB] text-[#257AB9] shrink-0">
+                    <Briefcase className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-900 leading-tight">
+                      Ravi Patel marked a job as completed
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      Site Visit – Sector 62
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] text-slate-400 shrink-0">
+                  1d ago
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Upcoming Tasks */}
+        <div className="rounded-2xl bg-white p-5 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-900">
+                Upcoming Tasks
+              </h2>
+              <button
+                type="button"
+                onClick={() => router.push("/jobs")}
+                className="text-[11px] font-medium text-slate-500 hover:text-slate-900 transition cursor-pointer"
+              >
+                View All
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {tasks.map((task) => (
+                <div
+                  key={task.id}
+                  onClick={() => toggleTask(task.id)}
+                  className="flex items-center justify-between gap-2 p-1.5 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <button
+                      type="button"
+                      className="text-slate-400 hover:text-slate-600 shrink-0 cursor-pointer"
+                    >
+                      {task.completed ? (
+                        <CheckSquare className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                    </button>
+                    <span
+                      className={`text-xs text-slate-700 truncate ${
+                        task.completed
+                          ? "line-through text-slate-400"
+                          : "font-medium"
+                      }`}
+                    >
+                      {task.title}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] text-slate-400">
+                      {task.due}
+                    </span>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${task.priorityColor}`}
+                    >
+                      {task.priority}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Plan & Subscription Card */}
+        <div className="rounded-2xl bg-white p-5 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute right-0 bottom-0 top-12 w-28 pointer-events-none opacity-80">
+            <Image
+              src="/images/subscription_branch.jpg"
+              alt="Botanical branch"
+              fill
+              className="object-contain object-right-bottom mix-blend-multiply"
+            />
+          </div>
+
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-900">
+                Plan &amp; Subscription
+              </h2>
+              <button
+                type="button"
+                onClick={() => router.push("/subscription")}
+                className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Manage Plan
+              </button>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-900">
+                  {currentPlan} Plan
+                </span>
+                <span className="rounded-full bg-[#E6F4EA] px-2 py-0.5 text-[10px] font-bold text-[#2E7D32]">
+                  Active
+                </span>
+              </div>
+
+              <p className="mt-2 text-xl font-black text-slate-900">
+                ₹4,999 / year
+              </p>
+              <p className="text-[10px] font-medium text-slate-400 mt-0.5">
+                Valid till 26 May 2026
+              </p>
+
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <Check className="h-3.5 w-3.5 text-[#2E7D32] shrink-0 stroke-[2.5]" />
+                  <span className="text-[11px]">Up to 50 team members</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <Check className="h-3.5 w-3.5 text-[#2E7D32] shrink-0 stroke-[2.5]" />
+                  <span className="text-[11px]">Project management</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <Check className="h-3.5 w-3.5 text-[#2E7D32] shrink-0 stroke-[2.5]" />
+                  <span className="text-[11px]">Basic reporting</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <Check className="h-3.5 w-3.5 text-[#2E7D32] shrink-0 stroke-[2.5]" />
+                  <span className="text-[11px]">Email support</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </FirmaLayout>
   );
 }
