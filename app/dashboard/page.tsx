@@ -162,13 +162,18 @@ export default function DashboardPage() {
               <span>Dashboard</span>
             </button>
 
-            <button
+          
+
+            <button 
+             onClick={() => router.push("/company")}
               type="button"
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
             >
-              <Building className="h-4 w-4 text-slate-400" />
+              <CreditCard className="h-4 w-4 text-slate-400" />
               <span>Company</span>
             </button>
+
+
 
             <button
               type="button"
