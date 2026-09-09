@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import { useAuthStore } from "@/store/authStore";
 import { OnboardingHeader } from "@/components/onboarding/OnboardingHeader";
 import { OnboardingStepper } from "@/components/onboarding/OnboardingStepper";
-import { ArrowLeft, ArrowRight, ChevronDown } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronDown, Building2 } from "lucide-react";
 
 const companySchema = z.object({
   companyName: z
@@ -47,6 +47,12 @@ const companySchema = z.object({
 
 type CompanyFormData = z.infer<typeof companySchema>;
 
+// Reusable input class
+const inputCls = (hasError?: boolean) =>
+  `w-full rounded-xl border bg-[#F9FAFB] px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-400 shadow-xs outline-none transition focus:border-[#182E25] focus:ring-2 focus:ring-[#182E25]/10 focus:bg-white ${
+    hasError ? "border-red-400" : "border-slate-200"
+  }`;
+
 export default function CompanyPage() {
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -65,6 +71,7 @@ export default function CompanyPage() {
     },
   });
 
+  // ── ALL ORIGINAL LOGIC PRESERVED ──────────────────────────────────────
   const onSubmit = async (data: CompanyFormData) => {
     if (!currentUser?.id) {
       alert("User not found. Please login again.");
@@ -82,21 +89,23 @@ export default function CompanyPage() {
 
     router.push("/onboarding/billing");
   };
+  // ───────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
-      {/* Header */}
+    <div className="min-h-screen bg-[#F5F6F5] flex flex-col font-sans antialiased">
       <OnboardingHeader />
 
-      {/* Main Container */}
       <main className="flex-1 pb-16 pt-4">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
-          {/* Stepper (Step 2: Company) */}
           <OnboardingStepper currentStep={2} />
 
           {/* Heading */}
           <div className="my-6">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#E5EDE7] px-3.5 py-1.5 text-xs font-semibold text-[#182E25] mb-3">
+              <Building2 className="h-3.5 w-3.5" />
+              Step 2 of 4
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
               Tell us about your company
             </h1>
             <p className="mt-1.5 text-sm text-slate-500">
@@ -105,7 +114,7 @@ export default function CompanyPage() {
           </div>
 
           {/* Form Card */}
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-xs">
+          <div className="rounded-2xl border border-slate-200/60 bg-white p-6 sm:p-8 shadow-xs">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {/* Row 1: Company Name & Website */}
               <div className="grid gap-5 sm:grid-cols-2">
@@ -117,9 +126,7 @@ export default function CompanyPage() {
                     type="text"
                     placeholder="ABC Solutions Pvt. Ltd."
                     {...register("companyName")}
-                    className={`w-full rounded-lg border bg-white px-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 ${
-                      errors.companyName ? "border-red-400" : "border-slate-200"
-                    }`}
+                    className={inputCls(!!errors.companyName)}
                   />
                   {errors.companyName && (
                     <p className="text-[11px] text-red-500 font-medium">
@@ -136,7 +143,7 @@ export default function CompanyPage() {
                     type="text"
                     placeholder="https://www.abcsolutions.com"
                     {...register("website")}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                    className={inputCls()}
                   />
                 </div>
               </div>
@@ -151,9 +158,7 @@ export default function CompanyPage() {
                     <select
                       {...register("industry")}
                       defaultValue="Construction"
-                      className={`w-full appearance-none rounded-lg border bg-white px-3.5 py-2 text-xs text-slate-800 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 ${
-                        errors.industry ? "border-red-400" : "border-slate-200"
-                      }`}
+                      className={`appearance-none ${inputCls(!!errors.industry)}`}
                     >
                       <option value="">Select industry</option>
                       <option value="Construction">Construction</option>
@@ -181,9 +186,7 @@ export default function CompanyPage() {
                   <div className="relative">
                     <select
                       {...register("companySize")}
-                      className={`w-full appearance-none rounded-lg border bg-white px-3.5 py-2 text-xs text-slate-800 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 ${
-                        errors.companySize ? "border-red-400" : "border-slate-200"
-                      }`}
+                      className={`appearance-none ${inputCls(!!errors.companySize)}`}
                     >
                       <option value="">Select company size</option>
                       <option value="1-10">1 – 10 employees</option>
@@ -211,9 +214,7 @@ export default function CompanyPage() {
                   <div className="relative">
                     <select
                       {...register("country")}
-                      className={`w-full appearance-none rounded-lg border bg-white px-3.5 py-2 text-xs text-slate-800 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 ${
-                        errors.country ? "border-red-400" : "border-slate-200"
-                      }`}
+                      className={`appearance-none ${inputCls(!!errors.country)}`}
                     >
                       <option value="India">India</option>
                       <option value="United States">United States</option>
@@ -237,9 +238,7 @@ export default function CompanyPage() {
                   <div className="relative">
                     <select
                       {...register("state")}
-                      className={`w-full appearance-none rounded-lg border bg-white px-3.5 py-2 text-xs text-slate-800 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 ${
-                        errors.state ? "border-red-400" : "border-slate-200"
-                      }`}
+                      className={`appearance-none ${inputCls(!!errors.state)}`}
                     >
                       <option value="Uttar Pradesh">Uttar Pradesh</option>
                       <option value="Maharashtra">Maharashtra</option>
@@ -267,9 +266,7 @@ export default function CompanyPage() {
                     type="text"
                     placeholder="Noida"
                     {...register("city")}
-                    className={`w-full rounded-lg border bg-white px-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 ${
-                      errors.city ? "border-red-400" : "border-slate-200"
-                    }`}
+                    className={inputCls(!!errors.city)}
                   />
                   {errors.city && (
                     <p className="text-[11px] text-red-500 font-medium">
@@ -279,7 +276,7 @@ export default function CompanyPage() {
                 </div>
               </div>
 
-              {/* Row 4: Company Address */}
+              {/* Row 4: Address */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
                   Company Address <span className="text-red-500">*</span>
@@ -288,9 +285,7 @@ export default function CompanyPage() {
                   type="text"
                   placeholder="B-128, Sector 62, Noida, Uttar Pradesh 201309"
                   {...register("address")}
-                  className={`w-full rounded-lg border bg-white px-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 shadow-2xs outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 ${
-                    errors.address ? "border-red-400" : "border-slate-200"
-                  }`}
+                  className={inputCls(!!errors.address)}
                 />
                 {errors.address && (
                   <p className="text-[11px] text-red-500 font-medium">
@@ -300,11 +295,11 @@ export default function CompanyPage() {
               </div>
 
               {/* Bottom Buttons */}
-              <div className="flex items-center justify-between border-t border-slate-100 pt-6">
+              <div className="flex items-center justify-between border-t border-slate-100 pt-6 mt-2">
                 <button
                   type="button"
                   onClick={() => router.push("/onboarding/plan")}
-                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition cursor-pointer"
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition cursor-pointer"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   <span>Back</span>
@@ -312,7 +307,7 @@ export default function CompanyPage() {
 
                 <button
                   type="submit"
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 active:scale-[0.99] transition cursor-pointer"
+                  className="flex items-center gap-2 rounded-xl bg-[#182E25] px-6 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#12231B] active:scale-[0.99] transition cursor-pointer"
                 >
                   <span>Continue</span>
                   <ArrowRight className="h-3.5 w-3.5" />

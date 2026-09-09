@@ -24,20 +24,21 @@ export function OnboardingHeader({ showLogout = true }: OnboardingHeaderProps) {
   };
 
   return (
-    <header className="w-full border-b border-slate-100 bg-white sticky top-0 z-30">
+    <header className="w-full border-b border-slate-200/50 bg-[#F5F6F5] sticky top-0 z-30">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         {/* Brand Logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white shadow-sm">
-            <Building2 className="h-5 w-5 text-blue-400" />
+        <div
+          className="flex items-center gap-2.5 cursor-pointer"
+          onClick={() => router.push("/")}
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#182E25] text-white shadow-sm">
+            <Building2 className="h-5 w-5 text-white" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-base font-extrabold tracking-tight text-slate-900">
-                FIRMA
-              </span>
-            </div>
-            <p className="text-[11px] font-medium leading-none text-slate-400">
+            <span className="text-base font-black tracking-tight text-slate-900 block leading-tight">
+              FIRMA
+            </span>
+            <p className="text-[10px] font-medium leading-none text-slate-500">
               Build Smarter. Together.
             </p>
           </div>
@@ -48,13 +49,13 @@ export function OnboardingHeader({ showLogout = true }: OnboardingHeaderProps) {
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            className="flex items-center gap-2.5 rounded-full border border-slate-200/80 bg-white py-1 pl-1 pr-3 shadow-xs hover:border-slate-300 transition-colors focus:outline-hidden"
+            className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 hover:bg-slate-200/50 transition cursor-pointer"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#182E25] text-xs font-bold text-white shadow-xs">
               {userInitial}
             </div>
             <div className="text-left hidden sm:block">
-              <p className="text-xs font-bold text-slate-800 leading-tight">
+              <p className="text-xs font-bold text-slate-900 leading-tight">
                 {userName}
               </p>
               <p className="text-[10px] font-medium text-slate-400 capitalize leading-none">
@@ -75,7 +76,7 @@ export function OnboardingHeader({ showLogout = true }: OnboardingHeaderProps) {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50/60 transition-colors"
+                  className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-red-600 hover:bg-red-50/60 transition cursor-pointer"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                   Logout

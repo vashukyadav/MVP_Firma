@@ -6,7 +6,7 @@ import { db, type PlanType } from "@/lib/db";
 import { useAuthStore } from "@/store/authStore";
 import { OnboardingHeader } from "@/components/onboarding/OnboardingHeader";
 import { OnboardingStepper } from "@/components/onboarding/OnboardingStepper";
-import { Check, ArrowLeft, ArrowRight } from "lucide-react";
+import { Check, ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
 
 interface PlanItem {
   id: PlanType;
@@ -59,6 +59,7 @@ export default function PlanPage() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("STARTER");
 
+  // ── ALL ORIGINAL LOGIC PRESERVED ──────────────────────────────────────
   const handleContinue = async () => {
     if (!currentUser?.id) {
       alert("User not found. Please login again.");
@@ -74,21 +75,23 @@ export default function PlanPage() {
 
     router.push("/onboarding/company");
   };
+  // ───────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
-      {/* Header */}
+    <div className="min-h-screen bg-[#F5F6F5] flex flex-col font-sans antialiased">
       <OnboardingHeader />
 
-      {/* Main Container */}
       <main className="flex-1 pb-16 pt-4">
         <div className="mx-auto max-w-4xl px-4 sm:px-6">
-          {/* Stepper (Step 1: Plan) */}
           <OnboardingStepper currentStep={1} />
 
           {/* Page Heading */}
           <div className="text-center my-6">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#E5EDE7] px-3.5 py-1.5 text-xs font-semibold text-[#182E25] mb-3">
+              <Sparkles className="h-3.5 w-3.5" />
+              Step 1 of 4
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
               Choose the right plan for your business
             </h1>
             <p className="mt-2 text-sm text-slate-500 max-w-xl mx-auto">
@@ -97,7 +100,7 @@ export default function PlanPage() {
           </div>
 
           {/* Plans Grid */}
-          <div className="mt-8 grid gap-5 sm:grid-cols-3">
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
             {plans.map((plan) => {
               const isSelected = selectedPlan === plan.id;
 
@@ -107,19 +110,19 @@ export default function PlanPage() {
                   onClick={() => setSelectedPlan(plan.id)}
                   className={`relative flex flex-col justify-between rounded-2xl border bg-white p-6 transition-all duration-150 cursor-pointer ${
                     isSelected
-                      ? "border-blue-600 ring-2 ring-blue-100 shadow-md"
+                      ? "border-[#182E25] ring-2 ring-[#E5EDE7] shadow-md"
                       : "border-slate-200/80 hover:border-slate-300 hover:shadow-xs"
                   }`}
                 >
                   <div>
                     {/* Top Row: Title, Badge & Radio */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-base font-bold text-slate-900">
                           {plan.name}
                         </span>
                         {plan.recommended && (
-                          <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                          <span className="rounded-full bg-[#182E25] px-2 py-0.5 text-[10px] font-bold text-white">
                             Recommended
                           </span>
                         )}
@@ -127,9 +130,9 @@ export default function PlanPage() {
 
                       {/* Custom Radio Button */}
                       <div
-                        className={`flex h-4 w-4 items-center justify-center rounded-full border transition-colors ${
+                        className={`flex h-4 w-4 items-center justify-center rounded-full border transition-colors shrink-0 ${
                           isSelected
-                            ? "border-blue-600 bg-blue-600"
+                            ? "border-[#182E25] bg-[#182E25]"
                             : "border-slate-300 bg-white"
                         }`}
                       >
@@ -152,10 +155,10 @@ export default function PlanPage() {
                     </div>
 
                     {/* Features List */}
-                    <div className="mt-6 space-y-3 border-t border-slate-100 pt-5">
+                    <div className="mt-5 space-y-2.5 border-t border-slate-100 pt-5">
                       {plan.features.map((feature) => (
                         <div key={feature} className="flex items-start gap-2.5 text-xs text-slate-700">
-                          <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5 stroke-[2.5]" />
+                          <Check className="h-3.5 w-3.5 text-[#2E7D32] shrink-0 mt-0.5 stroke-[2.5]" />
                           <span>{feature}</span>
                         </div>
                       ))}
@@ -171,7 +174,7 @@ export default function PlanPage() {
             <button
               type="button"
               onClick={() => router.push("/onboarding/welcome")}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition cursor-pointer"
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition cursor-pointer"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               <span>Back</span>
@@ -180,7 +183,7 @@ export default function PlanPage() {
             <button
               type="button"
               onClick={handleContinue}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 active:scale-[0.99] transition cursor-pointer"
+              className="flex items-center gap-2 rounded-xl bg-[#182E25] px-6 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#12231B] active:scale-[0.99] transition cursor-pointer"
             >
               <span>Continue</span>
               <ArrowRight className="h-3.5 w-3.5" />

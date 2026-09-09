@@ -22,17 +22,17 @@ export function OnboardingStepper({ currentStep }: OnboardingStepperProps) {
         <div className="absolute left-[8%] right-[8%] top-[16px] -translate-y-1/2 flex -z-0">
           <div
             className={`h-[2px] flex-1 transition-colors duration-200 ${
-              currentStep >= 2 ? "bg-emerald-500" : "bg-slate-200"
+              currentStep >= 2 ? "bg-[#182E25]" : "bg-slate-200"
             }`}
           />
           <div
             className={`h-[2px] flex-1 transition-colors duration-200 ${
-              currentStep >= 3 ? "bg-emerald-500" : "bg-slate-200"
+              currentStep >= 3 ? "bg-[#182E25]" : "bg-slate-200"
             }`}
           />
           <div
             className={`h-[2px] flex-1 transition-colors duration-200 ${
-              currentStep === 4 ? "bg-emerald-500" : "bg-slate-200"
+              currentStep === 4 ? "bg-[#182E25]" : "bg-slate-200"
             }`}
           />
         </div>
@@ -52,9 +52,9 @@ export function OnboardingStepper({ currentStep }: OnboardingStepperProps) {
               <div
                 className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-all duration-200 ${
                   isCompleted
-                    ? "bg-emerald-500 text-white shadow-xs"
+                    ? "bg-[#182E25] text-white shadow-xs"
                     : isActive
-                    ? "bg-blue-600 text-white ring-4 ring-blue-100 shadow-xs"
+                    ? "bg-[#182E25] text-white ring-4 ring-[#E5EDE7] shadow-xs"
                     : "border border-slate-200 bg-white text-slate-400"
                 }`}
               >
@@ -69,7 +69,7 @@ export function OnboardingStepper({ currentStep }: OnboardingStepperProps) {
               <span
                 className={`mt-1.5 text-xs font-medium tracking-tight ${
                   isActive
-                    ? "text-blue-600 font-semibold"
+                    ? "text-[#182E25] font-semibold"
                     : isCompleted
                     ? "text-slate-700 font-medium"
                     : "text-slate-400"
