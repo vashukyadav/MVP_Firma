@@ -111,44 +111,65 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
 
   // Determine current active item
   const currentNav =
-    activeNav ||
-    (pathname === "/dashboard"
-      ? "Dashboard"
-      : pathname.startsWith("/company")
-      ? "Company"
-      : pathname.startsWith("/subscription")
-      ? "Subscription"
-      : pathname.startsWith("/team")
-      ? "Team & Admins"
-      : pathname.startsWith("/projects")
-      ? "Projects"
-      : pathname.startsWith("/customers")
-      ? "Customers"
-      : pathname.startsWith("/quotations")
-      ? "Quotations"
-      : pathname.startsWith("/jobs")
-      ? "Jobs"
-      : pathname.startsWith("/reports")
-      ? "Reports"
-      : pathname.startsWith("/setting")
-      ? "Settings"
-      : pathname.startsWith("/help")
-      ? "Help & Support"
-      : "");
+  activeNav ||
+  (pathname === "/dashboard"
+    ? "Dashboard"
+    : pathname.startsWith("/company")
+    ? "Company"
+    : pathname.startsWith("/subscription")
+    ? "Subscription"
+    : pathname.startsWith("/team")
+    ? "Team & Admins"
+    : pathname.startsWith("/users")
+    ? "Users & Roles"
+    : pathname.startsWith("/projects")
+    ? "Projects"
+    : pathname.startsWith("/customers")
+    ? "Customers"
+    : pathname.startsWith("/quotations")
+    ? "Quotations"
+    : pathname.startsWith("/jobs")
+    ? "Jobs"
+    : pathname.startsWith("/reports")
+    ? "Reports"
+    : pathname.startsWith("/setting")
+    ? "Settings"
+    : pathname.startsWith("/help")
+    ? "Help & Support"
+    : "");
+ const ownerNavItems = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Company", href: "/company", icon: Building },
+  { name: "Subscription", href: "/subscription", icon: CreditCard },
+  { name: "Team & Admins", href: "/team", icon: Users },
 
-  const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Company", href: "/company", icon: Building },
-    { name: "Subscription", href: "/subscription", icon: CreditCard },
-    { name: "Team & Admins", href: "/team", icon: Users },
-    { name: "Projects", href: "/projects", icon: FolderKanban },
-    { name: "Customers", href: "/customers", icon: Layers },
-    { name: "Enquiries", href: "/quotations", icon: HelpCircle },
-    { name: "Quotations", href: "/quotations", icon: FileCheck2 },
-    { name: "Jobs", href: "/jobs", icon: Briefcase },
-    { name: "Reports", href: "/reports", icon: BarChart3 },
-    { name: "Settings", href: "/setting", icon: Settings },
-  ];
+  { name: "Customers", href: "/customers", icon: Layers },
+  { name: "Enquiries", href: "/quotations", icon: HelpCircle },
+  { name: "Quotations", href: "/quotations", icon: FileCheck2 },
+  { name: "Projects", href: "/projects", icon: FolderKanban },
+  { name: "Jobs", href: "/jobs", icon: Briefcase },
+
+  { name: "Reports", href: "/reports", icon: BarChart3 },
+  { name: "Settings", href: "/setting", icon: Settings },
+  { name: "Help & Support", href: "/help", icon: HelpCircle },
+];
+
+const adminNavItems = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Users & Roles", href: "/users", icon: Users },
+  { name: "Customers", href: "/customers", icon: Layers },
+  { name: "Enquiries", href: "/quotations", icon: HelpCircle },
+  { name: "Quotations", href: "/quotations", icon: FileCheck2 },
+  { name: "Projects", href: "/projects", icon: FolderKanban },
+  { name: "Jobs", href: "/jobs", icon: Briefcase },
+  { name: "Reports", href: "/reports", icon: BarChart3 },
+  { name: "Settings", href: "/setting", icon: Settings },
+  { name: "Help & Support", href: "/help", icon: HelpCircle },
+];
+const navItems =
+  user.role === "ACCOUNT_ADMIN"
+    ? adminNavItems
+    : ownerNavItems;
 
   return (
     <div className="min-h-screen bg-[#F5F6F5] flex text-slate-800 font-sans antialiased">

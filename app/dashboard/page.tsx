@@ -127,7 +127,7 @@ export default function DashboardPage() {
             {greeting}
           </span>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 tracking-tight flex items-center gap-2">
-            Welcome back, {firstName}! <span>👋</span>
+            Welcome back, {firstName}!
           </h1>
           <p className="text-xs text-slate-600 mt-1">
             Here&apos;s what&apos;s happening with your business today.
