@@ -46,13 +46,13 @@ export default function HelpPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4 pb-2">
         <div>
-          <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+          <span className="text-eyebrow font-semibold tracking-wider text-ash uppercase">
             KNOWLEDGE BASE &amp; ASSISTANCE
           </span>
-          <h1 className="text-2xl font-extrabold text-slate-900 mt-0.5 tracking-tight flex items-center gap-2">
+          <h1 className="text-display-h1 font-bold text-onyx mt-0.5 tracking-tight flex items-center gap-2">
             Help &amp; Support Center
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-body text-ash mt-1">
             Browse troubleshooting guides, frequently asked questions, or reach out to our dedicated support team.
           </p>
         </div>
@@ -60,58 +60,58 @@ export default function HelpPage() {
 
       {/* 3 Contact / Quick Action Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-2xl bg-white p-5 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+        <div className="rounded-[10px] bg-white p-5 border border-pebble flex flex-col justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E6F4EA] text-[#2E7D32]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[6px] bg-clear-bg text-success-text">
               <Mail className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Email Support</h3>
-              <p className="text-[11px] text-slate-400">Response within 2 hours</p>
+              <h3 className="text-heading-h3 font-bold text-onyx">Email Support</h3>
+              <p className="text-eyebrow text-ash">Response within 2 hours</p>
             </div>
           </div>
-          <p className="mt-4 text-xs font-semibold text-[#182E25]">
+          <p className="mt-4 text-body font-semibold text-onyx">
             support@firma.build
           </p>
         </div>
 
-        <div className="rounded-2xl bg-white p-5 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+        <div className="rounded-[10px] bg-white p-5 border border-pebble flex flex-col justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FEF7E2] text-[#C98A19]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[6px] bg-sunfleck text-onyx">
               <Phone className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Priority Phone</h3>
-              <p className="text-[11px] text-slate-400">Mon-Sat 9am - 8pm IST</p>
+              <h3 className="text-heading-h3 font-bold text-onyx">Priority Phone</h3>
+              <p className="text-eyebrow text-ash">Mon-Sat 9am - 8pm IST</p>
             </div>
           </div>
-          <p className="mt-4 text-xs font-semibold text-[#182E25]">
+          <p className="mt-4 text-body font-semibold text-onyx">
             +91 1800 209 8899
           </p>
         </div>
 
-        <div className="rounded-2xl bg-white p-5 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+        <div className="rounded-[10px] bg-white p-5 border border-pebble flex flex-col justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E5EDE7] text-[#182E25]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[6px] bg-breath text-onyx">
               <BookOpen className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Documentation</h3>
-              <p className="text-[11px] text-slate-400">API &amp; User Manuals</p>
+              <h3 className="text-heading-h3 font-bold text-onyx">Documentation</h3>
+              <p className="text-eyebrow text-ash">API &amp; User Manuals</p>
             </div>
           </div>
-          <p className="mt-4 text-xs font-semibold text-[#182E25] flex items-center gap-1">
-            docs.firma.build <ExternalLink className="h-3 w-3" />
+          <p className="mt-4 text-body font-semibold text-onyx flex items-center gap-1">
+            docs.firma.build <ExternalLink className="h-3.5 w-3.5 text-ash" />
           </p>
         </div>
       </div>
 
       {/* FAQ Accordion Section */}
-      <div className="rounded-2xl bg-white p-6 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-        <h2 className="text-base font-bold text-slate-900">
+      <div className="rounded-[10px] bg-white p-6 border border-pebble">
+        <h2 className="text-heading-h3 font-bold text-onyx">
           Frequently Asked Questions
         </h2>
-        <p className="text-xs text-slate-500 mt-0.5 mb-5">
+        <p className="text-body text-ash mt-0.5 mb-5">
           Quick answers to common questions about accounts, projects, and billing.
         </p>
 
@@ -121,23 +121,23 @@ export default function HelpPage() {
             return (
               <div
                 key={idx}
-                className="rounded-xl border border-slate-200/80 overflow-hidden transition"
+                className="rounded-[10px] border border-pebble overflow-hidden transition"
               >
                 <button
                   type="button"
                   onClick={() => setOpenFaq(isOpen ? null : idx)}
-                  className="w-full px-4 py-3 text-left flex items-center justify-between text-xs font-bold text-slate-900 hover:bg-slate-50 transition cursor-pointer"
+                  className="w-full px-4 py-3 text-left flex items-center justify-between text-body font-bold text-onyx hover:bg-stone/50 transition cursor-pointer"
                 >
                   <span>{faq.q}</span>
                   {isOpen ? (
-                    <ChevronUp className="h-4 w-4 text-slate-400 shrink-0" />
+                    <ChevronUp className="h-4 w-4 text-ash shrink-0" />
                   ) : (
-                    <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
+                    <ChevronDown className="h-4 w-4 text-ash shrink-0" />
                   )}
                 </button>
 
                 {isOpen && (
-                  <div className="px-4 pb-3.5 pt-1 text-xs text-slate-600 leading-relaxed bg-slate-50/50 border-t border-slate-100">
+                  <div className="px-4 pb-3.5 pt-1 text-body text-ash leading-relaxed bg-stone/50 border-t border-pebble">
                     {faq.a}
                   </div>
                 )}

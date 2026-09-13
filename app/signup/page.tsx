@@ -72,46 +72,46 @@ export default function SignupPage() {
     // ───────────────────────────────────────────────────────────────────────
 
     return (
-        <div className="min-h-screen bg-[#F5F6F5] font-sans antialiased flex">
+        <div className="min-h-screen bg-stone font-sans antialiased flex">
             {/* ============================================================ */}
             {/* LEFT PANEL — Branding & Visual                               */}
             {/* ============================================================ */}
-            <div className="hidden lg:flex lg:w-5/12 flex-col relative overflow-hidden bg-[#182E25]">
+            <div className="hidden lg:flex lg:w-5/12 flex-col relative overflow-hidden bg-onyx">
                 {/* Background image */}
                 <div className="absolute inset-0">
                     <Image
                         src="/images/landing_hero.jpg"
                         alt="FIRMA Platform"
                         fill
+                        sizes="50vw"
                         className="object-cover opacity-20"
                         priority
                     />
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-b from-[#182E25]/85 via-[#182E25]/65 to-[#182E25]/90" />
 
                 {/* Content */}
                 <div className="relative z-10 flex flex-col h-full p-12">
                     {/* Logo */}
                     <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push("/")}>
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm border border-white/20">
-                            <Building2 className="h-5 w-5 text-white" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white/15 backdrop-blur-sm border border-white/20">
+                            <Building2 className="h-5 w-5 text-breath" />
                         </div>
                         <div>
                             <span className="text-lg font-black tracking-tight text-white block leading-tight">FIRMA</span>
-                            <span className="text-[10px] font-medium text-[#7FA88B] block leading-none">Build Smarter. Together.</span>
+                            <span className="text-[10px] font-medium text-breath block leading-none">Build Smarter. Together.</span>
                         </div>
                     </div>
 
                     {/* Hero Text */}
                     <div className="flex-1 flex flex-col justify-center">
-                        <h2 className="text-3xl font-black text-white leading-tight tracking-tight">
+                        <h2 className="text-display-h1 font-normal text-white leading-tight tracking-tight">
                             Start managing
                             <br />
                             your business
                             <br />
-                            <span className="text-[#7FA88B]">smarter.</span>
+                            <span className="font-semibold text-sunfleck">smarter.</span>
                         </h2>
-                        <p className="mt-4 text-sm text-white/55 leading-relaxed max-w-xs">
+                        <p className="mt-4 text-body text-stone/80 leading-relaxed max-w-xs">
                             Create your FIRMA account and unlock the complete construction management platform in minutes.
                         </p>
 
@@ -121,30 +121,30 @@ export default function SignupPage() {
                                 const Icon = h.icon;
                                 return (
                                     <div key={h.label} className="flex items-center gap-3">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10">
-                                            <Icon className="h-4 w-4 text-[#7FA88B]" />
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-white/10">
+                                            <Icon className="h-4 w-4 text-breath" />
                                         </div>
-                                        <span className="text-xs font-medium text-white/70">{h.label}</span>
+                                        <span className="text-xs font-medium text-stone/90">{h.label}</span>
                                     </div>
                                 );
                             })}
                         </div>
 
                         {/* Social proof */}
-                        <div className="mt-10 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 p-4">
+                        <div className="mt-10 rounded-[10px] bg-white/10 backdrop-blur-sm border border-white/15 p-4">
                             <div className="flex items-center gap-1 mb-1">
                                 {[...Array(5)].map((_, i) => (
-                                    <span key={i} className="text-[#F3C044] text-xs">★</span>
+                                    <span key={i} className="text-sunfleck text-xs">★</span>
                                 ))}
                             </div>
-                            <p className="text-xs text-white/70 leading-relaxed italic">
+                            <p className="text-xs text-stone/80 leading-relaxed italic">
                                 &ldquo;FIRMA transformed how we manage our construction projects. Absolutely essential.&rdquo;
                             </p>
-                            <p className="mt-2 text-[11px] font-semibold text-[#7FA88B]">— Vikram Rathore, MD, Horizon Infra</p>
+                            <p className="mt-2 text-[11px] font-semibold text-breath">— Vikram Rathore, MD, Horizon Infra</p>
                         </div>
                     </div>
 
-                    <p className="text-[11px] text-white/25">&copy; 2025 FIRMA. All rights reserved.</p>
+                    <p className="text-[11px] text-stone/40">&copy; 2025 FIRMA. All rights reserved.</p>
                 </div>
             </div>
 
@@ -157,24 +157,24 @@ export default function SignupPage() {
                     className="flex lg:hidden items-center gap-3 mb-8 cursor-pointer"
                     onClick={() => router.push("/")}
                 >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#182E25]">
-                        <Building2 className="h-5 w-5 text-white" />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-onyx text-white">
+                        <Building2 className="h-5 w-5 text-breath" />
                     </div>
-                    <span className="text-lg font-black tracking-tight text-slate-900">FIRMA</span>
+                    <span className="text-lg font-black tracking-tight text-onyx">FIRMA</span>
                 </div>
 
                 <div className="w-full max-w-lg">
                     {/* Heading */}
                     <div className="mb-7">
-                        <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+                        <h1 className="text-display-h1 font-normal text-onyx tracking-tight">
                             Create your account
                         </h1>
-                        <p className="mt-1.5 text-sm text-slate-500">
+                        <p className="mt-1.5 text-body-sml text-ash">
                             Already have an account?{" "}
                             <button
                                 type="button"
                                 onClick={() => router.push("/login")}
-                                className="font-semibold text-[#182E25] hover:underline cursor-pointer"
+                                className="font-semibold text-onyx hover:underline cursor-pointer"
                             >
                                 Sign in
                             </button>
@@ -182,30 +182,30 @@ export default function SignupPage() {
                     </div>
 
                     {/* Form Card */}
-                    <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm p-8">
+                    <div className="rounded-[20px] bg-white border border-pebble shadow-2xs p-8">
                         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                             {/* Name + Company Size Row */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {/* Name */}
                                 <div className="space-y-1.5">
-                                    <label htmlFor="name" className="text-xs font-semibold text-slate-700">
-                                        Full Name <span className="text-red-500">*</span>
+                                    <label htmlFor="name" className="text-xs font-semibold text-onyx">
+                                        Full Name <span className="text-hazard">*</span>
                                     </label>
                                     <input
                                         id="name"
-                                        placeholder="Rahul Sharma"
+                                        placeholder="Full Name"
                                         {...register("name")}
-                                        className="w-full rounded-xl border border-slate-200 bg-[#F9FAFB] px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#182E25] focus:ring-2 focus:ring-[#182E25]/10 focus:bg-white"
+                                        className="w-full rounded-[10px] border border-pebble bg-white px-4 py-2.5 text-sm text-onyx placeholder-ash outline-none transition focus:border-onyx focus:ring-1 focus:ring-onyx"
                                     />
                                     {errors.name && (
-                                        <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>
+                                        <p className="text-xs text-hazard mt-1">{errors.name.message}</p>
                                     )}
                                 </div>
 
                                 {/* Company Size */}
                                 <div className="space-y-1.5">
-                                    <label htmlFor="size" className="text-xs font-semibold text-slate-700">
-                                        Company Size <span className="text-red-500">*</span>
+                                    <label htmlFor="size" className="text-xs font-semibold text-onyx">
+                                        Company Size <span className="text-hazard">*</span>
                                     </label>
                                     <input
                                         id="size"
@@ -213,28 +213,28 @@ export default function SignupPage() {
                                         min={1}
                                         placeholder="e.g. 25"
                                         {...register("size", { valueAsNumber: true })}
-                                        className="w-full rounded-xl border border-slate-200 bg-[#F9FAFB] px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#182E25] focus:ring-2 focus:ring-[#182E25]/10 focus:bg-white"
+                                        className="w-full rounded-[10px] border border-pebble bg-white px-4 py-2.5 text-sm text-onyx placeholder-ash outline-none transition focus:border-onyx focus:ring-1 focus:ring-onyx"
                                     />
                                     {errors.size && (
-                                        <p className="text-xs text-red-500 mt-1">{errors.size.message}</p>
+                                        <p className="text-xs text-hazard mt-1">{errors.size.message}</p>
                                     )}
                                 </div>
                             </div>
 
                             {/* Email */}
                             <div className="space-y-1.5">
-                                <label htmlFor="email" className="text-xs font-semibold text-slate-700">
-                                    Email Address <span className="text-red-500">*</span>
+                                <label htmlFor="email" className="text-xs font-semibold text-onyx">
+                                    Email Address <span className="text-hazard">*</span>
                                 </label>
                                 <input
                                     id="email"
                                     type="email"
                                     placeholder="you@example.com"
                                     {...register("email")}
-                                    className="w-full rounded-xl border border-slate-200 bg-[#F9FAFB] px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#182E25] focus:ring-2 focus:ring-[#182E25]/10 focus:bg-white"
+                                    className="w-full rounded-[10px] border border-pebble bg-white px-4 py-2.5 text-sm text-onyx placeholder-ash outline-none transition focus:border-onyx focus:ring-1 focus:ring-onyx"
                                 />
                                 {errors.email && (
-                                    <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>
+                                    <p className="text-xs text-hazard mt-1">{errors.email.message}</p>
                                 )}
                             </div>
 
@@ -242,8 +242,8 @@ export default function SignupPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {/* Password */}
                                 <div className="space-y-1.5">
-                                    <label htmlFor="password" className="text-xs font-semibold text-slate-700">
-                                        Password <span className="text-red-500">*</span>
+                                    <label htmlFor="password" className="text-xs font-semibold text-onyx">
+                                        Password <span className="text-hazard">*</span>
                                     </label>
                                     <div className="relative">
                                         <input
@@ -251,25 +251,25 @@ export default function SignupPage() {
                                             type={showPassword ? "text" : "password"}
                                             placeholder="••••••••"
                                             {...register("password")}
-                                            className="w-full rounded-xl border border-slate-200 bg-[#F9FAFB] px-4 py-2.5 pr-11 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#182E25] focus:ring-2 focus:ring-[#182E25]/10 focus:bg-white"
+                                            className="w-full rounded-[10px] border border-pebble bg-white px-4 py-2.5 pr-11 text-sm text-onyx placeholder-ash outline-none transition focus:border-onyx focus:ring-1 focus:ring-onyx"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ash hover:text-onyx transition cursor-pointer"
                                         >
                                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                         </button>
                                     </div>
                                     {errors.password && (
-                                        <p className="text-xs text-red-500 mt-1">{errors.password.message}</p>
+                                        <p className="text-xs text-hazard mt-1">{errors.password.message}</p>
                                     )}
                                 </div>
 
                                 {/* Confirm Password */}
                                 <div className="space-y-1.5">
-                                    <label htmlFor="confirmPassword" className="text-xs font-semibold text-slate-700">
-                                        Confirm Password <span className="text-red-500">*</span>
+                                    <label htmlFor="confirmPassword" className="text-xs font-semibold text-onyx">
+                                        Confirm Password <span className="text-hazard">*</span>
                                     </label>
                                     <div className="relative">
                                         <input
@@ -277,29 +277,29 @@ export default function SignupPage() {
                                             type={showConfirm ? "text" : "password"}
                                             placeholder="••••••••"
                                             {...register("confirmPassword")}
-                                            className="w-full rounded-xl border border-slate-200 bg-[#F9FAFB] px-4 py-2.5 pr-11 text-sm text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#182E25] focus:ring-2 focus:ring-[#182E25]/10 focus:bg-white"
+                                            className="w-full rounded-[10px] border border-pebble bg-white px-4 py-2.5 pr-11 text-sm text-onyx placeholder-ash outline-none transition focus:border-onyx focus:ring-1 focus:ring-onyx"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => setShowConfirm(!showConfirm)}
-                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ash hover:text-onyx transition cursor-pointer"
                                         >
                                             {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                         </button>
                                     </div>
                                     {errors.confirmPassword && (
-                                        <p className="text-xs text-red-500 mt-1">{errors.confirmPassword.message}</p>
+                                        <p className="text-xs text-hazard mt-1">{errors.confirmPassword.message}</p>
                                     )}
                                 </div>
                             </div>
 
                             {/* Password hints */}
-                            <div className="rounded-xl bg-[#F5F6F5] border border-slate-200/60 p-3.5">
-                                <p className="text-[11px] font-semibold text-slate-600 mb-2">Password requirements:</p>
+                            <div className="rounded-[10px] bg-stone border border-pebble/60 p-3.5">
+                                <p className="text-[11px] font-semibold text-onyx mb-2">Password requirements:</p>
                                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                                     {["Minimum 6 characters", "Mix of letters & numbers recommended"].map((hint) => (
-                                        <span key={hint} className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                                            <CheckCircle2 className="h-3 w-3 text-[#4E8F67] shrink-0" />
+                                        <span key={hint} className="flex items-center gap-1.5 text-[11px] text-ash">
+                                            <CheckCircle2 className="h-3 w-3 text-complete-status shrink-0" />
                                             {hint}
                                         </span>
                                     ))}
@@ -310,7 +310,7 @@ export default function SignupPage() {
                             <button
                                 type="submit"
                                 disabled={isLoading}
-                                className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#182E25] py-3 text-sm font-bold text-white hover:bg-[#12231B] active:scale-[0.99] transition shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+                                className="w-full flex items-center justify-center gap-2 rounded-[10px] bg-onyx py-3 text-sm font-semibold text-white hover:bg-black active:scale-[0.99] transition shadow-xs cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed mt-1"
                             >
                                 {isLoading ? (
                                     <span className="flex items-center gap-2">
@@ -322,7 +322,7 @@ export default function SignupPage() {
                                     </span>
                                 ) : (
                                     <>
-                                        Create Account <ArrowRight className="h-4 w-4" />
+                                        Create Account <ArrowRight className="h-4 w-4 text-breath" />
                                     </>
                                 )}
                             </button>
@@ -330,10 +330,10 @@ export default function SignupPage() {
                     </div>
 
                     {/* Footer note */}
-                    <p className="mt-6 text-center text-xs text-slate-400">
+                    <p className="mt-6 text-center text-xs text-ash">
                         By creating an account, you agree to our{" "}
-                        <span className="text-slate-600 font-medium cursor-pointer hover:underline">Terms of Service</span> &amp;{" "}
-                        <span className="text-slate-600 font-medium cursor-pointer hover:underline">Privacy Policy</span>.
+                        <span className="text-onyx font-medium cursor-pointer hover:underline">Terms of Service</span> &amp;{" "}
+                        <span className="text-onyx font-medium cursor-pointer hover:underline">Privacy Policy</span>.
                     </p>
                 </div>
             </div>

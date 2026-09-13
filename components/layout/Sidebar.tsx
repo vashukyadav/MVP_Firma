@@ -30,7 +30,7 @@ const menuByRole = {
   SALES_MANAGER: [
     "Dashboard",
     "Customers",
-    "Enquiries",
+    "Leads",
     "Quotations",
     "Reports",
   ],
@@ -65,22 +65,24 @@ export default function Sidebar() {
     : [];
 
   return (
-    <aside>
-      
+    <aside className="w-60 bg-stone text-onyx border-r border-pebble p-4 space-y-4 font-sans">
       {/* Logo */}
-      <div>
+      <div className="text-base font-black tracking-tight text-onyx">
         MINI FIRMA
       </div>
 
       {/* Menu */}
-      <nav>
+      <nav className="space-y-1 text-xs">
         {menuItems.map((item) => (
-          <button key={item}>
+          <button
+            key={item}
+            type="button"
+            className="w-full text-left px-3 py-2 rounded-[10px] text-ash hover:bg-mist/70 hover:text-onyx transition cursor-pointer"
+          >
             {item}
           </button>
         ))}
       </nav>
-
     </aside>
   );
 }

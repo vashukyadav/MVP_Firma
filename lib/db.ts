@@ -32,7 +32,38 @@ export interface Company {
   city: string;
   address: string;
 }
+export type EnquiryStatus =
+  | "NEW"
+  | "CONTACTED"
+  | "QUALIFIED"
+  | "QUOTATION"
+  | "WON"
+  | "LOST";
 
+export interface Enquiry {
+  id?: number;
+
+  customerId: number;
+
+  title: string;
+  description?: string;
+
+  source: string;
+
+  estimatedValue?: number;
+
+  expectedStartDate?: string;
+  expectedEndDate?: string;
+
+  status: EnquiryStatus;
+
+  assignedTo?: number;
+
+  notes?: string;
+
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Onboarding {
   userId: number;
@@ -40,19 +71,31 @@ export interface Onboarding {
   companyCompleted: boolean;
   billingCompleted: boolean;
 }
-
-
+export interface Customer {
+  id?: number;
+  companyName: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  address: string;
+  industry: string;
+  notes?: string;
+}
 class FirmaDB extends Dexie {
   users!: Table<User, number>;
   onboarding!: Table<Onboarding, number>;
-  company!:Table<Company,number>;
+  company!: Table<Company, number>;
+  customer!: Table<Customer, number>;
+  enquiry!: Table<Enquiry, number>;
   constructor() {
     super("MiniFIRMA");
 
     this.version(2).stores({
       users: "++id,email,size,role",
       onboarding: "userId,plan",
-      company:"userId",
+      company: "userId",
+      customer: "++id,phone,email,companyName",
+        enquiry: "++id,customerId,status,assignedTo,createdAt",
     });
   }
 }

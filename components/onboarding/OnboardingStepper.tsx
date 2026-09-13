@@ -22,17 +22,17 @@ export function OnboardingStepper({ currentStep }: OnboardingStepperProps) {
         <div className="absolute left-[8%] right-[8%] top-[16px] -translate-y-1/2 flex -z-0">
           <div
             className={`h-[2px] flex-1 transition-colors duration-200 ${
-              currentStep >= 2 ? "bg-[#182E25]" : "bg-slate-200"
+              currentStep >= 2 ? "bg-onyx" : "bg-pebble"
             }`}
           />
           <div
             className={`h-[2px] flex-1 transition-colors duration-200 ${
-              currentStep >= 3 ? "bg-[#182E25]" : "bg-slate-200"
+              currentStep >= 3 ? "bg-onyx" : "bg-pebble"
             }`}
           />
           <div
             className={`h-[2px] flex-1 transition-colors duration-200 ${
-              currentStep === 4 ? "bg-[#182E25]" : "bg-slate-200"
+              currentStep === 4 ? "bg-onyx" : "bg-pebble"
             }`}
           />
         </div>
@@ -50,12 +50,12 @@ export function OnboardingStepper({ currentStep }: OnboardingStepperProps) {
             <div key={item.step} className="relative z-10 flex flex-col items-center">
               {/* Step Circle */}
               <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-all duration-200 ${
+                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-all duration-200 ${
                   isCompleted
-                    ? "bg-[#182E25] text-white shadow-xs"
+                    ? "bg-complete-status text-white shadow-none"
                     : isActive
-                    ? "bg-[#182E25] text-white ring-4 ring-[#E5EDE7] shadow-xs"
-                    : "border border-slate-200 bg-white text-slate-400"
+                    ? "bg-onyx text-white ring-4 ring-breath shadow-none"
+                    : "border border-pebble bg-white text-ash"
                 }`}
               >
                 {isCompleted ? (
@@ -67,12 +67,12 @@ export function OnboardingStepper({ currentStep }: OnboardingStepperProps) {
 
               {/* Step Label */}
               <span
-                className={`mt-1.5 text-xs font-medium tracking-tight ${
+                className={`mt-1.5 text-eyebrow font-medium tracking-tight ${
                   isActive
-                    ? "text-[#182E25] font-semibold"
+                    ? "text-onyx font-bold"
                     : isCompleted
-                    ? "text-slate-700 font-medium"
-                    : "text-slate-400"
+                    ? "text-onyx font-medium"
+                    : "text-ash"
                 }`}
               >
                 {item.label}

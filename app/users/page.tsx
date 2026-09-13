@@ -15,12 +15,12 @@ export default function UsersPage() {
       return;
     }
 
-    if (currentUser.role !== "ACCOUNT_ADMIN") {
+    if (currentUser.role !== "ACCOUNT_ADMIN" && currentUser.role !== "OWNER") {
       router.replace("/dashboard");
     }
   }, [currentUser, router]);
 
-  if (!currentUser || currentUser.role !== "ACCOUNT_ADMIN") {
+  if (!currentUser || (currentUser.role !== "ACCOUNT_ADMIN" && currentUser.role !== "OWNER")) {
     return null;
   }
 

@@ -98,7 +98,7 @@ export default function SubscriptionPage() {
     return (
       <FirmaLayout activeNav="Subscription">
         <div className="flex items-center justify-center min-h-[50vh]">
-          <p className="text-xs font-medium text-slate-400">
+          <p className="text-xs font-medium text-ash">
             Loading subscription...
           </p>
         </div>
@@ -111,13 +111,13 @@ export default function SubscriptionPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4 pb-2">
         <div>
-          <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+          <span className="text-eyebrow text-ash uppercase">
             SUBSCRIPTION &amp; BILLING
           </span>
-          <h1 className="text-2xl font-extrabold text-slate-900 mt-0.5 tracking-tight flex items-center gap-2">
+          <h1 className="text-display-h1 font-normal text-onyx mt-0.5 tracking-tight flex items-center gap-2">
             Plans &amp; Subscription
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-body-sml text-ash mt-1">
             Manage your current FIRMA subscription plan, member limits, and billing history.
           </p>
         </div>
@@ -125,16 +125,16 @@ export default function SubscriptionPage() {
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-2 text-xs font-semibold shadow-2xs transition cursor-pointer"
+            className="flex items-center gap-1.5 rounded-[10px] border border-pebble bg-white hover:bg-stone text-onyx px-3.5 py-2 text-xs font-semibold shadow-2xs transition cursor-pointer"
           >
-            <Download className="h-3.5 w-3.5" />
+            <Download className="h-3.5 w-3.5 text-ash" />
             <span>Invoices</span>
           </button>
         </div>
       </div>
 
       {/* Current Active Plan Banner */}
-      <div className="rounded-3xl bg-white p-6 sm:p-8 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] relative overflow-hidden">
+      <div className="rounded-[10px] bg-white p-6 sm:p-8 border border-pebble/60 shadow-2xs relative overflow-hidden">
         {/* Botanical Plant artwork */}
         <div className="absolute right-0 bottom-0 top-6 w-36 pointer-events-none opacity-80 hidden md:block">
           <Image
@@ -147,38 +147,38 @@ export default function SubscriptionPage() {
 
         <div className="relative z-10 max-w-2xl">
           <div className="flex items-center gap-2.5">
-            <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+            <span className="text-xs font-bold text-onyx uppercase tracking-wide">
               Current Plan
             </span>
-            <span className="rounded-full bg-[#E6F4EA] px-2.5 py-0.5 text-[10px] font-bold text-[#2E7D32]">
+            <span className="rounded-full bg-clear-bg px-2.5 py-0.5 text-[10px] font-bold text-success-text">
               Active
             </span>
           </div>
 
           <div className="mt-3 flex flex-wrap items-baseline gap-2">
-            <h2 className="text-3xl font-black text-slate-900">
+            <h2 className="text-3xl font-bold text-onyx">
               {selectedPlan.name} Plan
             </h2>
-            <span className="text-xl font-bold text-slate-700">
+            <span className="text-xl font-bold text-onyx">
               {selectedPlan.price}
             </span>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-ash">
               {selectedPlan.period}
             </span>
           </div>
 
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-ash">
             {selectedPlan.description} Next auto-renewal scheduled for{" "}
-            <span className="font-semibold text-slate-700">26 May 2026</span>.
+            <span className="font-semibold text-onyx">26 May 2026</span>.
           </p>
 
           <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
             {selectedPlan.features.map((feature) => (
               <div
                 key={feature}
-                className="flex items-center gap-2 text-xs text-slate-700"
+                className="flex items-center gap-2 text-xs text-onyx"
               >
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#E6F4EA] text-[#2E7D32] shrink-0">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-clear-bg text-success-text shrink-0">
                   <Check className="h-3 w-3 stroke-[2.5]" />
                 </div>
                 <span>{feature}</span>
@@ -191,10 +191,10 @@ export default function SubscriptionPage() {
       {/* Available Plans Comparison */}
       <div className="mt-6">
         <div className="mb-4">
-          <h2 className="text-base font-bold text-slate-900">
+          <h2 className="text-heading-h3 font-medium text-onyx">
             Available Plans
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-body-sml text-ash mt-0.5">
             Choose the plan that fits the scale of your projects and team.
           </p>
         </div>
@@ -208,14 +208,14 @@ export default function SubscriptionPage() {
             return (
               <div
                 key={planKey}
-                className={`rounded-2xl p-6 transition flex flex-col justify-between relative ${
+                className={`rounded-[10px] p-6 transition flex flex-col justify-between relative ${
                   isPopular
-                    ? "bg-[#182E25] text-white shadow-lg ring-1 ring-black/5"
-                    : "bg-white text-slate-800 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)]"
+                    ? "bg-onyx text-white border border-onyx shadow-xl"
+                    : "bg-white text-onyx border border-pebble shadow-2xs"
                 }`}
               >
                 {item.badge && (
-                  <span className="absolute -top-3 right-6 rounded-full bg-amber-400 px-3 py-0.5 text-[10px] font-bold text-slate-900 shadow-xs">
+                  <span className="absolute -top-3 right-6 rounded-full bg-sunfleck px-3 py-0.5 text-[10px] font-bold text-onyx shadow-xs">
                     {item.badge}
                   </span>
                 )}
@@ -224,7 +224,7 @@ export default function SubscriptionPage() {
                   <div className="flex items-center justify-between">
                     <h3
                       className={`text-lg font-bold ${
-                        isPopular ? "text-white" : "text-slate-900"
+                        isPopular ? "text-white" : "text-onyx"
                       }`}
                     >
                       {item.name}
@@ -234,7 +234,7 @@ export default function SubscriptionPage() {
                         className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                           isPopular
                             ? "bg-white/20 text-white"
-                            : "bg-[#E6F4EA] text-[#2E7D32]"
+                            : "bg-clear-bg text-success-text"
                         }`}
                       >
                         Current
@@ -244,15 +244,15 @@ export default function SubscriptionPage() {
 
                   <div className="mt-3 flex items-baseline gap-1">
                     <span
-                      className={`text-3xl font-black ${
-                        isPopular ? "text-white" : "text-slate-900"
+                      className={`text-3xl font-bold ${
+                        isPopular ? "text-white" : "text-onyx"
                       }`}
                     >
                       {item.price}
                     </span>
                     <span
                       className={`text-xs ${
-                        isPopular ? "text-white/70" : "text-slate-400"
+                        isPopular ? "text-stone/70" : "text-ash"
                       }`}
                     >
                       {item.period}
@@ -261,25 +261,25 @@ export default function SubscriptionPage() {
 
                   <p
                     className={`mt-2 text-xs leading-relaxed ${
-                      isPopular ? "text-white/80" : "text-slate-500"
+                      isPopular ? "text-stone/80" : "text-ash"
                     }`}
                   >
                     {item.description}
                   </p>
 
-                  <div className="my-5 border-t border-slate-100/20" />
+                  <div className="my-5 border-t border-pebble/30" />
 
                   <div className="space-y-2.5 text-xs">
                     {item.features.map((feature) => (
                       <div key={feature} className="flex items-center gap-2">
                         <Check
                           className={`h-3.5 w-3.5 shrink-0 stroke-[2.5] ${
-                            isPopular ? "text-emerald-400" : "text-[#2E7D32]"
+                            isPopular ? "text-breath" : "text-complete-status"
                           }`}
                         />
                         <span
                           className={
-                            isPopular ? "text-white/90" : "text-slate-700"
+                            isPopular ? "text-stone/90" : "text-onyx"
                           }
                         >
                           {feature}
@@ -293,14 +293,14 @@ export default function SubscriptionPage() {
                   <button
                     type="button"
                     disabled={isCurrent}
-                    className={`w-full py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                    className={`w-full py-2.5 rounded-[10px] text-xs font-semibold transition cursor-pointer ${
                       isCurrent
                         ? isPopular
-                          ? "bg-white/10 text-white/60 cursor-not-allowed"
-                          : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                          ? "bg-white/10 text-white/50 cursor-not-allowed"
+                          : "bg-mist text-ash cursor-not-allowed"
                         : isPopular
-                        ? "bg-white text-[#182E25] hover:bg-slate-100 shadow-xs"
-                        : "bg-[#182E25] text-white hover:bg-[#12231B] shadow-xs"
+                        ? "bg-white text-onyx hover:bg-stone shadow-xs"
+                        : "bg-onyx text-white hover:bg-black shadow-xs"
                     }`}
                   >
                     {isCurrent ? "Active Plan" : "Upgrade Plan"}

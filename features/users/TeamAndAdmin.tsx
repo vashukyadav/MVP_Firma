@@ -23,26 +23,7 @@ export default function TeamAndAdmins() {
   const loadUsers = async () => {
     try {
       const data = await db.users.toArray();
-      if (data.length === 0) {
-        // Sample baseline data matching the dashboard stats
-        const initialUsers: User[] = [
-          { name: "Rahul Sharma", email: "rahul@abcsolutions.com", password: "***", role: "OWNER", size: 0 },
-          { name: "Pooja Verma", email: "pooja@abcsolutions.com", password: "***", role: "ACCOUNT_ADMIN", size: 0 },
-          { name: "Amit Kumar", email: "amit.k@abcsolutions.com", password: "***", role: "SALES_MANAGER", size: 0 },
-          { name: "Vikram Singh", email: "vikram@abcsolutions.com", password: "***", role: "SALES_MANAGER", size: 0 },
-          { name: "Sneha Reddy", email: "sneha@abcsolutions.com", password: "***", role: "SALES_MANAGER", size: 0 },
-          { name: "Rajesh Joshi", email: "rajesh@abcsolutions.com", password: "***", role: "PROJECT_MANAGER", size: 0 },
-          { name: "Ananya Roy", email: "ananya@abcsolutions.com", password: "***", role: "PROJECT_MANAGER", size: 0 },
-          { name: "Ravi Patel", email: "ravi.p@abcsolutions.com", password: "***", role: "FIELD_WORKER", size: 0 },
-          { name: "Suresh Meena", email: "suresh@abcsolutions.com", password: "***", role: "FIELD_WORKER", size: 0 },
-          { name: "Deepak Yadav", email: "deepak@abcsolutions.com", password: "***", role: "FIELD_WORKER", size: 0 },
-          { name: "Manoj Kumar", email: "manoj@abcsolutions.com", password: "***", role: "FIELD_WORKER", size: 0 },
-          { name: "Kavita Nair", email: "kavita@abcsolutions.com", password: "***", role: "FINANCE_MANAGER", size: 0 },
-        ];
-        setUsers(initialUsers);
-      } else {
-        setUsers(data);
-      }
+      setUsers(data);
     } catch (error) {
       console.error("Failed to load users:", error);
     } finally {
@@ -57,19 +38,19 @@ export default function TeamAndAdmins() {
   const getRoleBadge = (role: User["role"]) => {
     switch (role) {
       case "OWNER":
-        return { label: "Owner", color: "bg-[#FEF7E2] text-[#C98A19] border-[#FBECC5]" };
+        return { label: "Owner", color: "bg-sunfleck text-onyx border-pebble" };
       case "ACCOUNT_ADMIN":
-        return { label: "Account Admin", color: "bg-[#E5EDE7] text-[#182E25] border-[#CADBCE]" };
+        return { label: "Account Admin", color: "bg-breath text-onyx border-pebble" };
       case "SALES_MANAGER":
-        return { label: "Sales Manager", color: "bg-[#E6F4EA] text-[#183D2D] border-[#CBEAD5]" };
+        return { label: "Sales Manager", color: "bg-clear-bg text-success-text border-pebble" };
       case "PROJECT_MANAGER":
-        return { label: "Project Manager", color: "bg-[#EBF3ED] text-[#416C50] border-[#D1E5D8]" };
+        return { label: "Project Manager", color: "bg-breath text-onyx border-pebble" };
       case "FIELD_WORKER":
-        return { label: "Field Worker", color: "bg-[#E8F5E9] text-[#2E7D32] border-[#C8E6C9]" };
+        return { label: "Field Worker", color: "bg-stone text-onyx border-pebble" };
       case "FINANCE_MANAGER":
-        return { label: "Finance Manager", color: "bg-[#FFF8E1] text-[#E65100] border-[#FFE082]" };
+        return { label: "Finance Manager", color: "bg-caution-bg text-caution-text border-pebble" };
       default:
-        return { label: role, color: "bg-slate-100 text-slate-700 border-slate-200" };
+        return { label: role, color: "bg-stone text-ash border-pebble" };
     }
   };
 
@@ -93,15 +74,15 @@ export default function TeamAndAdmins() {
   return (
     <FirmaLayout activeNav="Team & Admins">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4 pb-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-2 pb-1">
         <div>
-          <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+          <span className="text-eyebrow font-semibold tracking-wider text-ash uppercase">
             ORGANIZATION
           </span>
-          <h1 className="text-2xl font-extrabold text-slate-900 mt-0.5 tracking-tight flex items-center gap-2">
+          <h1 className="text-display-h1 font-bold text-onyx mt-0.5 tracking-tight flex items-center gap-2">
             Team &amp; Admins
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-sm text-ash mt-1">
             Manage your organization workforce, assign roles, and monitor team access.
           </p>
         </div>
@@ -109,35 +90,35 @@ export default function TeamAndAdmins() {
 
       {/* 3 KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-2xl bg-white p-4 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center gap-3.5">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#E6F4EA] text-[#2E7D32]">
+        <div className="rounded-[10px] bg-white p-4.5 border border-pebble flex items-center gap-3.5 shadow-2xs">
+          <div className="flex h-11 w-11 items-center justify-center rounded-[8px] bg-clear-bg text-success-text">
             <Users className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-[11px] font-medium text-slate-400">Total Members</span>
-            <p className="text-2xl font-extrabold text-slate-900">{users.length}</p>
+            <span className="text-xs font-semibold text-ash">Total Members</span>
+            <p className="text-2xl font-bold text-onyx">{users.length}</p>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white p-4 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center gap-3.5">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#E5EDE7] text-[#182E25]">
+        <div className="rounded-[10px] bg-white p-4.5 border border-pebble flex items-center gap-3.5 shadow-2xs">
+          <div className="flex h-11 w-11 items-center justify-center rounded-[8px] bg-breath text-onyx">
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-[11px] font-medium text-slate-400">Administrators</span>
-            <p className="text-2xl font-extrabold text-slate-900">
+            <span className="text-xs font-semibold text-ash">Administrators</span>
+            <p className="text-2xl font-bold text-onyx">
               {users.filter((u) => u.role === "OWNER" || u.role === "ACCOUNT_ADMIN").length}
             </p>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white p-4 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex items-center gap-3.5">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FEF7E2] text-[#C98A19]">
+        <div className="rounded-[10px] bg-white p-4.5 border border-pebble flex items-center gap-3.5 shadow-2xs">
+          <div className="flex h-11 w-11 items-center justify-center rounded-[8px] bg-sunfleck text-onyx">
             <Briefcase className="h-5 w-5" />
           </div>
           <div>
-            <span className="text-[11px] font-medium text-slate-400">Field &amp; Operations</span>
-            <p className="text-2xl font-extrabold text-slate-900">
+            <span className="text-xs font-semibold text-ash">Field &amp; Operations</span>
+            <p className="text-2xl font-bold text-onyx">
               {users.filter((u) => u.role !== "OWNER" && u.role !== "ACCOUNT_ADMIN").length}
             </p>
           </div>
@@ -145,15 +126,15 @@ export default function TeamAndAdmins() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="rounded-2xl bg-white p-4 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col sm:flex-row gap-3">
+      <div className="rounded-[10px] bg-white p-4 border border-pebble flex flex-col sm:flex-row gap-3 shadow-2xs">
         <div className="relative flex-1">
-          <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="h-4 w-4 text-ash absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search by name or email address..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3.5 py-2 text-xs text-slate-800 placeholder-slate-400 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:border-[#182E25] focus:bg-white transition"
+            className="w-full h-10 pl-10 pr-3.5 text-sm text-onyx placeholder:text-ash bg-stone rounded-[10px] border border-pebble outline-none focus:border-forest focus:ring-2 focus:ring-forest/20 transition"
           />
         </div>
 
@@ -162,7 +143,7 @@ export default function TeamAndAdmins() {
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="appearance-none bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium rounded-xl px-3.5 py-2 pr-8 outline-none focus:border-[#182E25] cursor-pointer"
+              className="appearance-none h-10 bg-stone border border-pebble text-onyx text-sm font-medium rounded-[10px] px-3.5 pr-9 outline-none focus:border-forest focus:ring-2 focus:ring-forest/20 cursor-pointer"
             >
               <option value="ALL">All Roles</option>
               <option value="OWNER">Owner</option>
@@ -172,66 +153,82 @@ export default function TeamAndAdmins() {
               <option value="FIELD_WORKER">Field Worker</option>
               <option value="FINANCE_MANAGER">Finance Manager</option>
             </select>
-            <ChevronDown className="h-3.5 w-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="h-4 w-4 text-ash absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
       </div>
 
       {/* Users Table */}
-      <div className="rounded-2xl bg-white border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-sm font-bold text-slate-900">
+      <div className="rounded-[10px] bg-white border border-pebble overflow-hidden shadow-2xs">
+        <div className="px-6 py-4 border-b border-pebble flex items-center justify-between">
+          <h2 className="text-base font-bold text-onyx">
             Team Directory ({filteredUsers.length})
           </h2>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-xs text-slate-400">
+          <div className="p-8 text-center text-body text-ash">
             Loading team members...
           </div>
         ) : filteredUsers.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400">
+          <div className="p-8 text-center text-body text-ash">
             No team members matched your query.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <tr className="border-b border-pebble bg-stone text-xs font-semibold text-ash uppercase tracking-wider">
                   <th className="px-6 py-3.5">Name</th>
                   <th className="px-6 py-3.5">Email</th>
                   <th className="px-6 py-3.5">Role</th>
                   <th className="px-6 py-3.5 text-right">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
+              <tbody className="divide-y divide-pebble text-sm">
                 {filteredUsers.map((item, idx) => {
                   const badge = getRoleBadge(item.role);
                   return (
-                    <tr key={item.id || idx} className="hover:bg-slate-50/70 transition">
+                    <tr key={item.id || idx} className="hover:bg-stone/50 transition">
                       <td className="px-6 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E5EDE7] text-[#182E25] font-bold text-xs">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-breath text-onyx font-bold text-xs">
                             {item.name.charAt(0).toUpperCase()}
                           </div>
-                          <span className="font-bold text-slate-900">{item.name}</span>
+                          <span className="font-semibold text-onyx">{item.name}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-3.5 text-slate-500 font-medium">
+                      <td className="px-6 py-3.5 text-ash font-medium">
                         {item.email}
                       </td>
                       <td className="px-6 py-3.5">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${badge.color}`}>
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${badge.color}`}>
                           {badge.label}
                         </span>
                       </td>
                       <td className="px-6 py-3.5 text-right">
-                        <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-                        <span className="ml-1.5 text-[11px] text-slate-500">Active</span>
+                        <span className="inline-block h-2 w-2 rounded-full bg-success" />
+                        <span className="ml-1.5 text-xs font-medium text-ash">Active</span>
                       </td>
                     </tr>
                   );
                 })}
+
+                {filteredUsers.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-12 text-center text-ash">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-stone text-ash">
+                          <Users className="h-6 w-6" />
+                        </div>
+                        <p className="text-sm font-medium text-onyx">No team members registered yet</p>
+                        <p className="text-xs text-ash">
+                          Create user accounts from the Users &amp; Roles section to populate your team.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

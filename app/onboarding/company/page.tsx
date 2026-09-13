@@ -49,8 +49,8 @@ type CompanyFormData = z.infer<typeof companySchema>;
 
 // Reusable input class
 const inputCls = (hasError?: boolean) =>
-  `w-full rounded-xl border bg-[#F9FAFB] px-3.5 py-2.5 text-xs text-slate-800 placeholder-slate-400 shadow-xs outline-none transition focus:border-[#182E25] focus:ring-2 focus:ring-[#182E25]/10 focus:bg-white ${
-    hasError ? "border-red-400" : "border-slate-200"
+  `w-full rounded-[10px] border bg-stone px-3.5 py-2.5 text-body text-onyx placeholder:text-ash outline-none transition focus:border-onyx ${
+    hasError ? "border-hazard-text text-hazard-text" : "border-pebble"
   }`;
 
 export default function CompanyPage() {
@@ -92,7 +92,7 @@ export default function CompanyPage() {
   // ───────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#F5F6F5] flex flex-col font-sans antialiased">
+    <div className="min-h-screen bg-stone flex flex-col font-sans antialiased">
       <OnboardingHeader />
 
       <main className="flex-1 pb-16 pt-4">
@@ -101,26 +101,26 @@ export default function CompanyPage() {
 
           {/* Heading */}
           <div className="my-6">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#E5EDE7] px-3.5 py-1.5 text-xs font-semibold text-[#182E25] mb-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-breath px-3.5 py-1.5 text-eyebrow font-semibold text-onyx border border-pebble mb-3">
               <Building2 className="h-3.5 w-3.5" />
               Step 2 of 4
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            <h1 className="text-display-h1 font-bold tracking-tight text-onyx">
               Tell us about your company
             </h1>
-            <p className="mt-1.5 text-sm text-slate-500">
+            <p className="mt-1.5 text-body text-ash">
               This helps us personalize your experience.
             </p>
           </div>
 
           {/* Form Card */}
-          <div className="rounded-2xl border border-slate-200/60 bg-white p-6 sm:p-8 shadow-xs">
+          <div className="rounded-[20px] border border-pebble bg-white p-6 sm:p-8 shadow-none">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {/* Row 1: Company Name & Website */}
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                    Company Name <span className="text-red-500">*</span>
+                  <label className="text-eyebrow font-medium text-ash flex items-center gap-1">
+                    Company Name <span className="text-hazard-text">*</span>
                   </label>
                   <input
                     type="text"
@@ -129,14 +129,14 @@ export default function CompanyPage() {
                     className={inputCls(!!errors.companyName)}
                   />
                   {errors.companyName && (
-                    <p className="text-[11px] text-red-500 font-medium">
+                    <p className="text-eyebrow text-hazard-text font-medium">
                       {errors.companyName.message}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
+                  <label className="text-eyebrow font-medium text-ash">
                     Company Website
                   </label>
                   <input
@@ -151,8 +151,8 @@ export default function CompanyPage() {
               {/* Row 2: Industry & Company Size */}
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                    Industry <span className="text-red-500">*</span>
+                  <label className="text-eyebrow font-medium text-ash flex items-center gap-1">
+                    Industry <span className="text-hazard-text">*</span>
                   </label>
                   <div className="relative">
                     <select
@@ -170,18 +170,18 @@ export default function CompanyPage() {
                       <option value="Real Estate">Real Estate</option>
                       <option value="Other">Other</option>
                     </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ash" />
                   </div>
                   {errors.industry && (
-                    <p className="text-[11px] text-red-500 font-medium">
+                    <p className="text-eyebrow text-hazard-text font-medium">
                       {errors.industry.message}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                    Company Size <span className="text-red-500">*</span>
+                  <label className="text-eyebrow font-medium text-ash flex items-center gap-1">
+                    Company Size <span className="text-hazard-text">*</span>
                   </label>
                   <div className="relative">
                     <select
@@ -195,10 +195,10 @@ export default function CompanyPage() {
                       <option value="201-500">201 – 500 employees</option>
                       <option value="500+">500+ employees</option>
                     </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ash" />
                   </div>
                   {errors.companySize && (
-                    <p className="text-[11px] text-red-500 font-medium">
+                    <p className="text-eyebrow text-hazard-text font-medium">
                       {errors.companySize.message}
                     </p>
                   )}
@@ -208,8 +208,8 @@ export default function CompanyPage() {
               {/* Row 3: Country, State, City */}
               <div className="grid gap-5 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                    Country <span className="text-red-500">*</span>
+                  <label className="text-eyebrow font-medium text-ash flex items-center gap-1">
+                    Country <span className="text-hazard-text">*</span>
                   </label>
                   <div className="relative">
                     <select
@@ -222,18 +222,18 @@ export default function CompanyPage() {
                       <option value="United Arab Emirates">United Arab Emirates</option>
                       <option value="Singapore">Singapore</option>
                     </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ash" />
                   </div>
                   {errors.country && (
-                    <p className="text-[11px] text-red-500 font-medium">
+                    <p className="text-eyebrow text-hazard-text font-medium">
                       {errors.country.message}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                    State <span className="text-red-500">*</span>
+                  <label className="text-eyebrow font-medium text-ash flex items-center gap-1">
+                    State <span className="text-hazard-text">*</span>
                   </label>
                   <div className="relative">
                     <select
@@ -249,18 +249,18 @@ export default function CompanyPage() {
                       <option value="Tamil Nadu">Tamil Nadu</option>
                       <option value="Other">Other</option>
                     </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ash" />
                   </div>
                   {errors.state && (
-                    <p className="text-[11px] text-red-500 font-medium">
+                    <p className="text-eyebrow text-hazard-text font-medium">
                       {errors.state.message}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                    City <span className="text-red-500">*</span>
+                  <label className="text-eyebrow font-medium text-ash flex items-center gap-1">
+                    City <span className="text-hazard-text">*</span>
                   </label>
                   <input
                     type="text"
@@ -269,7 +269,7 @@ export default function CompanyPage() {
                     className={inputCls(!!errors.city)}
                   />
                   {errors.city && (
-                    <p className="text-[11px] text-red-500 font-medium">
+                    <p className="text-eyebrow text-hazard-text font-medium">
                       {errors.city.message}
                     </p>
                   )}
@@ -278,8 +278,8 @@ export default function CompanyPage() {
 
               {/* Row 4: Address */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                  Company Address <span className="text-red-500">*</span>
+                <label className="text-eyebrow font-medium text-ash flex items-center gap-1">
+                  Company Address <span className="text-hazard-text">*</span>
                 </label>
                 <input
                   type="text"
@@ -288,18 +288,18 @@ export default function CompanyPage() {
                   className={inputCls(!!errors.address)}
                 />
                 {errors.address && (
-                  <p className="text-[11px] text-red-500 font-medium">
+                  <p className="text-eyebrow text-hazard-text font-medium">
                     {errors.address.message}
                   </p>
                 )}
               </div>
 
               {/* Bottom Buttons */}
-              <div className="flex items-center justify-between border-t border-slate-100 pt-6 mt-2">
+              <div className="flex items-center justify-between border-t border-pebble pt-6 mt-2">
                 <button
                   type="button"
                   onClick={() => router.push("/onboarding/plan")}
-                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition cursor-pointer"
+                  className="flex items-center gap-2 rounded-[10px] border border-pebble bg-stone px-4 py-2.5 text-body font-semibold text-onyx hover:bg-mist transition cursor-pointer"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   <span>Back</span>
@@ -307,7 +307,7 @@ export default function CompanyPage() {
 
                 <button
                   type="submit"
-                  className="flex items-center gap-2 rounded-xl bg-[#182E25] px-6 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#12231B] active:scale-[0.99] transition cursor-pointer"
+                  className="flex items-center gap-2 rounded-[10px] bg-onyx px-6 py-2.5 text-body font-bold text-white hover:bg-onyx/90 active:scale-[0.99] transition cursor-pointer"
                 >
                   <span>Continue</span>
                   <ArrowRight className="h-3.5 w-3.5" />

@@ -32,13 +32,13 @@ export default function SettingPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4 pb-2">
         <div>
-          <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+          <span className="text-eyebrow font-semibold tracking-wider text-ash uppercase">
             PREFERENCES
           </span>
-          <h1 className="text-2xl font-extrabold text-slate-900 mt-0.5 tracking-tight flex items-center gap-2">
+          <h1 className="text-display-h1 font-bold text-onyx mt-0.5 tracking-tight flex items-center gap-2">
             System &amp; Account Settings
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-body text-ash mt-1">
             Configure enterprise preferences, security protocols, and team notification channels.
           </p>
         </div>
@@ -46,9 +46,9 @@ export default function SettingPage() {
         <button
           type="button"
           onClick={handleSave}
-          className="flex items-center gap-2 rounded-xl bg-[#182E25] hover:bg-[#12231B] text-white px-4 py-2 text-xs font-semibold shadow-xs transition cursor-pointer self-start sm:self-auto"
+          className="flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4.5 py-2.5 text-sm font-medium shadow-xs transition cursor-pointer self-start sm:self-auto"
         >
-          <Save className="h-3.5 w-3.5" />
+          <Save className="h-4 w-4" />
           <span>{saved ? "Saved Successfully!" : "Save Changes"}</span>
         </button>
       </div>
@@ -57,26 +57,15 @@ export default function SettingPage() {
         {/* Left (8 cols): Settings Sections */}
         <div className="lg:col-span-8 space-y-5">
           {/* 1. Notification Preferences */}
-          <div className="rounded-2xl bg-white p-6 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E6F4EA] text-[#2E7D32]">
-                <Bell className="h-4 w-4" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  Notification Preferences
-                </h2>
-                <p className="text-[11px] text-slate-400">
-                  Manage how you and your team receive project updates
-                </p>
-              </div>
-            </div>
+          <div className="rounded-[10px] bg-white p-6 border border-pebble shadow-2xs">
+            <h2 className="text-base font-bold text-onyx">Notifications &amp; Alerts</h2>
+            <p className="text-xs text-ash mt-0.5">Control how FIRMA communicates system updates to your team.</p>
 
-            <div className="mt-5 space-y-4 text-xs">
+            <div className="mt-5 space-y-4 text-sm">
               <div className="flex items-center justify-between py-2">
                 <div>
-                  <p className="font-bold text-slate-800">Email Notifications</p>
-                  <p className="text-slate-400 text-[11px]">
+                  <p className="font-semibold text-onyx">Email Notifications</p>
+                  <p className="text-ash text-xs mt-0.5">
                     Receive email alerts for new quotations, jobs, and project delays.
                   </p>
                 </div>
@@ -84,7 +73,7 @@ export default function SettingPage() {
                   type="button"
                   onClick={() => setEmailAlerts(!emailAlerts)}
                   className={`w-11 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${
-                    emailAlerts ? "bg-[#182E25]" : "bg-slate-200"
+                    emailAlerts ? "bg-forest" : "bg-stone border border-pebble"
                   }`}
                 >
                   <div
@@ -95,10 +84,10 @@ export default function SettingPage() {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between py-2 border-t border-slate-100">
+              <div className="flex items-center justify-between py-2 border-t border-pebble/60">
                 <div>
-                  <p className="font-bold text-slate-800">SMS / WhatsApp Field Alerts</p>
-                  <p className="text-slate-400 text-[11px]">
+                  <p className="font-semibold text-onyx">SMS / WhatsApp Field Alerts</p>
+                  <p className="text-ash text-xs mt-0.5">
                     Urgent site safety inspections and immediate dispatch notifications.
                   </p>
                 </div>
@@ -106,7 +95,7 @@ export default function SettingPage() {
                   type="button"
                   onClick={() => setSmsAlerts(!smsAlerts)}
                   className={`w-11 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${
-                    smsAlerts ? "bg-[#182E25]" : "bg-slate-200"
+                    smsAlerts ? "bg-forest" : "bg-stone border border-pebble"
                   }`}
                 >
                   <div
@@ -117,10 +106,10 @@ export default function SettingPage() {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between py-2 border-t border-slate-100">
+              <div className="flex items-center justify-between py-2 border-t border-pebble/60">
                 <div>
-                  <p className="font-bold text-slate-800">Weekly Executive Digest</p>
-                  <p className="text-slate-400 text-[11px]">
+                  <p className="font-semibold text-onyx">Weekly Executive Digest</p>
+                  <p className="text-ash text-xs mt-0.5">
                     Weekly summary of revenue collected and active project milestones.
                   </p>
                 </div>
@@ -128,7 +117,7 @@ export default function SettingPage() {
                   type="button"
                   onClick={() => setWeeklyDigest(!weeklyDigest)}
                   className={`w-11 h-6 flex items-center rounded-full p-1 transition cursor-pointer ${
-                    weeklyDigest ? "bg-[#182E25]" : "bg-slate-200"
+                    weeklyDigest ? "bg-forest" : "bg-stone border border-pebble"
                   }`}
                 >
                   <div
@@ -142,16 +131,16 @@ export default function SettingPage() {
           </div>
 
           {/* 2. Localization & Currency */}
-          <div className="rounded-2xl bg-white p-6 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FEF7E2] text-[#C98A19]">
+          <div className="rounded-[10px] bg-white p-6 border border-pebble">
+            <div className="flex items-center gap-3 pb-4 border-b border-pebble">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[6px] bg-sunfleck text-onyx">
                 <Globe className="h-4 w-4" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-slate-900">
+                <h2 className="text-heading-h3 font-bold text-onyx">
                   Regional &amp; Localization
                 </h2>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-eyebrow text-ash">
                   Currency symbol and default time zone formats
                 </p>
               </div>
@@ -159,13 +148,13 @@ export default function SettingPage() {
 
             <div className="grid gap-4 sm:grid-cols-2 mt-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">
+                <label className="text-eyebrow font-medium text-ash">
                   Primary Currency
                 </label>
                 <select
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-900 outline-none focus:border-[#182E25] shadow-2xs"
+                  className="w-full rounded-[10px] border border-pebble bg-stone px-3.5 py-2 text-body text-onyx outline-none focus:border-onyx"
                 >
                   <option value="INR">Indian Rupee (₹ INR)</option>
                   <option value="USD">US Dollar ($ USD)</option>
@@ -174,12 +163,12 @@ export default function SettingPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">
+                <label className="text-eyebrow font-medium text-ash">
                   Timezone
                 </label>
                 <select
                   defaultValue="IST"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-900 outline-none focus:border-[#182E25] shadow-2xs"
+                  className="w-full rounded-[10px] border border-pebble bg-stone px-3.5 py-2 text-body text-onyx outline-none focus:border-onyx"
                 >
                   <option value="IST">Asia/Kolkata (IST +5:30)</option>
                   <option value="GST">Asia/Dubai (GST +4:00)</option>
@@ -192,29 +181,29 @@ export default function SettingPage() {
 
         {/* Right (4 cols): Security status */}
         <div className="lg:col-span-4 space-y-5">
-          <div className="rounded-2xl bg-white p-6 border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E5EDE7] text-[#182E25]">
+          <div className="rounded-[10px] bg-white p-6 border border-pebble">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[6px] bg-breath text-onyx">
               <Shield className="h-5 w-5" />
             </div>
-            <h3 className="mt-3 text-sm font-bold text-slate-900">
+            <h3 className="mt-3 text-heading-h3 font-bold text-onyx">
               Security &amp; Encryption
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-eyebrow text-ash mt-0.5">
               End-to-end encryption active for all quotation and financial files.
             </p>
 
-            <div className="mt-4 pt-4 border-t border-slate-100 space-y-2.5 text-xs">
+            <div className="mt-4 pt-4 border-t border-pebble space-y-2.5 text-body">
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Two-Factor Auth:</span>
-                <span className="font-semibold text-emerald-600">Enabled</span>
+                <span className="text-ash">Two-Factor Auth:</span>
+                <span className="font-semibold text-success-text">Enabled</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Session Timeout:</span>
-                <span className="font-semibold text-slate-700">30 Days</span>
+                <span className="text-ash">Session Timeout:</span>
+                <span className="font-semibold text-onyx">30 Days</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">Role Audit Logs:</span>
-                <span className="font-semibold text-slate-700">Active</span>
+                <span className="text-ash">Role Audit Logs:</span>
+                <span className="font-semibold text-onyx">Active</span>
               </div>
             </div>
           </div>

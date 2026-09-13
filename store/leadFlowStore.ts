@@ -1,0 +1,384 @@
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+
+export type LeadStatus = "NEW" | "CONTACTED" | "QUALIFIED" | "LOST" | "CONVERTED";
+
+export interface Lead {
+  id: string;
+  companyName: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  estimatedValue: number;
+  location: string;
+  requirement: string;
+  source: string;
+  status: LeadStatus;
+  notes?: string;
+  createdAt: string;
+  timeline: {
+    event: string;
+    timestamp: string;
+    completed: boolean;
+  }[];
+}
+
+export type OpportunityStage = "NEW" | "QUALIFIED" | "PROPOSAL" | "NEGOTIATION" | "WON";
+
+export interface Opportunity {
+  id: string;
+  title: string;
+  leadId?: string;
+  customerName: string;
+  contactPerson: string;
+  estimatedValue: number;
+  expectedCloseDate: string;
+  actualCloseDate?: string;
+  stage: OpportunityStage;
+  description?: string;
+  owner: string;
+  createCustomer?: boolean;
+  createContact?: boolean;
+  winReason?: string;
+  winNotes?: string;
+  handedOverToProject?: boolean;
+  linkedProjectId?: string;
+  createdAt: string;
+}
+
+export interface QuoteLineItem {
+  id: number;
+  description: string;
+  qty: number;
+  rate: number;
+  amount: number;
+}
+
+export type QuoteStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED";
+
+export interface Quote {
+  id: string;
+  quoteNo: string;
+  opportunityId: string;
+  opportunityTitle: string;
+  customerName: string;
+  value: number;
+  status: QuoteStatus;
+  validUntil: string;
+  sentOn?: string;
+  lineItems: QuoteLineItem[];
+  createdAt: string;
+}
+
+export interface ProjectItem {
+  id: string;
+  name: string;
+  location: string;
+  client: string;
+  budget: string;
+  progress: number;
+  status: "IN_PROGRESS" | "AT_RISK" | "COMPLETED";
+  lead: string;
+  due: string;
+  sourceOpportunityId?: string;
+}
+
+interface LeadFlowState {
+  leads: Lead[];
+  opportunities: Opportunity[];
+  quotes: Quote[];
+  projects: ProjectItem[];
+
+  // Lead actions
+  addLead: (lead: Omit<Lead, "id" | "createdAt" | "timeline">) => Lead;
+  updateLead: (id: string, data: Partial<Lead>) => void;
+  deleteLead: (id: string) => void;
+
+  // Conversion action (Step 3 -> 4)
+  convertLeadToOpportunity: (
+    leadId: string,
+    data: {
+      opportunityName: string;
+      estimatedValue: number;
+      expectedCloseDate: string;
+      stage?: OpportunityStage;
+      description?: string;
+      createCustomer?: boolean;
+      createContact?: boolean;
+    }
+  ) => Opportunity;
+
+  // Quote actions (Step 6 -> 7)
+  createQuote: (
+    opportunityId: string,
+    data: {
+      quoteNo?: string;
+      validUntil: string;
+      lineItems: QuoteLineItem[];
+      status?: QuoteStatus;
+    }
+  ) => Quote;
+  acceptQuote: (quoteId: string) => void;
+  updateQuoteStatus: (quoteId: string, status: QuoteStatus) => void;
+
+  // Handover action (Step 8)
+  handoverToProject: (
+    opportunityId: string,
+    data?: {
+      winReason?: string;
+      winNotes?: string;
+      projectManager?: string;
+    }
+  ) => ProjectItem;
+
+  // Add generic project
+  addProject: (project: ProjectItem) => void;
+}
+
+const defaultLeads: Lead[] = [];
+const defaultOpportunities: Opportunity[] = [];
+const defaultQuotes: Quote[] = [];
+const defaultProjects: ProjectItem[] = [];
+
+export const useLeadFlowStore = create<LeadFlowState>()(
+  persist(
+    (set, get) => ({
+      leads: defaultLeads,
+      opportunities: defaultOpportunities,
+      quotes: defaultQuotes,
+      projects: defaultProjects,
+
+      addLead: (leadData) => {
+        const id = `LEAD-${String(get().leads.length + 1).padStart(3, "0")}`;
+        const newLead: Lead = {
+          ...leadData,
+          id,
+          createdAt: new Date().toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          timeline: [
+            {
+              event: "Lead created",
+              timestamp: new Date().toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              completed: true,
+            },
+            { event: "Contacted", timestamp: "Pending", completed: false },
+            { event: "Qualified", timestamp: "Pending", completed: false },
+          ],
+        };
+        set((state) => ({ leads: [newLead, ...state.leads] }));
+        return newLead;
+      },
+
+      updateLead: (id, data) => {
+        set((state) => ({
+          leads: state.leads.map((lead) =>
+            lead.id === id ? { ...lead, ...data } : lead
+          ),
+        }));
+      },
+
+      deleteLead: (id) => {
+        set((state) => ({
+          leads: state.leads.filter((lead) => lead.id !== id),
+        }));
+      },
+
+      convertLeadToOpportunity: (leadId, data) => {
+        const lead = get().leads.find((l) => l.id === leadId);
+        const oppId = `OPP-${Math.floor(100 + Math.random() * 900)}`;
+
+        const newOpp: Opportunity = {
+          id: oppId,
+          title: data.opportunityName,
+          leadId,
+          customerName: lead?.companyName || "New Customer",
+          contactPerson: lead?.contactPerson || "Lead Contact",
+          estimatedValue: data.estimatedValue,
+          expectedCloseDate: data.expectedCloseDate,
+          stage: data.stage || "QUALIFIED",
+          description: data.description || "",
+          owner: "Dewald",
+          createCustomer: data.createCustomer ?? true,
+          createContact: data.createContact ?? true,
+          createdAt: new Date().toISOString().split("T")[0],
+        };
+
+        set((state) => ({
+          opportunities: [newOpp, ...state.opportunities],
+          leads: state.leads.map((l) =>
+            l.id === leadId
+              ? {
+                  ...l,
+                  status: "CONVERTED",
+                  timeline: [
+                    ...l.timeline,
+                    {
+                      event: "Converted to Opportunity",
+                      timestamp: new Date().toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }),
+                      completed: true,
+                    },
+                  ],
+                }
+              : l
+          ),
+        }));
+
+        return newOpp;
+      },
+
+      createQuote: (opportunityId, data) => {
+        const opp = get().opportunities.find((o) => o.id === opportunityId);
+        const quoteNo = data.quoteNo || `Q-00${get().quotes.length + 12}`;
+        const totalValue = data.lineItems.reduce((sum, item) => sum + item.amount, 0);
+
+        const newQuote: Quote = {
+          id: quoteNo,
+          quoteNo,
+          opportunityId,
+          opportunityTitle: opp?.title || "New Opportunity",
+          customerName: opp?.customerName || "Customer",
+          value: totalValue,
+          status: data.status || "SENT",
+          validUntil: data.validUntil,
+          sentOn: data.status === "SENT" ? new Date().toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          }) : undefined,
+          lineItems: data.lineItems,
+          createdAt: new Date().toISOString().split("T")[0],
+        };
+
+        set((state) => ({
+          quotes: [newQuote, ...state.quotes],
+          opportunities: state.opportunities.map((o) =>
+            o.id === opportunityId ? { ...o, stage: "PROPOSAL" } : o
+          ),
+        }));
+
+        return newQuote;
+      },
+
+      acceptQuote: (quoteId) => {
+        const quote = get().quotes.find((q) => q.id === quoteId);
+        if (!quote) return;
+
+        set((state) => ({
+          quotes: state.quotes.map((q) =>
+            q.id === quoteId ? { ...q, status: "ACCEPTED" } : q
+          ),
+          opportunities: state.opportunities.map((o) =>
+            o.id === quote.opportunityId
+              ? {
+                  ...o,
+                  stage: "WON",
+                  actualCloseDate: new Date().toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  }),
+                  winReason: "Customer accepted quote",
+                  winNotes: "Project awarded. Handover to Project Manager for execution.",
+                }
+              : o
+          ),
+        }));
+      },
+
+      updateQuoteStatus: (quoteId, status) => {
+        set((state) => ({
+          quotes: state.quotes.map((q) =>
+            q.id === quoteId ? { ...q, status } : q
+          ),
+        }));
+      },
+
+      handoverToProject: (opportunityId, data) => {
+        const opp = get().opportunities.find((o) => o.id === opportunityId);
+        const projectId = `PRJ-${Math.floor(100 + Math.random() * 900)}`;
+
+        const newProject: ProjectItem = {
+          id: projectId,
+          name: opp?.title || "New Project",
+          location: "On-site Delhi NCR",
+          client: opp?.customerName || "Client",
+          budget: `₹${(opp?.estimatedValue || 2000000).toLocaleString("en-IN")}`,
+          progress: 0,
+          status: "IN_PROGRESS",
+          lead: data?.projectManager || "Amit Kumar",
+          due: "30 Nov 2026",
+          sourceOpportunityId: opportunityId,
+        };
+
+        set((state) => ({
+          projects: [newProject, ...state.projects],
+          opportunities: state.opportunities.map((o) =>
+            o.id === opportunityId
+              ? {
+                  ...o,
+                  stage: "WON",
+                  handedOverToProject: true,
+                  linkedProjectId: projectId,
+                  winReason: data?.winReason || o.winReason || "Customer accepted quote",
+                  winNotes: data?.winNotes || o.winNotes || "Project awarded. Handover to Project Manager for execution.",
+                }
+              : o
+          ),
+        }));
+
+        return newProject;
+      },
+
+      addProject: (project) => {
+        set((state) => ({
+          projects: [project, ...state.projects],
+        }));
+      },
+    }),
+    {
+      name: "mini-firma-lead-flow",
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (!persistedState || version < 2) {
+          const dummyLeadIds = new Set(["LEAD-001", "LEAD-002", "LEAD-003", "LEAD-004"]);
+          const dummyOppIds = new Set(["OPP-001", "OPP-002", "OPP-003"]);
+          const dummyQuoteIds = new Set(["Q-0010", "Q-0011"]);
+          const dummyProjectIds = new Set(["PRJ-101", "PRJ-102", "PRJ-103"]);
+
+          return {
+            leads: Array.isArray(persistedState?.leads)
+              ? persistedState.leads.filter((l: any) => !dummyLeadIds.has(l.id))
+              : [],
+            opportunities: Array.isArray(persistedState?.opportunities)
+              ? persistedState.opportunities.filter((o: any) => !dummyOppIds.has(o.id))
+              : [],
+            quotes: Array.isArray(persistedState?.quotes)
+              ? persistedState.quotes.filter((q: any) => !dummyQuoteIds.has(q.id))
+              : [],
+            projects: Array.isArray(persistedState?.projects)
+              ? persistedState.projects.filter((p: any) => !dummyProjectIds.has(p.id))
+              : [],
+          };
+        }
+        return persistedState;
+      },
+    }
+  )
+);

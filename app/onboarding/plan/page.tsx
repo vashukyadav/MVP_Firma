@@ -78,7 +78,7 @@ export default function PlanPage() {
   // ───────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#F5F6F5] flex flex-col font-sans antialiased">
+    <div className="min-h-screen bg-stone flex flex-col font-sans antialiased">
       <OnboardingHeader />
 
       <main className="flex-1 pb-16 pt-4">
@@ -87,14 +87,14 @@ export default function PlanPage() {
 
           {/* Page Heading */}
           <div className="text-center my-6">
-            <div className="inline-flex items-center gap-2 rounded-full bg-[#E5EDE7] px-3.5 py-1.5 text-xs font-semibold text-[#182E25] mb-3">
+            <div className="inline-flex items-center gap-2 rounded-full bg-breath px-3.5 py-1.5 text-eyebrow font-semibold text-onyx border border-pebble mb-3">
               <Sparkles className="h-3.5 w-3.5" />
               Step 1 of 4
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            <h1 className="text-display-h1 font-bold tracking-tight text-onyx">
               Choose the right plan for your business
             </h1>
-            <p className="mt-2 text-sm text-slate-500 max-w-xl mx-auto">
+            <p className="mt-2 text-body text-ash max-w-xl mx-auto">
               Select a plan based on your team size and business needs. You can always upgrade later.
             </p>
           </div>
@@ -108,21 +108,21 @@ export default function PlanPage() {
                 <div
                   key={plan.id}
                   onClick={() => setSelectedPlan(plan.id)}
-                  className={`relative flex flex-col justify-between rounded-2xl border bg-white p-6 transition-all duration-150 cursor-pointer ${
+                  className={`relative flex flex-col justify-between rounded-[20px] border bg-white p-6 transition-all duration-150 cursor-pointer ${
                     isSelected
-                      ? "border-[#182E25] ring-2 ring-[#E5EDE7] shadow-md"
-                      : "border-slate-200/80 hover:border-slate-300 hover:shadow-xs"
+                      ? "border-onyx ring-2 ring-breath shadow-none"
+                      : "border-pebble hover:border-onyx shadow-none"
                   }`}
                 >
                   <div>
                     {/* Top Row: Title, Badge & Radio */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-base font-bold text-slate-900">
+                        <span className="text-heading-h3 font-bold text-onyx">
                           {plan.name}
                         </span>
                         {plan.recommended && (
-                          <span className="rounded-full bg-[#182E25] px-2 py-0.5 text-[10px] font-bold text-white">
+                          <span className="rounded-full bg-onyx px-2 py-0.5 text-eyebrow font-bold text-white">
                             Recommended
                           </span>
                         )}
@@ -132,8 +132,8 @@ export default function PlanPage() {
                       <div
                         className={`flex h-4 w-4 items-center justify-center rounded-full border transition-colors shrink-0 ${
                           isSelected
-                            ? "border-[#182E25] bg-[#182E25]"
-                            : "border-slate-300 bg-white"
+                            ? "border-onyx bg-onyx"
+                            : "border-pebble bg-white"
                         }`}
                       >
                         {isSelected && (
@@ -144,21 +144,21 @@ export default function PlanPage() {
 
                     {/* Price */}
                     <div className="mt-4 flex items-baseline gap-1">
-                      <span className="text-2xl font-extrabold text-slate-900">
+                      <span className="text-2xl font-bold text-onyx">
                         {plan.price}
                       </span>
                       {plan.period && (
-                        <span className="text-xs font-medium text-slate-500">
+                        <span className="text-eyebrow font-medium text-ash">
                           {plan.period}
                         </span>
                       )}
                     </div>
 
                     {/* Features List */}
-                    <div className="mt-5 space-y-2.5 border-t border-slate-100 pt-5">
+                    <div className="mt-5 space-y-2.5 border-t border-pebble pt-5">
                       {plan.features.map((feature) => (
-                        <div key={feature} className="flex items-start gap-2.5 text-xs text-slate-700">
-                          <Check className="h-3.5 w-3.5 text-[#2E7D32] shrink-0 mt-0.5 stroke-[2.5]" />
+                        <div key={feature} className="flex items-start gap-2.5 text-body text-onyx">
+                          <Check className="h-3.5 w-3.5 text-complete-status shrink-0 mt-0.5 stroke-[2.5]" />
                           <span>{feature}</span>
                         </div>
                       ))}
@@ -170,11 +170,11 @@ export default function PlanPage() {
           </div>
 
           {/* Bottom Navigation */}
-          <div className="mt-10 flex items-center justify-between border-t border-slate-200/60 pt-6">
+          <div className="mt-10 flex items-center justify-between border-t border-pebble pt-6">
             <button
               type="button"
               onClick={() => router.push("/onboarding/welcome")}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition cursor-pointer"
+              className="flex items-center gap-2 rounded-[10px] border border-pebble bg-stone px-4 py-2 text-body font-semibold text-onyx hover:bg-mist transition cursor-pointer"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               <span>Back</span>
@@ -183,7 +183,7 @@ export default function PlanPage() {
             <button
               type="button"
               onClick={handleContinue}
-              className="flex items-center gap-2 rounded-xl bg-[#182E25] px-6 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#12231B] active:scale-[0.99] transition cursor-pointer"
+              className="flex items-center gap-2 rounded-[10px] bg-onyx px-6 py-2.5 text-body font-bold text-white hover:bg-onyx/90 active:scale-[0.99] transition cursor-pointer"
             >
               <span>Continue</span>
               <ArrowRight className="h-3.5 w-3.5" />
