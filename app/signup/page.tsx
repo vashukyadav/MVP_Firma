@@ -6,7 +6,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { db } from "@/lib/db";
+import { db, generateCompanyId } from "@/lib/db";
 import {
     Building2,
     Eye,
@@ -53,21 +53,52 @@ export default function SignupPage() {
         resolver: zodResolver(signupSchema),
     });
 
-    // ── ALL ORIGINAL LOGIC PRESERVED ───────────────────────────────────────
+    // ── MULTI-TENANT SIGNUP LOGIC ──────────────────────────────────────────
     const onSubmit = async (data: SignupFormData) => {
         setIsLoading(true);
-        const userCount = await db.users.count();
-        const role = userCount === 0 ? "OWNER" : "ACCOUNT_ADMIN";
+        try {
+            const existingUser = await db.users
+                .where("email")
+                .equals(data.email)
+                .first();
 
-        await db.users.add({
-            name: data.name,
-            email: data.email,
-            password: data.password,
-            size: data.size,
-            role,
-        });
+            if (existingUser) {
+                alert("A user with this email already exists. Please log in.");
+                setIsLoading(false);
+                return;
+            }
 
-        router.push("/login");
+            // Each new signup creates an independent tenant (OWNER) with a unique companyId
+            const companyId = generateCompanyId();
+
+            const userId = await db.users.add({
+                companyId,
+                name: data.name,
+                email: data.email,
+                password: data.password,
+                size: data.size,
+                role: "OWNER",
+            });
+
+            // Pre-seed company profile for this organization
+            await db.company.put({
+                userId: Number(userId),
+                companyId,
+                companyName: `${data.name}'s Company`,
+                industry: "Construction",
+                companySize: `${data.size}`,
+                country: "India",
+                state: "",
+                city: "",
+                address: "",
+            });
+
+            router.push("/login");
+        } catch (err) {
+            console.error("Signup failed:", err);
+            alert("Signup failed. Please try again.");
+            setIsLoading(false);
+        }
     };
     // ───────────────────────────────────────────────────────────────────────
 

@@ -44,7 +44,14 @@ import {
 
 export default function LeadsPage() {
   const router = useRouter();
-  const { leads, addLead, deleteLead, convertLeadToOpportunity } = useLeadFlowStore();
+  const {
+    leads,
+    addLead,
+    updateLead,
+    deleteLead,
+    convertLeadToOpportunity,
+    clearAllDummyData,
+  } = useLeadFlowStore();
 
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
@@ -53,9 +60,23 @@ export default function LeadsPage() {
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingLeadId, setEditingLeadId] = useState<string | null>(null);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [convertedOpportunity, setConvertedOpportunity] = useState<Opportunity | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  // Edit Lead Form State
+  const [editCompanyName, setEditCompanyName] = useState("");
+  const [editContactPerson, setEditContactPerson] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editEstimatedValue, setEditEstimatedValue] = useState("");
+  const [editLocation, setEditLocation] = useState("Delhi NCR");
+  const [editRequirement, setEditRequirement] = useState("");
+  const [editSource, setEditSource] = useState("Website");
+  const [editStatus, setEditStatus] = useState<LeadStatus>("NEW");
+  const [editNotes, setEditNotes] = useState("");
 
   // Add Lead Form State
   const [newCompanyName, setNewCompanyName] = useState("");
@@ -77,38 +98,6 @@ export default function LeadsPage() {
 
   const loadCustomers = async () => {
     try {
-      const count = await db.customer.count();
-      if (count === 0) {
-        await db.customer.bulkAdd([
-          {
-            companyName: "Apex Infra Projects",
-            contactPerson: "Rajeshwar Sen",
-            email: "rajeshwar@apexinfra.com",
-            phone: "+91 98765 43210",
-            address: "Delhi NCR",
-            industry: "Infrastructure & Highways",
-            notes: "National Highway EPC contractor",
-          },
-          {
-            companyName: "BuildCraft Ltd",
-            contactPerson: "Ananya Deshmukh",
-            email: "ananya@buildcraft.com",
-            phone: "+91 98123 45678",
-            address: "Mumbai Central",
-            industry: "Commercial Construction",
-            notes: "Commercial towers contractor",
-          },
-          {
-            companyName: "Horizon EPC Group",
-            contactPerson: "Vikramaditya Rao",
-            email: "vikram@horizonepc.com",
-            phone: "+91 97654 32109",
-            address: "Bangalore",
-            industry: "Energy & Infrastructure",
-            notes: "Metro & Civil engineering works",
-          },
-        ]);
-      }
       const data = await db.customer.toArray();
       setCustomers(data);
     } catch (err) {
@@ -180,6 +169,98 @@ export default function LeadsPage() {
     setSelectedCustomerId("");
     setAutoFilledCustomerName(null);
     setIsManualCompany(false);
+  };
+
+  // Open Edit Modal
+  const handleOpenEditModal = (lead: Lead) => {
+    setEditingLeadId(lead.id);
+    setEditCompanyName(lead.companyName || "");
+    setEditContactPerson(lead.contactPerson || "");
+    setEditPhone(lead.phone || "");
+    setEditEmail(lead.email || "");
+    setEditEstimatedValue(lead.estimatedValue ? String(lead.estimatedValue) : "");
+    setEditLocation(lead.location || "Delhi NCR");
+    setEditRequirement(lead.requirement || "");
+    setEditSource(lead.source || "Website");
+    setEditStatus(lead.status || "NEW");
+    setEditNotes(lead.notes || "");
+    setShowEditModal(true);
+  };
+
+  // Save Edit Lead
+  const handleSaveEditLead = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLeadId) return;
+    const currentLead = leads.find((l) => l.id === editingLeadId);
+    if (!currentLead) return;
+
+    if (!editCompanyName.trim() || !editContactPerson.trim()) {
+      alert("Please provide Company Name and Contact Person.");
+      return;
+    }
+
+    const numVal = parseInt(editEstimatedValue.replace(/[^0-9]/g, ""), 10) || currentLead.estimatedValue;
+
+    let updatedTimeline = [...(currentLead.timeline || [])];
+    const nowStr = new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    if (editStatus !== currentLead.status) {
+      if (editStatus === "CONTACTED") {
+        updatedTimeline = updatedTimeline.map((step) =>
+          step.event === "Contacted" ? { ...step, completed: true, timestamp: nowStr } : step
+        );
+      } else if (editStatus === "QUALIFIED") {
+        updatedTimeline = updatedTimeline.map((step) =>
+          step.event === "Contacted" || step.event === "Qualified"
+            ? { ...step, completed: true, timestamp: step.completed ? step.timestamp : nowStr }
+            : step
+        );
+      } else if (editStatus === "LOST") {
+        const hasLost = updatedTimeline.some((t) => t.event.toLowerCase().includes("lost"));
+        if (!hasLost) {
+          updatedTimeline.push({
+            event: "Marked as Lost",
+            timestamp: nowStr,
+            completed: true,
+          });
+        }
+      }
+    }
+
+    updateLead(editingLeadId, {
+      companyName: editCompanyName.trim(),
+      contactPerson: editContactPerson.trim(),
+      phone: editPhone.trim(),
+      email: editEmail.trim(),
+      estimatedValue: numVal,
+      location: editLocation.trim(),
+      requirement: editRequirement.trim(),
+      source: editSource,
+      status: editStatus,
+      notes: editNotes.trim(),
+      timeline: updatedTimeline,
+    });
+
+    setShowEditModal(false);
+    setEditingLeadId(null);
+  };
+
+  // Delete Lead
+  const handleDeleteLead = (id: string) => {
+    if (confirm("Are you sure you want to delete this lead?")) {
+      deleteLead(id);
+      setShowEditModal(false);
+      setEditingLeadId(null);
+      if (selectedLeadId === id) {
+        setSelectedLeadId(null);
+      }
+    }
   };
 
   // Convert Modal Form State
@@ -279,25 +360,27 @@ export default function LeadsPage() {
   // Create New Lead
   const handleCreateNewLead = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCompanyName || !newContactPerson) {
+    if (!newCompanyName.trim() || !newContactPerson.trim()) {
       alert("Please provide Company Name and Contact Person.");
       return;
     }
 
     const numVal = parseInt(newEstimatedValue.replace(/[^0-9]/g, ""), 10) || 1500000;
     addLead({
-      companyName: newCompanyName,
-      contactPerson: newContactPerson,
-      phone: newPhone || "+91 98765 00000",
-      email: newEmail || "contact@client.com",
+      companyName: newCompanyName.trim(),
+      contactPerson: newContactPerson.trim(),
+      phone: newPhone.trim() || "+91 98765 00000",
+      email: newEmail.trim() || "contact@client.com",
       estimatedValue: numVal,
-      location: newLocation,
-      requirement: newRequirement || "Commercial Project",
+      location: newLocation.trim() || "Delhi NCR",
+      requirement: newRequirement.trim() || "Commercial Project",
       source: newSource,
       status: newStatus,
-      notes: newNotes,
+      notes: newNotes.trim(),
     });
 
+    setFilter("ALL");
+    setSearch("");
     setShowAddModal(false);
     resetAddForm();
   };
@@ -402,14 +485,38 @@ export default function LeadsPage() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedLeadId(item.id)}
-                              className="rounded-[6px] border-pebble text-xs font-medium px-3 py-1 hover:bg-breath hover:text-onyx cursor-pointer"
-                            >
-                              View
-                            </Button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedLeadId(item.id)}
+                                className="rounded-[6px] border-pebble text-xs font-medium px-2.5 py-1 hover:bg-breath hover:text-onyx cursor-pointer"
+                              >
+                                View
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenEditModal(item)}
+                                className="h-7 w-7 p-0 rounded-[6px] text-ash hover:text-onyx hover:bg-stone cursor-pointer"
+                                title="Edit Lead"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm(`Delete lead "${item.companyName}"?`)) {
+                                    deleteLead(item.id);
+                                  }
+                                }}
+                                className="h-7 w-7 p-0 rounded-[6px] text-ash hover:text-hazard-text hover:bg-hazard-bg/20 cursor-pointer"
+                                title="Delete Lead"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -483,11 +590,26 @@ export default function LeadsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => alert("Edit lead details modal")}
-                  className="rounded-[8px] border-pebble text-xs font-medium gap-1.5 px-3 py-2 cursor-pointer"
+                  onClick={() => handleOpenEditModal(selectedLead)}
+                  className="rounded-[8px] border-pebble text-xs font-medium gap-1.5 px-3 py-2 cursor-pointer hover:bg-breath transition"
                 >
                   <Edit2 className="h-3.5 w-3.5 text-ash" />
                   <span>Edit</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm(`Delete lead "${selectedLead.companyName}"?`)) {
+                      deleteLead(selectedLead.id);
+                      setSelectedLeadId(null);
+                    }
+                  }}
+                  className="rounded-[8px] border-pebble text-xs font-medium gap-1.5 px-3 py-2 cursor-pointer hover:bg-hazard-bg/20 hover:text-hazard-text transition"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete</span>
                 </Button>
 
                 {selectedLead.status !== "CONVERTED" ? (
@@ -1002,53 +1124,31 @@ export default function LeadsPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-semibold text-onyx">
-                        Company Name <span className="text-hazard">*</span>
-                      </Label>
-                      {customers.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const nextManual = !isManualCompany;
-                            setIsManualCompany(nextManual);
-                            if (nextManual) {
-                              setSelectedCustomerId("__NEW__");
-                            } else {
-                              setSelectedCustomerId("");
-                              setAutoFilledCustomerName(null);
-                            }
-                          }}
-                          className="text-[11px] font-medium text-forest hover:underline cursor-pointer"
-                        >
-                          {isManualCompany ? "📋 Select Customer" : "✏️ Type New"}
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Company Dropdown or Input */}
-                    {isManualCompany || customers.length === 0 ? (
-                      <Input
-                        value={newCompanyName}
-                        onChange={(e) => setNewCompanyName(e.target.value)}
-                        placeholder="e.g. ABC Construction"
-                        required
-                        autoFocus
-                      />
-                    ) : (
+                    <Label className="text-xs font-semibold text-onyx">
+                      Company Name <span className="text-hazard">*</span>
+                    </Label>
+                    <Input
+                      value={newCompanyName}
+                      onChange={(e) => {
+                        setNewCompanyName(e.target.value);
+                        setSelectedCustomerId("");
+                      }}
+                      placeholder="e.g. ABC Construction"
+                      required
+                      autoFocus
+                    />
+                    {customers.length > 0 && (
                       <select
                         value={selectedCustomerId}
                         onChange={(e) => handleCustomerSelect(e.target.value)}
-                        className="h-10 w-full rounded-[10px] border border-pebble bg-white px-3 text-sm text-onyx shadow-2xs outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/20 cursor-pointer"
-                        required
+                        className="h-8 w-full rounded-[6px] border border-pebble bg-stone/40 px-2.5 text-xs text-ash shadow-2xs outline-none transition focus:border-forest cursor-pointer mt-1"
                       >
-                        <option value="">-- Select Customer Company --</option>
+                        <option value="">-- Quick auto-fill from existing customer --</option>
                         {customers.map((c) => (
                           <option key={c.id} value={String(c.id)}>
                             {c.companyName} ({c.contactPerson})
                           </option>
                         ))}
-                        <option value="__NEW__">➕ Type Other / New Company Manually</option>
                       </select>
                     )}
                   </div>
@@ -1189,6 +1289,206 @@ export default function LeadsPage() {
                   >
                     Create Lead
                   </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* EDIT LEAD MODAL                                                          */}
+        {/* ========================================================================= */}
+        {showEditModal && editingLeadId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+            <div className="relative w-full max-w-lg rounded-[18px] bg-white p-6 sm:p-7 shadow-2xl border border-pebble max-h-[92vh] overflow-y-auto">
+              <div className="flex items-center justify-between pb-4 border-b border-pebble/60">
+                <div>
+                  <h2 className="text-lg font-bold text-onyx flex items-center gap-2">
+                    <Edit2 className="h-5 w-5 text-forest" />
+                    <span>Edit Lead</span>
+                  </h2>
+                  <p className="text-xs text-ash mt-0.5">
+                    Update lead information, contact details, and progress status.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingLeadId(null);
+                  }}
+                  className="p-1.5 rounded-[8px] text-ash hover:text-onyx hover:bg-stone transition cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditLead} className="mt-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-onyx">
+                      Company Name <span className="text-hazard">*</span>
+                    </Label>
+                    <Input
+                      value={editCompanyName}
+                      onChange={(e) => setEditCompanyName(e.target.value)}
+                      placeholder="e.g. ABC Construction"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-onyx">
+                      Contact Person <span className="text-hazard">*</span>
+                    </Label>
+                    <Input
+                      value={editContactPerson}
+                      onChange={(e) => setEditContactPerson(e.target.value)}
+                      placeholder="e.g. Rahul Sharma"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-onyx">
+                      Phone Number
+                    </Label>
+                    <Input
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-onyx">
+                      Email Address
+                    </Label>
+                    <Input
+                      type="email"
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      placeholder="rahul@abc.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-onyx">
+                      Estimated Value (₹)
+                    </Label>
+                    <Input
+                      value={editEstimatedValue}
+                      onChange={(e) => setEditEstimatedValue(e.target.value)}
+                      placeholder="e.g. 2000000"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-onyx">
+                      Location
+                    </Label>
+                    <Input
+                      value={editLocation}
+                      onChange={(e) => setEditLocation(e.target.value)}
+                      placeholder="e.g. Delhi NCR"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-onyx">
+                      Requirement
+                    </Label>
+                    <Input
+                      value={editRequirement}
+                      onChange={(e) => setEditRequirement(e.target.value)}
+                      placeholder="e.g. Warehouse project"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-onyx">
+                      Source
+                    </Label>
+                    <select
+                      value={editSource}
+                      onChange={(e) => setEditSource(e.target.value)}
+                      className="h-10 w-full rounded-[10px] border border-pebble bg-white px-3 text-sm text-onyx shadow-2xs outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/20 cursor-pointer"
+                    >
+                      <option value="Website">Website</option>
+                      <option value="Referral">Referral</option>
+                      <option value="Tender">Tender</option>
+                      <option value="Direct">Direct</option>
+                      <option value="Architect">Architect</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-onyx">
+                    Status
+                  </Label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as LeadStatus)}
+                    className="h-10 w-full rounded-[10px] border border-pebble bg-white px-3 text-sm text-onyx shadow-2xs outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/20 cursor-pointer"
+                  >
+                    <option value="NEW">New</option>
+                    <option value="CONTACTED">Contacted</option>
+                    <option value="QUALIFIED">Qualified</option>
+                    <option value="LOST">Lost</option>
+                    <option value="CONVERTED">Converted</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-onyx">
+                    Notes
+                  </Label>
+                  <textarea
+                    rows={3}
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    placeholder="Customer comments, requirements, follow-up notes..."
+                    className="w-full rounded-[10px] border border-pebble bg-white p-3 text-sm text-onyx placeholder:text-ash shadow-2xs outline-none transition focus:border-forest focus:ring-2 focus:ring-forest/20"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-pebble/60">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => handleDeleteLead(editingLeadId)}
+                    className="text-hazard hover:text-hazard-text hover:bg-hazard-bg text-xs font-medium px-3 py-2 rounded-[8px] flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Delete</span>
+                  </Button>
+
+                  <div className="flex items-center gap-2.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setShowEditModal(false);
+                        setEditingLeadId(null);
+                      }}
+                      className="px-4 text-xs font-medium cursor-pointer"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="bg-forest hover:bg-forest-hover text-white px-5 text-xs font-semibold shadow-xs cursor-pointer"
+                    >
+                      Save Changes
+                    </Button>
+                  </div>
                 </div>
               </form>
             </div>

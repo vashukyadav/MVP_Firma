@@ -78,13 +78,17 @@ export default function CompanyPage() {
       return;
     }
 
+    const companyId = currentUser.companyId || `ORG-${currentUser.id}`;
+
     await db.company.put({
       userId: currentUser.id,
+      companyId,
       ...data,
     });
 
     await db.onboarding.update(currentUser.id, {
       companyCompleted: true,
+      companyId,
     });
 
     router.push("/onboarding/billing");

@@ -27,48 +27,7 @@ export default function FinancePage() {
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
 
-  const invoices: Invoice[] = [
-    {
-      id: "INV-2024-089",
-      client: "Riverside Real Estate Ltd",
-      project: "Riverside Luxury Villas",
-      amount: "₹1,250,000",
-      status: "PAID",
-      dueDate: "15 May 2024",
-    },
-    {
-      id: "INV-2024-090",
-      client: "Metro Construction Corp",
-      project: "Metro Heights Commercial Complex",
-      amount: "₹3,400,000",
-      status: "PENDING",
-      dueDate: "28 May 2024",
-    },
-    {
-      id: "INV-2024-091",
-      client: "GreenBuild Infrastructure",
-      project: "Whitefield Tech Park Block 3",
-      amount: "₹890,000",
-      status: "PAID",
-      dueDate: "10 May 2024",
-    },
-    {
-      id: "INV-2024-092",
-      client: "Apex Developers",
-      project: "Apex Horizon Towers",
-      amount: "₹2,100,000",
-      status: "OVERDUE",
-      dueDate: "02 May 2024",
-    },
-    {
-      id: "INV-2024-093",
-      client: "Silver Oaks Society",
-      project: "Residential Clubhouse & Pool",
-      amount: "₹650,000",
-      status: "PENDING",
-      dueDate: "05 Jun 2024",
-    },
-  ];
+  const invoices: Invoice[] = [];
 
   const getStatusBadge = (status: Invoice["status"]) => {
     switch (status) {
@@ -136,10 +95,9 @@ export default function FinancePage() {
                 <DollarSign className="h-4 w-4" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-onyx mt-2">₹8,290,000</p>
-            <div className="flex items-center gap-1 mt-1 text-eyebrow text-success-text">
-              <ArrowUpRight className="h-3.5 w-3.5" />
-              <span>+18.4% vs last quarter</span>
+            <p className="text-2xl font-bold text-onyx mt-2">₹0</p>
+            <div className="flex items-center gap-1 mt-1 text-eyebrow text-ash">
+              <span>No billed invoices</span>
             </div>
           </div>
 
@@ -150,10 +108,9 @@ export default function FinancePage() {
                 <TrendingUp className="h-4 w-4" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-onyx mt-2">₹2,140,000</p>
-            <div className="flex items-center gap-1 mt-1 text-eyebrow text-success-text">
-              <ArrowUpRight className="h-3.5 w-3.5" />
-              <span>Paid in 30 days</span>
+            <p className="text-2xl font-bold text-onyx mt-2">₹0</p>
+            <div className="flex items-center gap-1 mt-1 text-eyebrow text-ash">
+              <span>All accounts clear</span>
             </div>
           </div>
 
@@ -164,8 +121,8 @@ export default function FinancePage() {
                 <CreditCard className="h-4 w-4" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-onyx mt-2">₹4,050,000</p>
-            <span className="text-eyebrow text-ash mt-1 block">2 active invoices awaiting payment</span>
+            <p className="text-2xl font-bold text-onyx mt-2">₹0</p>
+            <span className="text-eyebrow text-ash mt-1 block">0 active invoices awaiting payment</span>
           </div>
 
           <div className="rounded-[10px] bg-white p-4 border border-pebble">
@@ -175,10 +132,9 @@ export default function FinancePage() {
                 <AlertCircle className="h-4 w-4" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-onyx mt-2">₹2,100,000</p>
-            <div className="flex items-center gap-1 mt-1 text-eyebrow text-hazard-text">
-              <ArrowDownRight className="h-3.5 w-3.5" />
-              <span>Requires immediate follow-up</span>
+            <p className="text-2xl font-bold text-onyx mt-2">₹0</p>
+            <div className="flex items-center gap-1 mt-1 text-eyebrow text-ash">
+              <span>No overdue accounts</span>
             </div>
           </div>
         </div>
@@ -234,32 +190,40 @@ export default function FinancePage() {
             </thead>
 
             <tbody className="divide-y divide-pebble text-body text-onyx">
-              {filteredInvoices.map((item) => {
-                const badge = getStatusBadge(item.status);
-                return (
-                  <tr key={item.id} className="hover:bg-stone/50 transition">
-                    <td className="p-4 font-bold text-onyx">{item.id}</td>
-                    <td className="p-4 font-medium">{item.client}</td>
-                    <td className="p-4 text-ash">{item.project}</td>
-                    <td className="p-4 font-bold text-onyx">{item.amount}</td>
-                    <td className="p-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-eyebrow font-semibold border ${badge.color}`}>
-                        {badge.label}
-                      </span>
-                    </td>
-                    <td className="p-4 text-ash text-eyebrow">{item.dueDate}</td>
-                    <td className="p-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => alert(`Viewing details for ${item.id}`)}
-                        className="border border-pebble rounded-[6px] px-2.5 py-1 text-eyebrow font-medium text-onyx bg-white hover:bg-mist cursor-pointer"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filteredInvoices.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center text-ash text-xs">
+                    No financial invoices recorded yet. Invoices generated from active projects and quotations will appear here.
+                  </td>
+                </tr>
+              ) : (
+                filteredInvoices.map((item) => {
+                  const badge = getStatusBadge(item.status);
+                  return (
+                    <tr key={item.id} className="hover:bg-stone/50 transition">
+                      <td className="p-4 font-bold text-onyx">{item.id}</td>
+                      <td className="p-4 font-medium">{item.client}</td>
+                      <td className="p-4 text-ash">{item.project}</td>
+                      <td className="p-4 font-bold text-onyx">{item.amount}</td>
+                      <td className="p-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-eyebrow font-semibold border ${badge.color}`}>
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td className="p-4 text-ash text-eyebrow">{item.dueDate}</td>
+                      <td className="p-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => alert(`Viewing details for ${item.id}`)}
+                          className="border border-pebble rounded-[6px] px-2.5 py-1 text-eyebrow font-medium text-onyx bg-white hover:bg-mist cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

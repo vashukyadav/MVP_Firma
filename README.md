@@ -138,7 +138,8 @@ Next.js App Router me `app/**/page.tsx` files routes define karti hain.
 | `/team` | `app/team/page.tsx` | Team and account admin area |
 | `/users` | `app/users/page.tsx` | Account Admin users and roles area |
 | `/customers` | `app/customers/page.tsx` | Customer management |
-| `/quotations` | `app/quotations/page.tsx` | Enquiries/quotations area |
+| `/leads` | `app/leads/page.tsx` | Leads & inquiry management |
+| `/quotations` | `app/quotations/page.tsx` | Quotations area |
 | `/projects` | `app/projects/page.tsx` | Project management |
 | `/jobs` | `app/jobs/page.tsx` | Jobs/work management |
 | `/finance` | `app/finance/page.tsx` | Finance area |
@@ -304,7 +305,7 @@ Default development URL usually `http://localhost:3000` hota hai.
 1. Existing pages ko replace karne se pehle unka current route aur data behavior preserve karein.
 2. Authenticated dashboard pages ke liye `FirmaLayout` use karein.
 3. `Sidebar.tsx` ka role menu useful reference hai, lekin uski current markup basic hai.
-4. `/quotations` current navigation me Enquiries ke liye bhi use ho raha hai. Enquiries aur Quotations ko separate karna ho to pehle route decision clearly define karein.
+4. Enquiry = Lead mapped to `/leads`. Owner, Account Admin, aur Sales Manager sabhi ko menubar me Leads ka direct access diya gaya hai.
 5. Account Admin ke create-admin flow me `FirmaLayout` ke andar direct Dexie write hoti hai.
 6. `/users` route Account Admin-only hai; role guard ko remove ya weaken na karein bina product requirement ke.
 7. Empty folders future API, GraphQL, hooks, shared types, services, and reusable UI ke liye scaffold hain.

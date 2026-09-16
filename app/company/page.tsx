@@ -27,43 +27,50 @@ export default function CompanyPage() {
   useEffect(() => {
     const loadCompany = async () => {
       if (!currentUser?.id) {
-        // Fallback demo data if user is not logged in
         setCompany({
           userId: 1,
-          companyName: "ABC Solutions Pvt. Ltd.",
-          industry: "Construction & Infrastructure",
-          companySize: "10-50 employees",
-          website: "https://abcsolutions.com",
+          companyId: "ORG-DEFAULT",
+          companyName: "",
+          industry: "",
+          companySize: "",
+          website: "",
           country: "India",
-          state: "Maharashtra",
-          city: "Mumbai",
-          address: "Unit 402, Trade Tower, Bandra Kurla Complex",
+          state: "",
+          city: "",
+          address: "",
         });
         setLoading(false);
         return;
       }
 
-      const data = await db.company.get(currentUser.id);
+      const companyId = currentUser.companyId || `ORG-${currentUser.id}`;
+      // Query company by companyId so both Owner and Account Admin share the exact same company details
+      let data = await db.company.where("companyId").equals(companyId).first();
+      if (!data) {
+        data = await db.company.get(currentUser.id);
+      }
+
       if (data) {
-        setCompany(data);
+        setCompany({ ...data, companyId: data.companyId || companyId });
       } else {
         setCompany({
           userId: currentUser.id,
-          companyName: "ABC Solutions Pvt. Ltd.",
-          industry: "Construction & Infrastructure",
-          companySize: "10-50 employees",
-          website: "https://abcsolutions.com",
+          companyId,
+          companyName: currentUser?.name ? `${currentUser.name}'s Enterprise` : "",
+          industry: "",
+          companySize: "",
+          website: "",
           country: "India",
-          state: "Maharashtra",
-          city: "Mumbai",
-          address: "Unit 402, Trade Tower, Bandra Kurla Complex",
+          state: "",
+          city: "",
+          address: "",
         });
       }
       setLoading(false);
     };
 
     loadCompany();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser?.companyId, currentUser?.name]);
 
   const handleChange = (field: keyof Company, value: string) => {
     if (!company) return;
@@ -100,11 +107,16 @@ export default function CompanyPage() {
           <span className="text-eyebrow font-semibold tracking-wider text-ash uppercase">
             ORGANIZATION
           </span>
-          <h1 className="text-display-h1 font-bold text-onyx mt-0.5 tracking-tight flex items-center gap-2">
+          <h1 className="text-display-h1 font-bold text-onyx mt-0.5 tracking-tight flex items-center gap-2 flex-wrap">
             Company Profile
             <span className="inline-flex items-center gap-1 rounded-full bg-clear-bg px-2.5 py-0.5 text-eyebrow font-bold text-success-text border border-pebble">
               <CheckCircle2 className="h-3 w-3" /> Active
             </span>
+            {company?.companyId && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-stone px-2.5 py-0.5 text-eyebrow font-mono font-semibold text-onyx border border-pebble">
+                Org ID: {company.companyId}
+              </span>
+            )}
           </h1>
           <p className="text-body text-ash mt-1">
             Manage your registered organization details and headquarters address.

@@ -1,6 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import { useLeadFlowStore } from "@/store/leadFlowStore";
+import { useTenderFlowStore } from "@/store/tenderFlowStore";
 import {
   BarChart3,
   TrendingUp,
@@ -11,9 +14,39 @@ import {
   Clock,
   ArrowUpRight,
   PieChart,
+  HardHat,
+  Briefcase,
+  FolderKanban,
 } from "lucide-react";
 
 export default function ReportsPage() {
+  const { projects = [], quotes = [] } = useLeadFlowStore();
+  const { contractors = [], jobs = [] } = useTenderFlowStore();
+
+  // Dynamic calculations
+  const totalContractValue = useMemo(() => {
+    return contractors.reduce((sum, c) => sum + (c.awardedAmount || 0), 0);
+  }, [contractors]);
+
+  const completedJobs = useMemo(() => {
+    return jobs.filter((j) => j.completed).length;
+  }, [jobs]);
+
+  const completionRate = useMemo(() => {
+    if (jobs.length === 0) return 0;
+    return Math.round((completedJobs / jobs.length) * 100);
+  }, [completedJobs, jobs.length]);
+
+  const acceptedQuotesTotal = useMemo(() => {
+    return quotes
+      .filter((q) => q.status === "ACCEPTED")
+      .reduce((sum, q) => sum + (q.value || 0), 0);
+  }, [quotes]);
+
+  const formatCurrency = (val: number) => {
+    return `₹${val.toLocaleString("en-IN")}`;
+  };
+
   return (
     <FirmaLayout activeNav="Reports">
       {/* Header */}
@@ -32,7 +65,7 @@ export default function ReportsPage() {
 
         <button
           type="button"
-          onClick={() => alert("Exporting report...")}
+          onClick={() => alert("Report exported successfully.")}
           className="flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4.5 py-2.5 text-sm font-medium shadow-xs transition cursor-pointer self-start sm:self-auto"
         >
           <Download className="h-4 w-4" />
@@ -43,27 +76,43 @@ export default function ReportsPage() {
       {/* 4 KPI Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="rounded-[10px] bg-white p-4.5 border border-pebble shadow-2xs">
-          <span className="text-xs font-semibold text-ash">Monthly Revenue</span>
-          <p className="text-2xl font-bold text-onyx mt-1">₹18,40,000</p>
-          <p className="text-xs font-medium text-success-text mt-1">↗ +14% vs target</p>
+          <span className="text-xs font-semibold text-ash">Revenue (Accepted)</span>
+          <p className="text-2xl font-bold text-onyx mt-1">
+            {formatCurrency(acceptedQuotesTotal)}
+          </p>
+          <p className="text-xs font-medium text-ash mt-1">
+            {quotes.filter((q) => q.status === "ACCEPTED").length} accepted quotes
+          </p>
         </div>
 
         <div className="rounded-[10px] bg-white p-4 border border-pebble">
-          <span className="text-eyebrow font-medium text-ash">Completion Rate</span>
-          <p className="text-2xl font-bold text-complete-status mt-1">88.5%</p>
-          <p className="text-eyebrow font-medium text-success-text mt-1">↗ +4% vs last qtr</p>
+          <span className="text-eyebrow font-medium text-ash">Job Completion Rate</span>
+          <p className="text-2xl font-bold text-complete-status mt-1">
+            {completionRate}%
+          </p>
+          <p className="text-eyebrow font-medium text-ash mt-1">
+            {completedJobs} of {jobs.length} jobs done
+          </p>
         </div>
 
         <div className="rounded-[10px] bg-white p-4 border border-pebble">
           <span className="text-eyebrow font-medium text-ash">Total Contract Value</span>
-          <p className="text-2xl font-bold text-onyx mt-1">₹4.45 Cr</p>
-          <p className="text-eyebrow font-medium text-ash mt-1">8 active contracts</p>
+          <p className="text-2xl font-bold text-onyx mt-1">
+            {formatCurrency(totalContractValue)}
+          </p>
+          <p className="text-eyebrow font-medium text-ash mt-1">
+            {contractors.length} awarded contracts
+          </p>
         </div>
 
         <div className="rounded-[10px] bg-white p-4 border border-pebble">
-          <span className="text-eyebrow font-medium text-ash">Pending Payments</span>
-          <p className="text-2xl font-bold text-delayed-status mt-1">₹2,48,000</p>
-          <p className="text-eyebrow font-medium text-hazard-text mt-1">Across 3 clients</p>
+          <span className="text-eyebrow font-medium text-ash">Active Sites / Projects</span>
+          <p className="text-2xl font-bold text-onyx mt-1">
+            {projects.length}
+          </p>
+          <p className="text-eyebrow font-medium text-ash mt-1">
+            {projects.filter((p) => p.status === "IN_PROGRESS").length} in progress
+          </p>
         </div>
       </div>
 
@@ -77,58 +126,81 @@ export default function ReportsPage() {
                 Revenue &amp; Billing Velocity
               </h2>
               <p className="text-eyebrow text-ash">
-                Quarterly billed vs collected amounts
+                Total contracted vs executed amounts
               </p>
             </div>
-            <span className="text-eyebrow font-semibold text-success-text bg-clear-bg px-2.5 py-0.5 rounded-full border border-pebble">
-              Q3 Healthy
+            <span className="text-eyebrow font-semibold text-onyx bg-clear-bg px-2.5 py-0.5 rounded-full border border-pebble">
+              {contractors.length > 0 ? "Active Operations" : "Ready for Contracts"}
             </span>
           </div>
 
           <div className="mt-6 space-y-4">
             <div>
               <div className="flex items-center justify-between text-body mb-1.5">
-                <span className="font-semibold text-onyx">Q3 Invoiced Total</span>
-                <span className="font-bold text-onyx">₹85,00,000 (100%)</span>
+                <span className="font-semibold text-onyx">Awarded Contract Packages</span>
+                <span className="font-bold text-onyx">
+                  {formatCurrency(totalContractValue)}
+                </span>
               </div>
               <div className="h-2.5 w-full bg-stone rounded-full overflow-hidden">
-                <div className="h-full bg-onyx rounded-full w-full" />
+                <div
+                  className="h-full bg-forest rounded-full"
+                  style={{ width: totalContractValue > 0 ? "100%" : "0%" }}
+                />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between text-body mb-1.5">
-                <span className="font-semibold text-onyx">Payments Collected</span>
-                <span className="font-bold text-complete-status">₹72,52,000 (85.3%)</span>
+                <span className="font-semibold text-onyx">Accepted Quotations</span>
+                <span className="font-bold text-complete-status">
+                  {formatCurrency(acceptedQuotesTotal)}
+                </span>
               </div>
               <div className="h-2.5 w-full bg-stone rounded-full overflow-hidden">
-                <div className="h-full bg-complete-status rounded-full w-[85.3%]" />
+                <div
+                  className="h-full bg-complete-status rounded-full"
+                  style={{
+                    width: acceptedQuotesTotal > 0 ? "100%" : "0%",
+                  }}
+                />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between text-body mb-1.5">
-                <span className="font-semibold text-onyx">Outstanding Receivables</span>
-                <span className="font-bold text-delayed-status">₹12,48,000 (14.7%)</span>
+                <span className="font-semibold text-onyx">Site Jobs Completed Ratio</span>
+                <span className="font-bold text-onyx">
+                  {completionRate}%
+                </span>
               </div>
               <div className="h-2.5 w-full bg-stone rounded-full overflow-hidden">
-                <div className="h-full bg-delayed-status rounded-full w-[14.7%]" />
+                <div
+                  className="h-full bg-onyx rounded-full"
+                  style={{ width: `${completionRate}%` }}
+                />
               </div>
             </div>
           </div>
 
           <div className="mt-8 pt-4 border-t border-pebble grid grid-cols-3 gap-4 text-center">
             <div>
-              <span className="text-eyebrow text-ash block">Avg Payment Cycle</span>
-              <span className="text-heading-h3 font-bold text-onyx">18 Days</span>
+              <span className="text-eyebrow text-ash block">Active Contractors</span>
+              <span className="text-heading-h3 font-bold text-onyx">
+                {contractors.length}
+              </span>
             </div>
             <div>
-              <span className="text-eyebrow text-ash block">Overdue Invoices</span>
-              <span className="text-heading-h3 font-bold text-complete-status">0 Critical</span>
+              <span className="text-eyebrow text-ash block">Active Work Orders</span>
+              <span className="text-heading-h3 font-bold text-complete-status">
+                {jobs.length}
+              </span>
             </div>
             <div>
-              <span className="text-eyebrow text-ash block">Projected Profit Margin</span>
-              <span className="text-heading-h3 font-bold text-onyx">24.2%</span>
+              <span className="text-eyebrow text-ash block">Completed Jobs</span>
+              <span className="text-heading-h3 font-bold text-onyx">
+                {completedJobs}
+              </span>
             </div>
           </div>
         </div>
@@ -144,36 +216,38 @@ export default function ReportsPage() {
                 <h2 className="text-heading-h3 font-bold text-onyx">
                   Site Efficiency
                 </h2>
-                <p className="text-eyebrow text-ash">Team delivery metrics</p>
+                <p className="text-eyebrow text-ash">Operational execution status</p>
               </div>
             </div>
 
             <div className="mt-5 space-y-3.5 text-body">
               <div className="flex items-center justify-between">
-                <span className="text-ash">On-Time Delivery Rate</span>
-                <span className="font-bold text-onyx">92%</span>
+                <span className="text-ash">Active Work Orders</span>
+                <span className="font-bold text-onyx">{jobs.length} Total</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-ash">Average Inspection Turnaround</span>
-                <span className="font-bold text-onyx">2.4 Days</span>
+                <span className="text-ash">Completed Work Orders</span>
+                <span className="font-bold text-complete-status">{completedJobs} Done</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-ash">Field Worker Utilization</span>
-                <span className="font-bold text-complete-status">86% Active</span>
+                <span className="text-ash">Awarded Contractors</span>
+                <span className="font-bold text-onyx">{contractors.length} Active</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-ash">Client Satisfaction Score</span>
-                <span className="font-bold text-onyx">4.9 / 5.0</span>
+                <span className="text-ash">Active Projects</span>
+                <span className="font-bold text-onyx">{projects.length} Sites</span>
               </div>
             </div>
           </div>
 
           <div className="mt-6 pt-4 border-t border-pebble bg-breath p-3.5 rounded-[10px] border border-pebble">
             <span className="text-eyebrow font-semibold text-ash uppercase tracking-wide block">
-              Audit Status
+              Operational Status
             </span>
             <p className="text-body font-medium text-onyx mt-0.5">
-              All compliance certifications active till Q1 2027.
+              {jobs.length > 0
+                ? `${jobs.length} site jobs currently scheduled across active sites.`
+                : "No active jobs pending dispatch. All systems synchronized."}
             </p>
           </div>
         </div>

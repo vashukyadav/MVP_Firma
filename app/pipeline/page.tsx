@@ -31,6 +31,7 @@ import {
   User,
   AlertCircle,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 
 function PipelineContent() {
@@ -40,6 +41,8 @@ function PipelineContent() {
     opportunities,
     handoverToProject,
     projects,
+    deleteOpportunity,
+    clearAllDummyData,
   } = useLeadFlowStore();
 
   const [mounted, setMounted] = useState(false);
@@ -52,7 +55,7 @@ function PipelineContent() {
   const [newOppCustomer, setNewOppCustomer] = useState("");
   const [newOppContact, setNewOppContact] = useState("");
   const [newOppValue, setNewOppValue] = useState("");
-  const [newOppCloseDate, setNewOppCloseDate] = useState("2025-11-30");
+  const [newOppCloseDate, setNewOppCloseDate] = useState("");
   const [newOppStage, setNewOppStage] = useState<OpportunityStage>("NEW");
   const [newOppDesc, setNewOppDesc] = useState("");
 
@@ -152,7 +155,7 @@ function PipelineContent() {
     const project = handoverToProject(selectedOpp.id, {
       winReason: selectedOpp.winReason || "Customer accepted quote",
       winNotes: selectedOpp.winNotes || "Project awarded. Handover to execution team.",
-      projectManager: "Amit Kumar",
+      projectManager: "Project Lead",
     });
 
     setHandedOverProjectId(project.id);
@@ -270,15 +273,30 @@ function PipelineContent() {
                         <span className="text-[10px] font-bold text-ash uppercase tracking-wider">
                           {deal.id}
                         </span>
-                        {deal.stage === "WON" ? (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-clear-bg text-success-text border border-clear-bg flex items-center gap-1">
-                            <Trophy className="h-2.5 w-2.5" /> Won
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-medium text-ash flex items-center gap-1">
-                            <Calendar className="h-3 w-3" /> {deal.expectedCloseDate}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {deal.stage === "WON" ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-clear-bg text-success-text border border-clear-bg flex items-center gap-1">
+                              <Trophy className="h-2.5 w-2.5" /> Won
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium text-ash flex items-center gap-1">
+                              <Calendar className="h-3 w-3" /> {deal.expectedCloseDate}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Delete deal "${deal.title}"?`)) {
+                                deleteOpportunity(deal.id);
+                              }
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-ash hover:text-hazard-text hover:bg-hazard-bg/20 rounded transition cursor-pointer"
+                            title="Delete Opportunity"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
                       </div>
 
                       <h4 className="text-xs font-bold text-onyx leading-snug group-hover:text-forest transition">
@@ -337,13 +355,29 @@ function PipelineContent() {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedOppId(null)}
-                className="p-1.5 rounded-[8px] text-ash hover:bg-mist hover:text-onyx transition cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm(`Delete deal "${selectedOpp.title}"?`)) {
+                      deleteOpportunity(selectedOpp.id);
+                      setSelectedOppId(null);
+                    }
+                  }}
+                  className="px-2.5 py-1.5 rounded-[8px] text-xs font-semibold text-ash hover:bg-hazard-bg/20 hover:text-hazard-text transition cursor-pointer flex items-center gap-1.5 border border-pebble"
+                  title="Delete Opportunity"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedOppId(null)}
+                  className="p-1.5 rounded-[8px] text-ash hover:bg-mist hover:text-onyx transition cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body */}

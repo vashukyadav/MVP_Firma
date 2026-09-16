@@ -108,6 +108,9 @@ interface LeadFlowState {
     }
   ) => Opportunity;
 
+  // Delete opportunity
+  deleteOpportunity: (id: string) => void;
+
   // Quote actions (Step 6 -> 7)
   createQuote: (
     opportunityId: string,
@@ -120,6 +123,7 @@ interface LeadFlowState {
   ) => Quote;
   acceptQuote: (quoteId: string) => void;
   updateQuoteStatus: (quoteId: string, status: QuoteStatus) => void;
+  deleteQuote: (quoteId: string) => void;
 
   // Handover action (Step 8)
   handoverToProject: (
@@ -131,8 +135,13 @@ interface LeadFlowState {
     }
   ) => ProjectItem;
 
-  // Add generic project
+  // Generic project actions
   addProject: (project: ProjectItem) => void;
+  deleteProject: (projectId: string) => void;
+
+  // Purge & cleanup
+  clearAllDummyData: () => void;
+  resetAllLeadFlowData: () => void;
 }
 
 const defaultLeads: Lead[] = [];
@@ -149,7 +158,7 @@ export const useLeadFlowStore = create<LeadFlowState>()(
       projects: defaultProjects,
 
       addLead: (leadData) => {
-        const id = `LEAD-${String(get().leads.length + 1).padStart(3, "0")}`;
+        const id = `LEAD-${Math.floor(1000 + Math.random() * 9000)}`;
         const newLead: Lead = {
           ...leadData,
           id,
@@ -243,6 +252,13 @@ export const useLeadFlowStore = create<LeadFlowState>()(
         return newOpp;
       },
 
+      deleteOpportunity: (id) => {
+        set((state) => ({
+          opportunities: state.opportunities.filter((o) => o.id !== id),
+          quotes: state.quotes.filter((q) => q.opportunityId !== id),
+        }));
+      },
+
       createQuote: (opportunityId, data) => {
         const opp = get().opportunities.find((o) => o.id === opportunityId);
         const quoteNo = data.quoteNo || `Q-00${get().quotes.length + 12}`;
@@ -310,6 +326,12 @@ export const useLeadFlowStore = create<LeadFlowState>()(
         }));
       },
 
+      deleteQuote: (quoteId) => {
+        set((state) => ({
+          quotes: state.quotes.filter((q) => q.id !== quoteId && q.quoteNo !== quoteId),
+        }));
+      },
+
       handoverToProject: (opportunityId, data) => {
         const opp = get().opportunities.find((o) => o.id === opportunityId);
         const projectId = `PRJ-${Math.floor(100 + Math.random() * 900)}`;
@@ -317,13 +339,15 @@ export const useLeadFlowStore = create<LeadFlowState>()(
         const newProject: ProjectItem = {
           id: projectId,
           name: opp?.title || "New Project",
-          location: "On-site Delhi NCR",
+          location: opp?.customerName ? `${opp.customerName} Site` : "Project Site",
           client: opp?.customerName || "Client",
-          budget: `₹${(opp?.estimatedValue || 2000000).toLocaleString("en-IN")}`,
+          budget: opp?.estimatedValue
+            ? `₹${opp.estimatedValue.toLocaleString("en-IN")}`
+            : "₹0",
           progress: 0,
           status: "IN_PROGRESS",
-          lead: data?.projectManager || "Amit Kumar",
-          due: "30 Nov 2026",
+          lead: data?.projectManager || "Project Lead",
+          due: opp?.expectedCloseDate || "Ongoing",
           sourceOpportunityId: opportunityId,
         };
 
@@ -351,34 +375,139 @@ export const useLeadFlowStore = create<LeadFlowState>()(
           projects: [project, ...state.projects],
         }));
       },
+
+      deleteProject: (projectId) => {
+        set((state) => ({
+          projects: state.projects.filter((p) => p.id !== projectId),
+        }));
+      },
+
+      clearAllDummyData: () => {
+        set((state) => ({
+          leads: state.leads.filter((l) => !isDummyLead(l)),
+          opportunities: state.opportunities.filter((o) => !isDummyOpportunity(o)),
+          quotes: state.quotes.filter((q) => !isDummyQuote(q)),
+          projects: state.projects.filter((p) => !isDummyProject(p)),
+        }));
+      },
+
+      resetAllLeadFlowData: () => {
+        set({
+          leads: [],
+          opportunities: [],
+          quotes: [],
+          projects: [],
+        });
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.removeItem("mini-firma-lead-flow");
+          } catch (e) {}
+        }
+      },
     }),
     {
       name: "mini-firma-lead-flow",
-      version: 2,
+      version: 4,
       migrate: (persistedState: any, version: number) => {
-        if (!persistedState || version < 2) {
-          const dummyLeadIds = new Set(["LEAD-001", "LEAD-002", "LEAD-003", "LEAD-004"]);
-          const dummyOppIds = new Set(["OPP-001", "OPP-002", "OPP-003"]);
-          const dummyQuoteIds = new Set(["Q-0010", "Q-0011"]);
-          const dummyProjectIds = new Set(["PRJ-101", "PRJ-102", "PRJ-103"]);
-
+        if (!persistedState) {
           return {
-            leads: Array.isArray(persistedState?.leads)
-              ? persistedState.leads.filter((l: any) => !dummyLeadIds.has(l.id))
-              : [],
-            opportunities: Array.isArray(persistedState?.opportunities)
-              ? persistedState.opportunities.filter((o: any) => !dummyOppIds.has(o.id))
-              : [],
-            quotes: Array.isArray(persistedState?.quotes)
-              ? persistedState.quotes.filter((q: any) => !dummyQuoteIds.has(q.id))
-              : [],
-            projects: Array.isArray(persistedState?.projects)
-              ? persistedState.projects.filter((p: any) => !dummyProjectIds.has(p.id))
-              : [],
+            leads: [],
+            opportunities: [],
+            quotes: [],
+            projects: [],
           };
         }
-        return persistedState;
+        return {
+          leads: Array.isArray(persistedState.leads)
+            ? persistedState.leads.filter((l: any) => !isDummyLead(l))
+            : [],
+          opportunities: Array.isArray(persistedState.opportunities)
+            ? persistedState.opportunities.filter((o: any) => !isDummyOpportunity(o))
+            : [],
+          quotes: Array.isArray(persistedState.quotes)
+            ? persistedState.quotes.filter((q: any) => !isDummyQuote(q))
+            : [],
+          projects: Array.isArray(persistedState.projects)
+            ? persistedState.projects.filter((p: any) => !isDummyProject(p))
+            : [],
+        };
       },
     }
   )
 );
+
+// Dummy detection helper functions (only exact matching specific historical dummy test names)
+export const isDummyLead = (l: any): boolean => {
+  if (!l) return false;
+  const company = (l.companyName || "").trim().toLowerCase();
+  const contact = (l.contactPerson || "").trim().toLowerCase();
+
+  const dummyCompanies = [
+    "famehouse makers",
+    "test4",
+    "renovation org",
+    "plumbing fixers",
+    "philips airline part",
+  ];
+  if (dummyCompanies.includes(company)) return true;
+
+  const dummyContacts = [
+    "jrd_sharma",
+    "test4.1",
+    "reno_org",
+    "dummy_person",
+    "mitchell santner",
+    "8978455623",
+  ];
+  if (dummyContacts.includes(contact)) return true;
+
+  return false;
+};
+
+export const isDummyOpportunity = (o: any): boolean => {
+  if (!o) return false;
+  const customer = (o.customerName || "").trim().toLowerCase();
+
+  const dummyCustomers = [
+    "famehouse makers",
+    "test4",
+    "renovation org",
+    "plumbing fixers",
+    "philips airline part",
+  ];
+  if (dummyCustomers.includes(customer)) return true;
+
+  return false;
+};
+
+export const isDummyQuote = (q: any): boolean => {
+  if (!q) return false;
+  const customer = (q.customerName || "").trim().toLowerCase();
+
+  const dummyCustomers = [
+    "famehouse makers",
+    "test4",
+    "renovation org",
+    "plumbing fixers",
+    "philips airline part",
+  ];
+  if (dummyCustomers.includes(customer)) return true;
+
+  return false;
+};
+
+export const isDummyProject = (p: any): boolean => {
+  if (!p) return false;
+  const client = (p.client || "").trim().toLowerCase();
+
+  const dummyClients = [
+    "famehouse makers",
+    "test4",
+    "renovation org",
+    "plumbing fixers",
+    "philips airline part",
+  ];
+  if (dummyClients.includes(client)) return true;
+
+  return false;
+};

@@ -29,6 +29,18 @@ import {
   Layers,
   FileCheck2,
   Target,
+  Gavel,
+  ClipboardList,
+  Calendar,
+  ArrowLeftRight,
+  MapPin,
+  HardHat,
+  Users2,
+  FileText,
+  Clock,
+  ShieldAlert,
+  ListChecks,
+  Camera,
 } from "lucide-react";
 
 interface FirmaLayoutProps {
@@ -39,7 +51,7 @@ interface FirmaLayoutProps {
 export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { currentUser, logout } = useAuthStore();
+  const { currentUser, logout, setUser } = useAuthStore();
 
   // Admin Modal State
   const [adminOpen, setAdminOpen] = useState(false);
@@ -52,9 +64,11 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
 
   // User Dropdown State
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [hasAdmin, setHasAdmin] = useState(false);
 
   const user = currentUser || {
     id: 0,
+    companyId: "ORG-DEFAULT",
     name: "User",
     email: "",
     role: "OWNER" as const,
@@ -63,9 +77,46 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
 
   const userInitial = (currentUser?.name?.charAt(0) || "U").toUpperCase();
 
+  // Check if an Account Admin has already been created in this company
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user.companyId) return;
+      try {
+        const adminCount = await db.users
+          .where("companyId")
+          .equals(user.companyId)
+          .filter((u) => u.role === "ACCOUNT_ADMIN")
+          .count();
+        setHasAdmin(adminCount > 0);
+      } catch (err) {
+        console.error("Failed to check admin status:", err);
+      }
+    };
+    checkAdminStatus();
+  }, [adminOpen, user.role, user.companyId]);
+
+  // Listen to custom event to open Admin creation modal (e.g. from Dashboard banner)
+  useEffect(() => {
+    const handleOpenModal = () => {
+      if (user.role === "OWNER" && !hasAdmin) {
+        setAdminOpen(true);
+      }
+    };
+    window.addEventListener("open-add-admin-modal", handleOpenModal);
+    return () => {
+      window.removeEventListener("open-add-admin-modal", handleOpenModal);
+    };
+  }, [user.role, hasAdmin]);
+
   // Create Admin Submission
   const handleCreateAdmin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+
+    if (user.role !== "OWNER") {
+      alert("Only the Owner can create an Account Admin");
+      setAdminOpen(false);
+      return;
+    }
 
     if (!adminName || !adminEmail || !adminPassword || !confirmPassword) {
       alert("Please fill all fields");
@@ -74,6 +125,19 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
 
     if (adminPassword !== confirmPassword) {
       alert("Passwords do not match");
+      return;
+    }
+
+    const existingAdmin = await db.users
+      .where("companyId")
+      .equals(user.companyId || "")
+      .filter((u) => u.role === "ACCOUNT_ADMIN")
+      .first();
+
+    if (existingAdmin) {
+      alert("Account Admin already exists for your company");
+      setHasAdmin(true);
+      setAdminOpen(false);
       return;
     }
 
@@ -88,6 +152,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
     }
 
     await db.users.add({
+      companyId: user.companyId || "ORG-DEFAULT",
       name: adminName,
       email: adminEmail,
       password: adminPassword,
@@ -95,6 +160,8 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
       size: 0,
     });
 
+    setHasAdmin(true);
+    window.dispatchEvent(new CustomEvent("admin-created"));
     alert("Account Admin created successfully!");
 
     setAdminName("");
@@ -110,89 +177,178 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
     router.push("/login");
   };
 
+  const isPmRoute =
+    pathname.startsWith("/scheduling") ||
+    pathname.startsWith("/variations") ||
+    pathname.startsWith("/rfis") ||
+    pathname.startsWith("/sites") ||
+    pathname.startsWith("/crew") ||
+    pathname.startsWith("/documents") ||
+    pathname.startsWith("/timesheets");
+
   // Determine current active item
   const currentNav =
-  activeNav ||
-  (pathname === "/dashboard"
-    ? "Dashboard"
-    : pathname.startsWith("/company")
-    ? "Company"
-    : pathname.startsWith("/subscription")
-    ? "Subscription"
-    : pathname.startsWith("/team")
-    ? "Team & Admins"
-    : pathname.startsWith("/users")
-    ? "Users & Roles"
-    : pathname.startsWith("/projects")
-    ? "Projects"
-    : pathname.startsWith("/customers")
-    ? "Customers"
-    : pathname.startsWith("/leads")
-    ? "Leads"
-    : pathname.startsWith("/tenders")
-    ? "Tenders"
-    : pathname.startsWith("/pipeline")
-    ? "Pipeline"
-    : pathname.startsWith("/quotations")
-    ? "Quotations"
-    : pathname.startsWith("/jobs")
-    ? "Jobs"
-    : pathname.startsWith("/reports")
-    ? "Reports"
-    : pathname.startsWith("/setting")
-    ? "Settings"
-    : pathname.startsWith("/help")
-    ? "Help & Support"
-    : "");
- const ownerNavItems = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Company", href: "/company", icon: Building },
-  { name: "Subscription", href: "/subscription", icon: CreditCard },
-  { name: "Team & Admins", href: "/team", icon: Users },
+    activeNav ||
+    (pathname === "/dashboard"
+      ? "Dashboard"
+      : pathname.startsWith("/company")
+        ? "Company"
+        : pathname.startsWith("/subscription")
+          ? "Subscription"
+          : pathname.startsWith("/team")
+            ? "Team & Admins"
+            : pathname.startsWith("/users")
+              ? "Users & Roles"
+              : pathname.startsWith("/projects")
+                ? "Projects"
+                : pathname.startsWith("/customers")
+                  ? "Customers"
+                  : pathname.startsWith("/leads")
+                    ? "Leads"
+                    : pathname.startsWith("/tenders")
+                      ? "Tenders"
+                      : pathname.startsWith("/pipeline")
+                        ? "Pipeline"
+                        : pathname.startsWith("/quotations")
+                          ? "Quotations"
+                          : pathname.startsWith("/jobs")
+                            ? "Jobs"
+                            : pathname.startsWith("/scheduling")
+                              ? "Scheduling"
+                              : pathname.startsWith("/variations")
+                                ? "Variations"
+                                : pathname.startsWith("/rfis")
+                                  ? "RFIs"
+                                  : pathname.startsWith("/sites")
+                                    ? "Sites"
+                                    : pathname.startsWith("/contractors")
+                                      ? "Contractors"
+                                      : pathname.startsWith("/crew")
+                                        ? "Crew / People"
+                                        : pathname.startsWith("/documents")
+                                          ? "Documents"
+                                          : pathname.startsWith("/timesheets")
+                                            ? "Timesheets"
+                                            : pathname.startsWith("/site-reports")
+                                              ? "Site Reports"
+                                              : pathname.startsWith("/safety")
+                                                ? "Safety & Incidents"
+                                                : pathname.startsWith("/punch-lists")
+                                                  ? "Punch Lists"
+                                                  : pathname.startsWith("/photos")
+                                                    ? "Photos"
+                                                    : pathname.startsWith("/reports")
+                                                      ? "Reports"
+                                                      : pathname.startsWith("/setting")
+                                                        ? "Settings"
+                                                        : pathname.startsWith("/help")
+                                                          ? "Help & Support"
+                                                          : "");
 
-  { name: "Customers", href: "/customers", icon: Layers },
-  { name: "Enquiries", href: "/quotations", icon: HelpCircle },
-  { name: "Quotations", href: "/quotations", icon: FileCheck2 },
-  { name: "Projects", href: "/projects", icon: FolderKanban },
-  { name: "Jobs", href: "/jobs", icon: Briefcase },
+  const siteManagerNavItems = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Projects", href: "/projects", icon: Building2 },
+    { name: "Tenders", href: "/tenders", icon: Gavel },
+    { name: "Jobs", href: "/jobs", icon: ClipboardList },
+    { name: "Scheduling", href: "/scheduling", icon: Calendar },
+    { name: "Variations", href: "/variations", icon: ArrowLeftRight },
+    { name: "RFIs", href: "/rfis", icon: HelpCircle },
+    { name: "Sites", href: "/sites", icon: MapPin },
+    { name: "Contractors", href: "/contractors", icon: HardHat },
+    { name: "Crew / People", href: "/crew", icon: Users2 },
+    { name: "Documents", href: "/documents", icon: FileText },
+    { name: "Timesheets", href: "/timesheets", icon: Clock },
+    { name: "Reports", href: "/site-reports", icon: BarChart3 },
+    { name: "Safety & Incidents", href: "/safety", icon: ShieldAlert },
+    { name: "Punch Lists", href: "/punch-lists", icon: ListChecks },
+    { name: "Photos", href: "/photos", icon: Camera },
+  ];
 
-  { name: "Reports", href: "/reports", icon: BarChart3 },
-  { name: "Settings", href: "/setting", icon: Settings },
-  { name: "Help & Support", href: "/help", icon: HelpCircle },
-];
+  const ownerNavItems = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Company", href: "/company", icon: Building },
+    { name: "Subscription", href: "/subscription", icon: CreditCard },
+    { name: "Team & Admins", href: "/team", icon: Users },
+    { name: "Customers", href: "/customers", icon: Layers },
+    { name: "Leads", href: "/leads", icon: Target },
+    { name: "Quotations", href: "/quotations", icon: FileCheck2 },
+    { name: "Tenders", href: "/tenders", icon: Gavel },
+    { name: "Projects", href: "/projects", icon: FolderKanban },
+    { name: "Jobs", href: "/jobs", icon: Briefcase },
+    { name: "Contractors", href: "/contractors", icon: HardHat },
+    { name: "Reports", href: "/reports", icon: BarChart3 },
+    { name: "Settings", href: "/setting", icon: Settings },
+    { name: "Help & Support", href: "/help", icon: HelpCircle },
+  ];
 
-const adminNavItems = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Users & Roles", href: "/users", icon: Users },
-  { name: "Customers", href: "/customers", icon: Layers },
-  { name: "Enquiries", href: "/quotations", icon: HelpCircle },
-  { name: "Quotations", href: "/quotations", icon: FileCheck2 },
-  { name: "Projects", href: "/projects", icon: FolderKanban },
-  { name: "Jobs", href: "/jobs", icon: Briefcase },
-  { name: "Reports", href: "/reports", icon: BarChart3 },
-  { name: "Settings", href: "/setting", icon: Settings },
-  { name: "Help & Support", href: "/help", icon: HelpCircle },
-];
+  const adminNavItems = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Users & Roles", href: "/users", icon: Users },
+    { name: "Customers", href: "/customers", icon: Layers },
+    { name: "Leads", href: "/leads", icon: Target },
+    { name: "Quotations", href: "/quotations", icon: FileCheck2 },
+    { name: "Tenders", href: "/tenders", icon: Gavel },
+    { name: "Projects", href: "/projects", icon: FolderKanban },
+    { name: "Jobs", href: "/jobs", icon: Briefcase },
+    { name: "Contractors", href: "/contractors", icon: HardHat },
+    { name: "Reports", href: "/reports", icon: BarChart3 },
+    { name: "Settings", href: "/setting", icon: Settings },
+    { name: "Help & Support", href: "/help", icon: HelpCircle },
+  ];
 
+  const salesmanagerNavItems = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Customers", href: "/customers", icon: Layers },
+    { name: "Leads", href: "/leads", icon: Target },
+    { name: "Quotations", href: "/quotations", icon: FileCheck2 },
+    { name: "Tenders", href: "/tenders", icon: FolderKanban },
+    { name: "Pipeline", href: "/pipeline", icon: Briefcase },
+    { name: "Reports", href: "/reports", icon: BarChart3 },
+    { name: "Settings", href: "/setting", icon: Settings },
+    { name: "Help & Support", href: "/help", icon: HelpCircle },
+  ];
 
+  // Project Manager Menubar Items (Matching PDF / Screenshot Flow)
+  const projectManagerNavItems = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Projects", href: "/projects", icon: Building2 },
+    { name: "Tenders", href: "/tenders", icon: Gavel },
+    { name: "Jobs", href: "/jobs", icon: ClipboardList },
+    { name: "Scheduling", href: "/scheduling", icon: Calendar },
+    { name: "Variations", href: "/variations", icon: ArrowLeftRight },
+    { name: "RFIs", href: "/rfis", icon: HelpCircle },
+    { name: "Sites", href: "/sites", icon: MapPin },
+    { name: "Contractors", href: "/contractors", icon: HardHat },
+    { name: "Crew / People", href: "/crew", icon: Users2 },
+    { name: "Documents", href: "/documents", icon: FileText },
+    { name: "Timesheets", href: "/timesheets", icon: Clock },
+    { name: "Reports", href: "/reports", icon: BarChart3 },
+  ];
 
-const salesmanagerNavItems = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Customers", href: "/customers", icon: Layers },
-  { name: "Leads", href: "/leads", icon: Target },
-  { name: "Quotations", href: "/quotations", icon: FileCheck2 },
-  { name: "Tenders", href: "/tenders", icon: FolderKanban },
-  { name: "Pipeline", href: "/pipeline", icon: Briefcase },
-  { name: "Reports", href: "/reports", icon: BarChart3 },
-  { name: "Settings", href: "/setting", icon: Settings },
-  { name: "Help & Support", href: "/help", icon: HelpCircle },
-];
-const navItems =
-  user.role === "ACCOUNT_ADMIN"
-    ? adminNavItems
-    : user.role === "SALES_MANAGER"
-    ? salesmanagerNavItems
-    : ownerNavItems;
+  const isProjectManager =
+    user.role === "PROJECT_MANAGER" ||
+    (user.role !== "OWNER" && user.role !== "ACCOUNT_ADMIN" && user.role !== "SALES_MANAGER" && isPmRoute);
+
+  const isSiteManagerRoute =
+    pathname.startsWith("/site-reports") ||
+    pathname.startsWith("/safety") ||
+    pathname.startsWith("/punch-lists") ||
+    pathname.startsWith("/photos");
+
+  const navItems =
+    user.role === "SITE_MANAGER" || (user.role !== "OWNER" && user.role !== "ACCOUNT_ADMIN" && isSiteManagerRoute)
+      ? siteManagerNavItems
+      : user.role === "OWNER"
+      ? ownerNavItems
+      : user.role === "ACCOUNT_ADMIN"
+      ? adminNavItems
+      : user.role === "SALES_MANAGER"
+      ? salesmanagerNavItems
+      : user.role === "PROJECT_MANAGER"
+      ? projectManagerNavItems
+      : isPmRoute
+      ? projectManagerNavItems
+      : ownerNavItems;
 
   return (
     <div className="min-h-screen bg-stone flex text-onyx font-sans antialiased">
@@ -200,11 +356,11 @@ const navItems =
       {/* 1. LEFT SIDEBAR                                                           */}
       {/* ========================================================================= */}
       <aside className="w-60 bg-stone flex flex-col justify-between shrink-0 hidden lg:flex p-4 pr-2 sticky top-0 h-screen border-r border-pebble/60">
-        <div>
+        <div className="flex flex-col min-h-0 flex-1">
           {/* Logo & Brand Header */}
           <div
             onClick={() => router.push("/dashboard")}
-            className="flex items-center gap-3 px-2 py-3 mb-4 cursor-pointer"
+            className="flex items-center gap-3 px-2 py-3 mb-2 cursor-pointer shrink-0"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-onyx text-white shadow-xs">
               <Building2 className="h-5 w-5 text-breath" />
@@ -220,7 +376,7 @@ const navItems =
           </div>
 
           {/* Navigation Links */}
-          <nav className="space-y-1 text-sm">
+          <nav className="space-y-1 text-sm overflow-y-auto flex-1 pr-1.5 min-h-0">
             {navItems.map((item) => {
               const isActive = currentNav === item.name;
               const Icon = item.icon;
@@ -230,56 +386,74 @@ const navItems =
                   key={item.name}
                   type="button"
                   onClick={() => router.push(item.href)}
-                  className={`flex w-full items-center gap-3 px-3.5 py-2.5 transition text-left cursor-pointer ${
-                    isActive
+                  className={`flex w-full items-center gap-3 px-3.5 py-2 transition text-left cursor-pointer ${isActive
                       ? "rounded-[10px] bg-breath font-semibold text-onyx shadow-2xs"
                       : "rounded-[10px] font-medium text-ash hover:bg-mist/70 hover:text-onyx"
-                  }`}
+                    }`}
                 >
                   <Icon
-                    className={`h-4 w-4 ${
-                      isActive ? "text-onyx" : "text-ash"
-                    }`}
+                    className={`h-4 w-4 shrink-0 ${isActive ? "text-onyx" : "text-ash"
+                      }`}
                   />
-                  <span>{item.name}</span>
+                  <span className="truncate">{item.name}</span>
                 </button>
               );
             })}
           </nav>
         </div>
 
-        {/* Sidebar Bottom Promo Card ("Smarter people. Stronger projects.") */}
-        <div className="mt-6 rounded-[10px] bg-breath p-4 relative overflow-hidden flex flex-col justify-between h-36 shadow-xs border border-pebble/50 group">
-          <div className="absolute right-0 top-0 bottom-0 w-1/2 pointer-events-none opacity-85">
-            <Image
-              src="/images/sidebar_leaves.jpg"
-              alt="Botanical Leaves"
-              fill
-              sizes="(max-width: 768px) 100vw, 200px"
-              className="object-cover object-right mix-blend-multiply"
-            />
-          </div>
-          <div className="relative z-10">
-            <p className="text-sm font-bold text-onyx leading-snug">
-              Smarter
-              <br />
-              people.
-              <br />
-              Stronger
-              <br />
-              projects.
-            </p>
-          </div>
-          <div className="relative z-10 flex justify-end">
+        {/* Sidebar Bottom: Settings for Project Manager, or Promo Card for Owner */}
+        {isProjectManager ? (
+          <div className="pt-2 border-t border-pebble/60 mt-2 shrink-0">
             <button
               type="button"
-              onClick={() => router.push("/team")}
-              className="w-7 h-7 rounded-full bg-bark text-white flex items-center justify-center hover:bg-onyx hover:scale-105 transition shadow-xs cursor-pointer"
+              onClick={() => router.push("/setting")}
+              className={`flex w-full items-center gap-3 px-3.5 py-2.5 transition text-left cursor-pointer ${currentNav === "Settings"
+                  ? "rounded-[10px] bg-breath font-semibold text-onyx shadow-2xs"
+                  : "rounded-[10px] font-medium text-ash hover:bg-mist/70 hover:text-onyx"
+                }`}
             >
-              <ArrowRight className="h-3.5 w-3.5" />
+              <Settings
+                className={`h-4 w-4 shrink-0 ${currentNav === "Settings" ? "text-onyx" : "text-ash"
+                  }`}
+              />
+              <span>Settings</span>
             </button>
           </div>
-        </div>
+        ) : (
+          /* Sidebar Bottom Promo Card ("Smarter people. Stronger projects.") */
+          <div className="mt-6 rounded-[10px] bg-breath p-4 relative overflow-hidden flex flex-col justify-between h-36 shadow-xs border border-pebble/50 group shrink-0">
+            <div className="absolute right-0 top-0 bottom-0 w-1/2 pointer-events-none opacity-85">
+              <Image
+                src="/images/sidebar_leaves.jpg"
+                alt="Botanical Leaves"
+                fill
+                sizes="(max-width: 768px) 100vw, 200px"
+                className="object-cover object-right mix-blend-multiply"
+              />
+            </div>
+            <div className="relative z-10">
+              <p className="text-sm font-bold text-onyx leading-snug">
+                Smarter
+                <br />
+                people.
+                <br />
+                Stronger
+                <br />
+                projects.
+              </p>
+            </div>
+            <div className="relative z-10 flex justify-end">
+              <button
+                type="button"
+                onClick={() => router.push("/team")}
+                className="w-7 h-7 rounded-full bg-bark text-white flex items-center justify-center hover:bg-onyx hover:scale-105 transition shadow-xs cursor-pointer"
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* ========================================================================= */}
@@ -301,7 +475,22 @@ const navItems =
           </div>
 
           {/* Right: Notifications & User Profile Pill */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Site Manager Top Header Pill (Matching Design Screenshot) */}
+            {(user.role === "SITE_MANAGER" || isSiteManagerRoute) && (
+              <div className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-[12px] bg-white border border-pebble/80 shadow-2xs text-left">
+                <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-forest text-white">
+                  <HardHat className="h-4 w-4 text-white" />
+                </div>
+                <div className="leading-tight">
+                  <span className="text-xs font-bold text-onyx block">Role: Site Manager</span>
+                  <span className="text-[10px] text-ash block leading-tight truncate max-w-[280px]">
+                    On-site execution, daily reporting, crew coordination and site management
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Notification Bell */}
             <button
               type="button"
@@ -319,40 +508,158 @@ const navItems =
                 className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2 hover:bg-mist/70 transition cursor-pointer"
               >
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-onyx text-xs font-bold text-white shadow-xs">
-                  {userInitial}
+                  {user.role === "SITE_MANAGER" ? "SM" : userInitial}
                 </div>
                 <div className="text-left hidden sm:block">
                   <p className="text-xs font-bold text-onyx leading-tight">
-                    {user.name}
+                    {user.role === "SITE_MANAGER" && !currentUser?.name ? "Rohit Verma" : user.name}
                   </p>
                   <p className="text-[10px] font-medium text-ash leading-none capitalize">
-                    {user.role?.toLowerCase() || "Owner"}
+                    {user.role === "SITE_MANAGER" ? "Site Manager" : user.role?.toLowerCase() || "Owner"}
                   </p>
                 </div>
                 <ChevronDown className="h-3.5 w-3.5 text-ash" />
               </button>
 
               {userDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-[10px] border border-pebble bg-white py-1.5 shadow-lg z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute right-0 mt-2 w-56 rounded-[10px] border border-pebble bg-white py-1.5 shadow-lg z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="px-3.5 py-2 border-b border-pebble/60">
                     <p className="text-xs font-semibold text-onyx">
-                      {user.name}
+                      {user.role === "SITE_MANAGER" && !currentUser?.name ? "Rohit Verma" : user.name}
                     </p>
                     <p className="text-[10px] text-ash capitalize">
-                      {user.role?.toLowerCase() || "owner"}
+                      {user.role === "SITE_MANAGER" ? "Site Manager" : user.role?.toLowerCase().replace("_", " ") || "owner"}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserDropdownOpen(false);
-                      setAdminOpen(true);
-                    }}
-                    className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-onyx hover:bg-stone transition"
-                  >
-                    <UserPlus className="h-3.5 w-3.5 text-ash" />
-                    Add Admin
-                  </button>
+
+                  {/* Role Switcher for UI Navigation & Testing */}
+                  <div className="px-3 py-2 border-b border-pebble/60 bg-stone/50">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-ash mb-1.5">
+                      Switch Role (UI Demo)
+                    </p>
+                    <div className="grid grid-cols-2 gap-1 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUser({
+                            id: 99,
+                            companyId: currentUser?.companyId || "ORG-DEFAULT",
+                            name: "Rohit Verma",
+                            email: "rohit.verma@firma.com",
+                            role: "SITE_MANAGER",
+                            size: 24,
+                          });
+                          setUserDropdownOpen(false);
+                          router.push("/dashboard");
+                        }}
+                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "SITE_MANAGER"
+                            ? "bg-forest text-white font-semibold shadow-2xs"
+                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
+                          }`}
+                      >
+                        Site Mgr
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUser({
+                            id: currentUser?.id || 1,
+                            companyId: currentUser?.companyId || "ORG-DEFAULT",
+                            name: "Rahul Mehta",
+                            email: currentUser?.email || "rahul@firma.com",
+                            role: "PROJECT_MANAGER",
+                            size: 25,
+                          });
+                          setUserDropdownOpen(false);
+                          router.push("/dashboard");
+                        }}
+                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "PROJECT_MANAGER"
+                            ? "bg-forest text-white font-semibold shadow-2xs"
+                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
+                          }`}
+                      >
+                        Project Mgr
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUser({
+                            id: currentUser?.id || 1,
+                            companyId: currentUser?.companyId || "ORG-DEFAULT",
+                            name: currentUser?.name || "Owner User",
+                            email: currentUser?.email || "owner@firma.com",
+                            role: "OWNER",
+                            size: 10,
+                          });
+                          setUserDropdownOpen(false);
+                          router.push("/dashboard");
+                        }}
+                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "OWNER"
+                            ? "bg-forest text-white font-semibold shadow-2xs"
+                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
+                          }`}
+                      >
+                        Owner
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUser({
+                            id: currentUser?.id || 1,
+                            companyId: currentUser?.companyId || "ORG-DEFAULT",
+                            name: currentUser?.name || "Sales User",
+                            email: currentUser?.email || "sales@firma.com",
+                            role: "SALES_MANAGER",
+                            size: 10,
+                          });
+                          setUserDropdownOpen(false);
+                          router.push("/dashboard");
+                        }}
+                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "SALES_MANAGER"
+                            ? "bg-forest text-white font-semibold shadow-2xs"
+                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
+                          }`}
+                      >
+                        Sales Mgr
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUser({
+                            id: currentUser?.id || 1,
+                            companyId: currentUser?.companyId || "ORG-DEFAULT",
+                            name: currentUser?.name || "Admin User",
+                            email: currentUser?.email || "admin@firma.com",
+                            role: "ACCOUNT_ADMIN",
+                            size: 10,
+                          });
+                          setUserDropdownOpen(false);
+                          router.push("/dashboard");
+                        }}
+                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "ACCOUNT_ADMIN"
+                            ? "bg-forest text-white font-semibold shadow-2xs"
+                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
+                          }`}
+                      >
+                        Admin
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Only show 'Add Admin' if current logged in user is OWNER and no admin has been created yet */}
+                  {user.role === "OWNER" && !hasAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        setAdminOpen(true);
+                      }}
+                      className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-onyx hover:bg-stone transition cursor-pointer"
+                    >
+                      <UserPlus className="h-3.5 w-3.5 text-ash" />
+                      Add Admin
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleLogout}
@@ -368,7 +675,7 @@ const navItems =
         </header>
 
         {/* Page Content Body */}
-        <main className="flex-1 px-6 pb-8 space-y-5 max-w-[1400px] w-full mx-auto">
+        <main className="flex-1 px-6 pb-8 space-y-5 w-full">
           {children}
 
           {/* Footer */}

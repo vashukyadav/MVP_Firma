@@ -6,11 +6,13 @@ export type UserRole =
   | "SALES_MANAGER"
   | "PROJECT_MANAGER"
   | "FIELD_WORKER"
-  | "FINANCE_MANAGER";
+  | "FINANCE_MANAGER"
+  | "SITE_MANAGER";
 
 
 export interface User {
   id?: number;
+  companyId: string;
   name: string;
   email: string;
   password: string;
@@ -23,6 +25,7 @@ export type PlanType =
   | "ENTERPRISE";
 export interface Company {
   userId: number;
+  companyId: string;
   companyName: string;
   industry: string;
   companySize: string;
@@ -42,6 +45,7 @@ export type EnquiryStatus =
 
 export interface Enquiry {
   id?: number;
+  companyId?: string;
 
   customerId: number;
 
@@ -67,12 +71,14 @@ export interface Enquiry {
 
 export interface Onboarding {
   userId: number;
+  companyId?: string;
   plan: PlanType;
   companyCompleted: boolean;
   billingCompleted: boolean;
 }
 export interface Customer {
   id?: number;
+  companyId: string;
   companyName: string;
   contactPerson: string;
   email: string;
@@ -81,6 +87,16 @@ export interface Customer {
   industry: string;
   notes?: string;
 }
+
+export function generateCompanyId(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let randomPart = "";
+  for (let i = 0; i < 6; i++) {
+    randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `ORG-${randomPart}`;
+}
+
 class FirmaDB extends Dexie {
   users!: Table<User, number>;
   onboarding!: Table<Onboarding, number>;
@@ -95,8 +111,34 @@ class FirmaDB extends Dexie {
       onboarding: "userId,plan",
       company: "userId",
       customer: "++id,phone,email,companyName",
-        enquiry: "++id,customerId,status,assignedTo,createdAt",
+      enquiry: "++id,customerId,status,assignedTo,createdAt",
     });
+
+    this.version(3)
+      .stores({
+        users: "++id,email,companyId,size,role",
+        onboarding: "userId,companyId,plan",
+        company: "userId,companyId",
+        customer: "++id,companyId,phone,email,companyName",
+        enquiry: "++id,companyId,customerId,status,assignedTo,createdAt",
+      })
+      .upgrade(async (tx) => {
+        await tx.table("users").toCollection().modify((user: any) => {
+          if (!user.companyId) {
+            user.companyId = "ORG-DEFAULT";
+          }
+        });
+        await tx.table("company").toCollection().modify((comp: any) => {
+          if (!comp.companyId) {
+            comp.companyId = "ORG-DEFAULT";
+          }
+        });
+        await tx.table("customer").toCollection().modify((cust: any) => {
+          if (!cust.companyId) {
+            cust.companyId = "ORG-DEFAULT";
+          }
+        });
+      });
   }
 }
 

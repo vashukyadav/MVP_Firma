@@ -45,6 +45,8 @@ export default function TeamAndAdmins() {
         return { label: "Sales Manager", color: "bg-clear-bg text-success-text border-pebble" };
       case "PROJECT_MANAGER":
         return { label: "Project Manager", color: "bg-breath text-onyx border-pebble" };
+      case "SITE_MANAGER":
+        return { label: "Site Manager", color: "bg-emerald-50 text-emerald-800 border-emerald-200" };
       case "FIELD_WORKER":
         return { label: "Field Worker", color: "bg-stone text-onyx border-pebble" };
       case "FINANCE_MANAGER":
@@ -150,6 +152,7 @@ export default function TeamAndAdmins() {
               <option value="ACCOUNT_ADMIN">Account Admin</option>
               <option value="SALES_MANAGER">Sales Manager</option>
               <option value="PROJECT_MANAGER">Project Manager</option>
+              <option value="SITE_MANAGER">Site Manager</option>
               <option value="FIELD_WORKER">Field Worker</option>
               <option value="FINANCE_MANAGER">Finance Manager</option>
             </select>

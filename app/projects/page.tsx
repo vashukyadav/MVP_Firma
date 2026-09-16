@@ -25,10 +25,11 @@ import {
   Briefcase,
   X,
   Layers,
+  Trash2,
 } from "lucide-react";
 
 export default function ProjectsPage() {
-  const { projects, addProject } = useLeadFlowStore();
+  const { projects, addProject, deleteProject, clearAllDummyData } = useLeadFlowStore();
 
   const [mounted, setMounted] = useState(false);
   const [filter, setFilter] = useState("ALL");
@@ -41,8 +42,8 @@ export default function ProjectsPage() {
   const [projectClient, setProjectClient] = useState("");
   const [projectLocation, setProjectLocation] = useState("");
   const [projectBudget, setProjectBudget] = useState("");
-  const [projectLead, setProjectLead] = useState("Amit Kumar");
-  const [projectDue, setProjectDue] = useState("30 Dec 2026");
+  const [projectLead, setProjectLead] = useState("");
+  const [projectDue, setProjectDue] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -356,7 +357,21 @@ export default function ProjectsPage() {
               </div>
             </div>
 
-            <div className="p-4 border-t border-pebble flex justify-end bg-stone/40">
+            <div className="p-4 border-t border-pebble flex justify-between items-center bg-stone/40">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (confirm(`Delete project "${selectedProject.name}"?`)) {
+                    deleteProject(selectedProject.id);
+                    setSelectedProject(null);
+                  }
+                }}
+                className="text-xs text-hazard-text hover:bg-hazard-bg/20 border-pebble flex items-center gap-1 cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Project</span>
+              </Button>
               <Button
                 type="button"
                 onClick={() => setSelectedProject(null)}
@@ -432,6 +447,7 @@ export default function ProjectsPage() {
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold text-onyx">Project Lead</Label>
                   <Input
+                    placeholder="e.g. Project Lead / PM"
                     value={projectLead}
                     onChange={(e) => setProjectLead(e.target.value)}
                     className="text-xs h-9"
@@ -440,6 +456,7 @@ export default function ProjectsPage() {
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold text-onyx">Due Date</Label>
                   <Input
+                    placeholder="e.g. 30 Dec 2026"
                     value={projectDue}
                     onChange={(e) => setProjectDue(e.target.value)}
                     className="text-xs h-9"

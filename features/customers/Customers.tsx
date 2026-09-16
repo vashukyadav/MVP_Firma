@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import FirmaLayout from "@/components/layout/FirmaLayout";
 import { Customer, db } from "@/lib/db";
+import { useAuthStore } from "@/store/authStore";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +56,7 @@ type CustomerFormData = z.infer<typeof customerSchema>;
 ========================================================= */
 
 export default function Customers() {
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
   const [showForm, setShowForm] = useState(false);
@@ -77,49 +79,17 @@ export default function Customers() {
 
   const loadCustomers = async () => {
     try {
-      const count = await db.customer.count();
-      if (count === 0) {
-        await db.customer.bulkAdd([
-          {
-            companyName: "Apex Infra Projects",
-            contactPerson: "Rajeshwar Sen",
-            email: "rajeshwar@apexinfra.com",
-            phone: "+91 98765 43210",
-            address: "Delhi NCR",
-            industry: "Infrastructure & Highways",
-            notes: "National Highway EPC contractor",
-          },
-          {
-            companyName: "BuildCraft Ltd",
-            contactPerson: "Ananya Deshmukh",
-            email: "ananya@buildcraft.com",
-            phone: "+91 98123 45678",
-            address: "Mumbai Central",
-            industry: "Commercial Construction",
-            notes: "Commercial towers contractor",
-          },
-          {
-            companyName: "Horizon EPC Group",
-            contactPerson: "Vikramaditya Rao",
-            email: "vikram@horizonepc.com",
-            phone: "+91 97654 32109",
-            address: "Bangalore",
-            industry: "Energy & Infrastructure",
-            notes: "Metro & Civil engineering works",
-          },
-        ]);
-      }
+      const companyId = currentUser?.companyId || "ORG-DEFAULT";
+      const data = await db.customer.where("companyId").equals(companyId).toArray();
+      setCustomers(data);
     } catch (err) {
-      console.error("Error seeding customers:", err);
+      console.error("Error loading customers:", err);
     }
-    const data = await db.customer.toArray();
-
-    setCustomers(data);
   };
 
   useEffect(() => {
     loadCustomers();
-  }, []);
+  }, [currentUser?.companyId]);
 
   /* =======================================================
      DELETE CUSTOMER
@@ -196,14 +166,16 @@ export default function Customers() {
        CHECK DUPLICATE EMAIL
     ------------------------------------------------------- */
 
+    const companyId = currentUser?.companyId || "ORG-DEFAULT";
+
     const existingCustomer = await db.customer
-      .where("email")
-      .equals(data.email)
+      .where("companyId")
+      .equals(companyId)
+      .filter((c) => c.email === data.email)
       .first();
 
     if (existingCustomer) {
-      alert("Customer with this email already exists");
-
+      alert("A customer with this email already exists in your company");
       return;
     }
 
@@ -212,6 +184,7 @@ export default function Customers() {
     ------------------------------------------------------- */
 
     await db.customer.add({
+      companyId,
       companyName: data.companyName,
       contactPerson: data.contactPerson,
       email: data.email,
@@ -219,7 +192,7 @@ export default function Customers() {
       address: data.address,
       industry: data.industry,
       notes: data.notes ?? "",
-    } as Customer);
+    });
 
     alert("Customer created successfully!");
 
@@ -236,7 +209,7 @@ export default function Customers() {
 
   return (
     <FirmaLayout activeNav="Customers">
-      <div className="p-2 sm:p-4 space-y-6">
+      <div className="space-y-6 mt-4">
         {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>

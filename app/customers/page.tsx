@@ -17,10 +17,11 @@ export default function CustomersPage() {
       return;
     }
 
-    // Sirf Sales Manager aur Owner Customers access kar sakte hain
+    // Owner, Account Admin, aur Sales Manager Customers access kar sakte hain
     if (
       currentUser.role !== "SALES_MANAGER" &&
-      currentUser.role !== "OWNER"
+      currentUser.role !== "OWNER" &&
+      currentUser.role !== "ACCOUNT_ADMIN"
     ) {
       router.push("/dashboard");
     }
@@ -34,7 +35,8 @@ export default function CustomersPage() {
   // Unauthorized user ke liye kuch render nahi
   if (
     currentUser.role !== "SALES_MANAGER" &&
-    currentUser.role !== "OWNER"
+    currentUser.role !== "OWNER" &&
+    currentUser.role !== "ACCOUNT_ADMIN"
   ) {
     return null;
   }

@@ -45,6 +45,8 @@ function QuotationsContent() {
     createQuote,
     acceptQuote,
     updateQuoteStatus,
+    deleteQuote,
+    clearAllDummyData,
   } = useLeadFlowStore();
 
   const [mounted, setMounted] = useState(false);
@@ -57,9 +59,7 @@ function QuotationsContent() {
   const [quoteNo, setQuoteNo] = useState("");
   const [validUntil, setValidUntil] = useState("2025-11-30");
   const [lineItems, setLineItems] = useState<QuoteLineItem[]>([
-    { id: 1, description: "Site Preparation & Foundation Works", qty: 1, rate: 500000, amount: 500000 },
-    { id: 2, description: "Pre-Engineered Structural Framework", qty: 1, rate: 1000000, amount: 1000000 },
-    { id: 3, description: "Roofing & Wall Cladding Package", qty: 1, rate: 500000, amount: 500000 },
+    { id: 1, description: "", qty: 1, rate: 0, amount: 0 },
   ]);
 
   // Preview Modal
@@ -381,6 +381,19 @@ function QuotationsContent() {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Delete quote #${item.quoteNo}?`)) {
+                              deleteQuote(item.id);
+                            }
+                          }}
+                          className="p-1.5 rounded-[6px] text-ash hover:bg-hazard-bg/20 hover:text-hazard-text transition cursor-pointer"
+                          title="Delete Quote"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -680,25 +693,41 @@ function QuotationsContent() {
               </div>
             </div>
 
-            <div className="border-t border-pebble pt-4 flex justify-end gap-2">
+            <div className="border-t border-pebble pt-4 flex justify-between items-center">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setPreviewQuote(null)}
-                className="text-xs"
-              >
-                Close Preview
-              </Button>
-              <Button
-                type="button"
                 onClick={() => {
-                  alert("Quotation PDF generated successfully!");
+                  if (confirm(`Delete quote #${previewQuote.quoteNo}?`)) {
+                    deleteQuote(previewQuote.id);
+                    setPreviewQuote(null);
+                  }
                 }}
-                className="bg-forest hover:bg-forest-hover text-white text-xs"
+                className="text-xs text-hazard-text hover:bg-hazard-bg/20 border-pebble flex items-center gap-1 cursor-pointer"
               >
-                <Download className="h-3.5 w-3.5 mr-1" />
-                <span>Download PDF</span>
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Quote</span>
               </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPreviewQuote(null)}
+                  className="text-xs"
+                >
+                  Close Preview
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    alert("Quotation PDF generated successfully!");
+                  }}
+                  className="bg-forest hover:bg-forest-hover text-white text-xs"
+                >
+                  <Download className="h-3.5 w-3.5 mr-1" />
+                  <span>Download PDF</span>
+                </Button>
+              </div>
             </div>
           </div>
         </div>

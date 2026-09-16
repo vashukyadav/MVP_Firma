@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { db, type UserRole, type User } from "@/lib/db";
+import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,7 @@ const createUserSchema = z.object({
   role: z.enum([
     "SALES_MANAGER",
     "PROJECT_MANAGER",
+    "SITE_MANAGER",
     "FIELD_WORKER",
     "FINANCE_MANAGER",
   ]),
@@ -24,6 +26,7 @@ const createUserSchema = z.object({
 type CreateUserFormData = z.infer<typeof createUserSchema>;
 
 export default function CreateUser() {
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [users, setUsers] = useState<User[]>([]);
 
   const {
@@ -36,9 +39,9 @@ export default function CreateUser() {
   });
 
   const loadUsers = async () => {
-    const data = await db.users.toArray();
+    const companyId = currentUser?.companyId || "ORG-DEFAULT";
+    const data = await db.users.where("companyId").equals(companyId).toArray();
 
-    
     const otherUsers = data.filter(
       (user) => user.role !== "ACCOUNT_ADMIN"
     );
@@ -46,10 +49,9 @@ export default function CreateUser() {
     setUsers(otherUsers);
   };
 
-  
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [currentUser?.companyId]);
 
   const onSubmit = async (data: CreateUserFormData) => {
     const existingUser = await db.users
@@ -63,6 +65,7 @@ export default function CreateUser() {
     }
 
     await db.users.add({
+      companyId: currentUser?.companyId || "ORG-DEFAULT",
       name: data.name,
       email: data.email,
       password: data.password,
@@ -73,7 +76,6 @@ export default function CreateUser() {
     alert(`${data.role} created successfully`);
 
     reset();
-
 
     loadUsers();
   };
@@ -145,6 +147,10 @@ export default function CreateUser() {
 
             <option value="PROJECT_MANAGER">
               Project Manager
+            </option>
+
+            <option value="SITE_MANAGER">
+              Site Manager
             </option>
 
             <option value="FIELD_WORKER">

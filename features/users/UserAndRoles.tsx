@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import { useAuthStore } from "@/store/authStore";
 
 import { db, type User as DbUser } from "@/lib/db";
 
@@ -35,6 +36,7 @@ const userSchema = z.object({
   role: z.enum([
     "SALES_MANAGER",
     "PROJECT_MANAGER",
+    "SITE_MANAGER",
     "FIELD_WORKER",
     "FINANCE_MANAGER",
   ]),
@@ -43,6 +45,7 @@ const userSchema = z.object({
 type UserFormData = z.infer<typeof userSchema>;
 
 export default function UsersAndRoles() {
+  const currentUser = useAuthStore((state) => state.currentUser);
   const [users, setUsers] = useState<DbUser[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<DbUser | null>(null);
@@ -58,7 +61,8 @@ export default function UsersAndRoles() {
   });
 
   const loadUsers = async () => {
-    const data = await db.users.toArray();
+    const companyId = currentUser?.companyId || "ORG-DEFAULT";
+    const data = await db.users.where("companyId").equals(companyId).toArray();
 
     const employees = data.filter(
       (user) => user.role !== "OWNER" && user.role !== "ACCOUNT_ADMIN"
@@ -69,7 +73,7 @@ export default function UsersAndRoles() {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [currentUser?.companyId]);
 
   const handleDelete = async (id: number) => {
     const confirmDelete = confirm(
@@ -141,6 +145,7 @@ export default function UsersAndRoles() {
     }
 
     await db.users.add({
+      companyId: currentUser?.companyId || "ORG-DEFAULT",
       name: data.name,
       email: data.email,
       password: data.password,
@@ -168,6 +173,11 @@ export default function UsersAndRoles() {
           label: "Project Manager",
           color: "bg-breath text-onyx border-pebble/60",
         };
+      case "SITE_MANAGER":
+        return {
+          label: "Site Manager",
+          color: "bg-emerald-50 text-emerald-800 border-emerald-200",
+        };
       case "FIELD_WORKER":
         return {
           label: "Field Worker",
@@ -188,7 +198,7 @@ export default function UsersAndRoles() {
 
   return (
     <FirmaLayout activeNav="Users & Roles">
-      <div className="p-2 sm:p-4 space-y-6">
+      <div className="space-y-6 mt-4">
         {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -330,6 +340,7 @@ export default function UsersAndRoles() {
                       <option value="">Select organizational role</option>
                       <option value="SALES_MANAGER">Sales Manager</option>
                       <option value="PROJECT_MANAGER">Project Manager</option>
+                      <option value="SITE_MANAGER">Site Manager</option>
                       <option value="FIELD_WORKER">Field Worker</option>
                       <option value="FINANCE_MANAGER">Finance Manager</option>
                     </select>
