@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import { useTenderFlowStore } from "@/store/tenderFlowStore";
+import { useAuthStore } from "@/store/authStore";
+import { isFieldWorker, isJobAssignedToUser } from "@/lib/roleAccess";
 import {
   HelpCircle,
   Plus,
@@ -27,73 +30,43 @@ interface RfiItem {
   description?: string;
 }
 
-const initialRfis: RfiItem[] = [
-  {
-    id: "R-001",
-    subject: "Drawing clarification",
-    relatedJob: "J-004",
-    raisedBy: "Sharma Electrical",
-    date: "15 Sep 2025",
-    status: "Open",
-    description: "Clarification required on ceiling conduit routing for Block B 2nd floor lighting circuit.",
-  },
-  {
-    id: "R-002",
-    subject: "Conduit route change",
-    relatedJob: "J-002",
-    raisedBy: "Metro Builders",
-    date: "14 Sep 2025",
-    status: "In Progress",
-    description: "Proposed alternate penetration route due to structural beam collision at Grid C-4.",
-  },
-  {
-    id: "R-003",
-    subject: "Socket height confirm",
-    relatedJob: "J-004",
-    raisedBy: "Site Manager",
-    date: "12 Sep 2025",
-    status: "Open",
-    description: "Architectural drawings indicate 450mm AFF whereas client brief requested 300mm AFF.",
-  },
-];
+const initialRfis: RfiItem[] = [];
 
 export default function RfisPage() {
+  const { jobs = [] } = useTenderFlowStore();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const isWorker = isFieldWorker(currentUser);
+
+  const userJobs = useMemo(() => {
+    if (!isWorker) return jobs;
+    return jobs.filter((j) => isJobAssignedToUser(j, [], [], currentUser));
+  }, [jobs, isWorker, currentUser]);
+
   const [rfis, setRfis] = useState<RfiItem[]>(initialRfis);
-  const [activeFilter, setActiveFilter] = useState("All (3)");
+  const [activeFilter, setActiveFilter] = useState("My RFIs");
   const [search, setSearch] = useState("");
   const [selectedRfi, setSelectedRfi] = useState<RfiItem | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
 
   // New RFI form state
   const [newSubject, setNewSubject] = useState("");
-  const [newJob, setNewJob] = useState("J-004");
+  const [newJob, setNewJob] = useState("");
   const [newDesc, setNewDesc] = useState("");
 
-  const filteredRfis = rfis.filter((r) => {
-    const matchesSearch =
-      r.id.toLowerCase().includes(search.toLowerCase()) ||
-      r.subject.toLowerCase().includes(search.toLowerCase()) ||
-      r.relatedJob.toLowerCase().includes(search.toLowerCase()) ||
-      r.raisedBy.toLowerCase().includes(search.toLowerCase());
-
-    if (!matchesSearch) return false;
-    if (activeFilter === "Open (2)" || activeFilter === "Open") return r.status === "Open";
-    if (activeFilter === "In Progress (1)" || activeFilter === "In Progress") return r.status === "In Progress";
-    if (activeFilter === "Closed (0)" || activeFilter === "Closed") return r.status === "Closed";
-    return true;
-  });
-
-  const handleCreateRfi = (e: React.FormEvent) => {
+  const handleAddRfi = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSubject) return;
+    if (!newSubject.trim()) return;
 
-    const newId = `R-00${rfis.length + 1}`;
     const newItem: RfiItem = {
-      id: newId,
+      id: `R-${Math.floor(100 + Math.random() * 900)}`,
       subject: newSubject,
-      relatedJob: newJob,
-      raisedBy: "Site Manager",
-      date: "16 Sep 2025",
+      relatedJob: newJob || (jobs[0]?.id || "General"),
+      raisedBy: currentUser?.name || "Site Team",
+      date: new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
       status: "Open",
       description: newDesc || "Site technical query logged.",
     };
@@ -103,6 +76,20 @@ export default function RfisPage() {
     setNewSubject("");
     setNewDesc("");
   };
+
+  const filteredRfis = rfis.filter((r) => {
+    const matchesSearch =
+      r.id.toLowerCase().includes(search.toLowerCase()) ||
+      r.subject.toLowerCase().includes(search.toLowerCase()) ||
+      r.relatedJob.toLowerCase().includes(search.toLowerCase()) ||
+      r.raisedBy.toLowerCase().includes(search.toLowerCase());
+
+    if (!matchesSearch) return false;
+    if (activeFilter === "Open" && r.status !== "Open") return false;
+    if (activeFilter === "In Progress" && r.status !== "In Progress") return false;
+    if (activeFilter === "Closed" && r.status !== "Closed") return false;
+    return true;
+  });
 
   return (
     <FirmaLayout activeNav="RFIs">
@@ -116,7 +103,7 @@ export default function RfisPage() {
             </div>
             <h1 className="text-display-h1 font-bold text-onyx tracking-tight flex items-center gap-2.5">
               <HelpCircle className="h-6 w-6 text-forest" />
-              <span>RFIs (Updated)</span>
+              <span>RFIs</span>
             </h1>
             <p className="text-xs sm:text-sm text-ash mt-0.5">
               Request for Information management between site engineers, contractors and PM.
@@ -125,28 +112,36 @@ export default function RfisPage() {
 
           <button
             type="button"
-            onClick={() => setShowNewModal(true)}
+            onClick={() => {
+              setNewJob(jobs[0]?.id || "");
+              setShowNewModal(true);
+            }}
             className="px-4 py-2 rounded-[10px] bg-forest text-white text-xs font-bold hover:bg-forest-hover transition shadow-xs flex items-center gap-2 self-start sm:self-auto cursor-pointer"
           >
             <Plus className="h-4 w-4" /> New RFI
           </button>
         </div>
 
-        {/* Filter Pills & Search */}
+        {/* Filter Pills & Search matching Screen 6 */}
         <div className="rounded-[16px] bg-white border border-pebble/80 p-4 sm:p-5 shadow-2xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
               {[
-                { label: `All (${rfis.length})`, key: "All (3)" },
-                { label: `Open (${rfis.filter((r) => r.status === "Open").length})`, key: "Open (2)" },
-                { label: `In Progress (${rfis.filter((r) => r.status === "In Progress").length})`, key: "In Progress (1)" },
-                { label: `Closed (${rfis.filter((r) => r.status === "Closed").length})`, key: "Closed (0)" },
+                { label: `My RFIs (${rfis.length})`, key: "My RFIs" },
+                {
+                  label: `Open (${rfis.filter((r) => r.status === "Open" || r.status === "In Progress").length})`,
+                  key: "Open",
+                },
+                {
+                  label: `Closed (${rfis.filter((r) => r.status === "Closed").length})`,
+                  key: "Closed",
+                },
               ].map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => setActiveFilter(tab.key)}
-                  className={`px-3 py-1.5 rounded-[8px] text-xs font-bold transition cursor-pointer shrink-0 ${
+                  className={`px-3.5 py-1.5 rounded-[8px] text-xs font-bold transition cursor-pointer shrink-0 ${
                     activeFilter === tab.key
                       ? "bg-forest text-white shadow-2xs"
                       : "bg-stone text-ash hover:text-onyx hover:bg-mist/70"
@@ -169,52 +164,64 @@ export default function RfisPage() {
             </div>
           </div>
 
-          {/* Table matching Screen 8 */}
+          {/* Table matching Screen 6 (# | Subject | Job | Status | Actions) */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-pebble/80 text-ash text-[11px] font-bold uppercase tracking-wider">
                   <th className="py-2.5 px-3">#</th>
                   <th className="py-2.5 px-3">Subject</th>
-                  <th className="py-2.5 px-3">Related Job</th>
-                  <th className="py-2.5 px-3">Raised By</th>
-                  <th className="py-2.5 px-3">Date</th>
+                  <th className="py-2.5 px-3">Job</th>
                   <th className="py-2.5 px-3">Status</th>
                   <th className="py-2.5 px-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-pebble/40">
-                {filteredRfis.map((r) => (
-                  <tr key={r.id} className="hover:bg-stone/50 transition">
-                    <td className="py-3 px-3 font-bold font-mono text-ash">{r.id}</td>
-                    <td className="py-3 px-3 font-bold text-onyx">{r.subject}</td>
-                    <td className="py-3 px-3 font-bold text-forest">{r.relatedJob}</td>
-                    <td className="py-3 px-3 text-ash font-medium">{r.raisedBy}</td>
-                    <td className="py-3 px-3 text-ash">{r.date}</td>
-                    <td className="py-3 px-3">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-[4px] text-[10px] font-bold ${
-                          r.status === "Open"
-                            ? "bg-rose-100 text-rose-800"
-                            : r.status === "In Progress"
-                            ? "bg-teal-100 text-teal-800"
-                            : "bg-emerald-100 text-emerald-800"
-                        }`}
-                      >
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRfi(r)}
-                        className="px-3 py-1 rounded-[6px] bg-stone hover:bg-forest hover:text-white border border-pebble text-onyx font-bold transition text-xs cursor-pointer"
-                      >
-                        View
-                      </button>
+                {filteredRfis.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-ash text-sm">
+                      <HelpCircle className="h-9 w-9 text-ash/50 mx-auto mb-2 stroke-[1.5]" />
+                      <p className="font-bold text-onyx">No RFIs raised yet</p>
+                      <p className="text-xs text-ash mt-1">
+                        Click &quot;+ New RFI&quot; above to submit technical questions or drawings clarification.
+                      </p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredRfis.map((r) => (
+                    <tr key={r.id} className="hover:bg-stone/50 transition">
+                      <td className="py-3 px-3 font-bold font-mono text-ash">{r.id}</td>
+                      <td className="py-3 px-3 font-bold text-onyx">{r.subject}</td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded-[6px] bg-stone font-bold text-onyx border border-pebble text-[11px]">
+                          {r.relatedJob}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-[4px] text-[10px] font-bold ${
+                            r.status === "Open"
+                              ? "bg-amber-100 text-amber-800"
+                              : r.status === "In Progress"
+                              ? "bg-sky-100 text-sky-800"
+                              : "bg-stone text-ash border border-pebble"
+                          }`}
+                        >
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRfi(r)}
+                          className="px-3 py-1 rounded-[6px] bg-stone hover:bg-forest hover:text-white border border-pebble text-onyx font-bold transition text-xs cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -294,7 +301,7 @@ export default function RfisPage() {
       {showNewModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150">
           <form
-            onSubmit={handleCreateRfi}
+            onSubmit={handleAddRfi}
             className="bg-white rounded-[16px] max-w-md w-full p-6 shadow-2xl border border-pebble relative space-y-4"
           >
             <div className="flex items-center justify-between">
@@ -329,10 +336,16 @@ export default function RfisPage() {
                 onChange={(e) => setNewJob(e.target.value)}
                 className="w-full bg-white border border-pebble rounded-[8px] p-2 text-xs text-onyx"
               >
-                <option value="J-004">J-004 Electrical Installation</option>
-                <option value="J-001">J-001 Site Preparation</option>
-                <option value="J-002">J-002 Structural Work</option>
-                <option value="J-003">J-003 Plumbing Installation</option>
+                <option value="">-- Select Related Job --</option>
+                {userJobs.length > 0 ? (
+                  userJobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.id} - {j.title} ({j.projectName})
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>No assigned jobs found</option>
+                )}
               </select>
             </div>
 

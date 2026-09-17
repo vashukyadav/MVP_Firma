@@ -81,6 +81,8 @@ export interface ProjectItem {
   lead: string;
   due: string;
   sourceOpportunityId?: string;
+  siteManagerId?: string;
+  siteManagerName?: string;
 }
 
 interface LeadFlowState {
@@ -132,11 +134,14 @@ interface LeadFlowState {
       winReason?: string;
       winNotes?: string;
       projectManager?: string;
+      siteManagerId?: string;
+      siteManagerName?: string;
     }
   ) => ProjectItem;
 
   // Generic project actions
   addProject: (project: ProjectItem) => void;
+  updateProject: (projectId: string, data: Partial<ProjectItem>) => void;
   deleteProject: (projectId: string) => void;
 
   // Purge & cleanup
@@ -349,6 +354,8 @@ export const useLeadFlowStore = create<LeadFlowState>()(
           lead: data?.projectManager || "Project Lead",
           due: opp?.expectedCloseDate || "Ongoing",
           sourceOpportunityId: opportunityId,
+          siteManagerId: data?.siteManagerId,
+          siteManagerName: data?.siteManagerName,
         };
 
         set((state) => ({
@@ -373,6 +380,14 @@ export const useLeadFlowStore = create<LeadFlowState>()(
       addProject: (project) => {
         set((state) => ({
           projects: [project, ...state.projects],
+        }));
+      },
+
+      updateProject: (projectId, data) => {
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === projectId ? { ...p, ...data } : p
+          ),
         }));
       },
 

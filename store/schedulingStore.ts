@@ -73,62 +73,7 @@ interface SchedulingState {
   resetToDefaults: () => void;
 }
 
-export const defaultScheduledJobs: ScheduledJob[] = [
-  {
-    id: "JOB-201",
-    title: "Electrical Installation & Distribution Board",
-    project: "Skyline Apartments",
-    site: "Main Site • Block A",
-    worker: "Amit Verma",
-    workerRole: "Field Worker",
-    date: "15/09/2026",
-    dateFormatted: "15 Sep 2026",
-    startTime: "09:00 AM",
-    endTime: "05:00 PM",
-    timeSlot: "09:00 AM - 05:00 PM",
-    notes: "Main conduit laying and distribution switchboard installation.",
-    status: "In Progress",
-    colorScheme: "emerald",
-    dayOfWeek: "Tue",
-    dayDate: "15 Sep",
-  },
-  {
-    id: "JOB-202",
-    title: "Plumbing Riser Installation",
-    project: "Skyline Apartments",
-    site: "Skyline Apartments • Tower 2",
-    worker: "Ravi Kumar",
-    workerRole: "Field Worker",
-    date: "16/09/2026",
-    dateFormatted: "16 Sep 2026",
-    startTime: "08:30 AM",
-    endTime: "04:30 PM",
-    timeSlot: "08:30 AM - 04:30 PM",
-    notes: "Fix high-pressure UPVC water supply pipes and drainage lines.",
-    status: "Scheduled",
-    colorScheme: "indigo",
-    dayOfWeek: "Wed",
-    dayDate: "16 Sep",
-  },
-  {
-    id: "JOB-203",
-    title: "Site Safety Supervision & Execution Check",
-    project: "Skyline Apartments",
-    site: "Skyline Apartments • Main Zone",
-    worker: "Mohit Singh",
-    workerRole: "Site Manager",
-    date: "15/09/2026",
-    dateFormatted: "15 Sep 2026",
-    startTime: "08:00 AM",
-    endTime: "05:00 PM",
-    timeSlot: "08:00 AM - 05:00 PM",
-    notes: "Daily safety briefing, crane perimeter inspection, work sign-off.",
-    status: "In Progress",
-    colorScheme: "teal",
-    dayOfWeek: "Tue",
-    dayDate: "15 Sep",
-  },
-];
+export const defaultScheduledJobs: ScheduledJob[] = [];
 const defaultUnscheduledJobs: UnscheduledJob[] = [];
 const defaultWorkers: FieldWorker[] = [];
 const defaultSites: SiteLocation[] = [];
@@ -279,8 +224,55 @@ export const useSchedulingStore = create<SchedulingState>()(
       },
     }),
     {
-      name: "mini-firma-scheduling-store-v2",
-      storage: createJSONStorage(() => sessionStorage),
+      name: "mini-firma-scheduling-store-v3",
+      storage: {
+        getItem: (name: string) => {
+          if (typeof window === "undefined") return null;
+          try {
+            const raw = localStorage.getItem(name) || sessionStorage.getItem(name);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed?.state?.scheduledJobs && Array.isArray(parsed.state.scheduledJobs)) {
+                const dummyJobIds = new Set([
+                  "JOB-101", "JOB-102", "JOB-103", "JOB-104", "JOB-105", "JOB-106", "JOB-107",
+                  "JOB-201", "JOB-202", "JOB-203", "J-001", "J-002", "J-003", "J-004", "J-005"
+                ]);
+                parsed.state.scheduledJobs = parsed.state.scheduledJobs.filter(
+                  (j: ScheduledJob) => !dummyJobIds.has(j.id) && !/^J-00\d/.test(j.id)
+                );
+              }
+              if (parsed?.state?.unscheduledJobs && Array.isArray(parsed.state.unscheduledJobs)) {
+                const dummyJobIds = new Set([
+                  "JOB-101", "JOB-102", "JOB-103", "JOB-104", "JOB-105", "JOB-106", "JOB-107",
+                  "JOB-201", "JOB-202", "JOB-203", "J-001", "J-002", "J-003", "J-004", "J-005"
+                ]);
+                parsed.state.unscheduledJobs = parsed.state.unscheduledJobs.filter(
+                  (j: UnscheduledJob) => !dummyJobIds.has(j.id) && !/^J-00\d/.test(j.id)
+                );
+              }
+              return parsed;
+            }
+          } catch (e) {
+            console.error("Failed to read scheduling store:", e);
+          }
+          return null;
+        },
+        setItem: (name: string, value: unknown) => {
+          if (typeof window === "undefined") return;
+          try {
+            localStorage.setItem(name, JSON.stringify(value));
+          } catch (e) {
+            console.error("Failed to save scheduling store:", e);
+          }
+        },
+        removeItem: (name: string) => {
+          if (typeof window === "undefined") return;
+          try {
+            localStorage.removeItem(name);
+            sessionStorage.removeItem(name);
+          } catch (e) {}
+        },
+      },
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         const dummyJobIds = new Set([
@@ -291,6 +283,9 @@ export const useSchedulingStore = create<SchedulingState>()(
           "JOB-105",
           "JOB-106",
           "JOB-107",
+          "JOB-201",
+          "JOB-202",
+          "JOB-203",
         ]);
         const dummyWorkerIds = new Set([
           "W-01",
@@ -319,10 +314,6 @@ export const useSchedulingStore = create<SchedulingState>()(
         state.sites = (state.sites || []).filter(
           (s) => !dummySiteIds.has(s.id)
         );
-
-        if (!state.scheduledJobs || state.scheduledJobs.length === 0) {
-          state.scheduledJobs = [...defaultScheduledJobs];
-        }
       },
     }
   )

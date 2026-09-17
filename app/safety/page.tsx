@@ -25,30 +25,11 @@ interface SafetyItem {
   actionsTaken?: string;
 }
 
-const initialSafety: SafetyItem[] = [
-  {
-    id: "S-01",
-    type: "Safety Check",
-    description: "PPE inspection",
-    date: "15 Sep 2025",
-    status: "Open",
-    location: "Block B - 2nd Floor",
-    actionsTaken: "Two workers reminded to wear safety goggles during hammer drilling.",
-  },
-  {
-    id: "S-02",
-    type: "Incident",
-    description: "Minor injury",
-    date: "12 Sep 2025",
-    status: "Resolved",
-    location: "Material Staging Bay",
-    actionsTaken: "First aid dressing applied for minor sheet metal finger cut. Returned to duty.",
-  },
-];
+const initialSafety: SafetyItem[] = [];
 
 export default function SafetyPage() {
   const [items, setItems] = useState<SafetyItem[]>(initialSafety);
-  const [activeFilter, setActiveFilter] = useState("All (2)");
+  const [activeFilter, setActiveFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [selectedItem, setSelectedItem] = useState<SafetyItem | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
@@ -56,7 +37,7 @@ export default function SafetyPage() {
   // Form state
   const [newType, setNewType] = useState<"Safety Check" | "Incident" | "Near Miss">("Safety Check");
   const [newDesc, setNewDesc] = useState("");
-  const [newLoc, setNewLoc] = useState("Block B");
+  const [newLoc, setNewLoc] = useState("");
 
   const filteredItems = items.filter((item) => {
     const matchesSearch =
@@ -65,8 +46,8 @@ export default function SafetyPage() {
       item.type.toLowerCase().includes(search.toLowerCase());
 
     if (!matchesSearch) return false;
-    if (activeFilter === "Open (1)" || activeFilter === "Open") return item.status === "Open";
-    if (activeFilter === "Resolved (1)" || activeFilter === "Resolved") return item.status === "Resolved";
+    if (activeFilter === "Open") return item.status === "Open";
+    if (activeFilter === "Resolved") return item.status === "Resolved";
     return true;
   });
 
@@ -78,9 +59,13 @@ export default function SafetyPage() {
       id: `S-0${items.length + 1}`,
       type: newType,
       description: newDesc,
-      date: "16 Sep 2025",
+      date: new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
       status: "Open",
-      location: newLoc,
+      location: newLoc || "Site Area",
       actionsTaken: "Report logged by Site Manager for immediate EHS review.",
     };
 
@@ -122,9 +107,9 @@ export default function SafetyPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
               {[
-                { label: `All (${items.length})`, key: "All (2)" },
-                { label: `Open (${items.filter((i) => i.status === "Open").length})`, key: "Open (1)" },
-                { label: `Resolved (${items.filter((i) => i.status === "Resolved").length})`, key: "Resolved (1)" },
+                { label: `All (${items.length})`, key: "All" },
+                { label: `Open (${items.filter((i) => i.status === "Open").length})`, key: "Open" },
+                { label: `Resolved (${items.filter((i) => i.status === "Resolved").length})`, key: "Resolved" },
               ].map((tab) => (
                 <button
                   key={tab.key}

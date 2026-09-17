@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { db, type UserRole, type User } from "@/lib/db";
+import { db, type UserRole, type User, type CrewRole } from "@/lib/db";
 import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,9 +54,10 @@ export default function CreateUser() {
   }, [currentUser?.companyId]);
 
   const onSubmit = async (data: CreateUserFormData) => {
+    const cleanEmail = data.email.trim().toLowerCase();
     const existingUser = await db.users
       .where("email")
-      .equals(data.email)
+      .equals(cleanEmail)
       .first();
 
     if (existingUser) {
@@ -64,14 +65,52 @@ export default function CreateUser() {
       return;
     }
 
+    const companyId = currentUser?.companyId || "ORG-DEFAULT";
+
     await db.users.add({
-      companyId: currentUser?.companyId || "ORG-DEFAULT",
+      companyId,
       name: data.name,
-      email: data.email,
+      email: cleanEmail,
       password: data.password,
       role: data.role as UserRole,
       size: 0,
     });
+
+    // Proactively sync FIELD_WORKER or SITE_MANAGER to db.crew so Site Manager sees them
+    if (data.role === "FIELD_WORKER" || data.role === "SITE_MANAGER") {
+      const roleLabel: CrewRole =
+        data.role === "SITE_MANAGER" ? "Site Manager" : "Field Worker";
+      try {
+        const existingCrew = await db.crew.where("email").equals(cleanEmail).first();
+        if (!existingCrew) {
+          await db.crew.add({
+            companyId,
+            name: data.name,
+            role: roleLabel,
+            contact: "+91 98000 00000",
+            email: cleanEmail,
+            status: "Active",
+            trade:
+              roleLabel === "Field Worker"
+                ? "General Construction"
+                : "Site Operations",
+            site: "Main Site",
+            avatarBg:
+              roleLabel === "Field Worker"
+                ? "bg-emerald-100 text-emerald-800"
+                : "bg-purple-100 text-purple-800",
+            joinedDate: new Date().toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+            createdAt: new Date().toISOString(),
+          });
+        }
+      } catch (e) {
+        console.error("Failed to sync new worker to db.crew:", e);
+      }
+    }
 
     alert(`${data.role} created successfully`);
 

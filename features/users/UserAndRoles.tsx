@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import FirmaLayout from "@/components/layout/FirmaLayout";
 import { useAuthStore } from "@/store/authStore";
 
-import { db, type User as DbUser } from "@/lib/db";
+import { db, type User as DbUser, type CrewRole } from "@/lib/db";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,7 +81,19 @@ export default function UsersAndRoles() {
     );
 
     if (!confirmDelete) return;
+    const userToDelete = users.find((u) => u.id === id);
     await db.users.delete(id);
+
+    // Also remove from db.crew if matching email
+    if (userToDelete?.email) {
+      try {
+        const crewRec = await db.crew.where("email").equals(userToDelete.email.toLowerCase()).first();
+        if (crewRec?.id) {
+          await db.crew.delete(crewRec.id);
+        }
+      } catch (e) {}
+    }
+
     await loadUsers();
   };
 
@@ -118,6 +130,22 @@ export default function UsersAndRoles() {
         ...(data.password ? { password: data.password } : {}),
       });
 
+      // Update in db.crew if exists
+      if (editingUser.email) {
+        try {
+          const crewRec = await db.crew.where("email").equals(editingUser.email.toLowerCase()).first();
+          if (crewRec?.id) {
+            const roleLabel: CrewRole =
+              data.role === "SITE_MANAGER" ? "Site Manager" : "Field Worker";
+            await db.crew.update(crewRec.id, {
+              name: data.name,
+              email: data.email.toLowerCase(),
+              role: roleLabel,
+            });
+          }
+        } catch (e) {}
+      }
+
       alert("User updated successfully!");
 
       setEditingUser(null);
@@ -134,9 +162,10 @@ export default function UsersAndRoles() {
       return;
     }
 
+    const cleanEmail = data.email.trim().toLowerCase();
     const existingUser = await db.users
       .where("email")
-      .equals(data.email)
+      .equals(cleanEmail)
       .first();
 
     if (existingUser) {
@@ -144,14 +173,49 @@ export default function UsersAndRoles() {
       return;
     }
 
+    const companyId = currentUser?.companyId || "ORG-DEFAULT";
+
     await db.users.add({
-      companyId: currentUser?.companyId || "ORG-DEFAULT",
+      companyId,
       name: data.name,
-      email: data.email,
+      email: cleanEmail,
       password: data.password,
       role: data.role,
       size: 0,
     });
+
+    // Also proactively create in db.crew if role is FIELD_WORKER or SITE_MANAGER so Site Manager sees them immediately
+    if (data.role === "FIELD_WORKER" || data.role === "SITE_MANAGER") {
+      const roleLabel: CrewRole =
+        data.role === "SITE_MANAGER" ? "Site Manager" : "Field Worker";
+      try {
+        await db.crew.add({
+          companyId,
+          name: data.name,
+          role: roleLabel,
+          contact: "+91 98000 00000",
+          email: cleanEmail,
+          status: "Active",
+          trade:
+            roleLabel === "Field Worker"
+              ? "General Construction"
+              : "Site Operations",
+          site: "Main Site",
+          avatarBg:
+            roleLabel === "Field Worker"
+              ? "bg-emerald-100 text-emerald-800"
+              : "bg-purple-100 text-purple-800",
+          joinedDate: new Date().toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          }),
+          createdAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.error("Failed to add to db.crew:", e);
+      }
+    }
 
     alert("User created successfully!");
 

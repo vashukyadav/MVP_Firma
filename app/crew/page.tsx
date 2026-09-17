@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import { db } from "@/lib/db";
 import {
   useCrewStore,
   type CrewMember,
@@ -39,6 +40,7 @@ import {
   ChevronRight,
   Sparkles,
 } from "lucide-react";
+import { toast } from "@/components/ui/toast";
 
 export interface AssignedJobSummary {
   id: string;
@@ -47,7 +49,7 @@ export interface AssignedJobSummary {
   site: string;
   date: string;
   timeSlot: string;
-  status: "Scheduled" | "In Progress" | "Completed" | "Cancelled";
+  status: "Scheduled" | "In Progress" | "Completed" | "Cancelled" | "On-site" | "Travelling" | "Upcoming";
   colorScheme: ScheduledJob["colorScheme"];
   notes?: string;
   source: "schedule" | "tender";
@@ -66,6 +68,161 @@ export default function CrewPage() {
   } = useSchedulingStore();
   const { jobs: tenderJobs = [] } = useTenderFlowStore();
   const { projects = [] } = useLeadFlowStore();
+  const currentUser = useAuthStore((state) => state.currentUser);
+
+  // IndexedDB Real Crew Members (stored in db.crew)
+  const [dbCrewMembers, setDbCrewMembers] = useState<CrewMember[]>([]);
+
+  const loadDbCrew = useCallback(async () => {
+    try {
+      // Check if db.crew is empty; if so, migrate any non-system crew members from useCrewStore
+      const count = await db.crew.count();
+      if (count === 0) {
+        const storeMembers = useCrewStore.getState().members || [];
+        const dummyIds = new Set([
+          "crew-1", "crew-2", "crew-3", "crew-4", "crew-5", "crew-6",
+          "crew-7", "crew-8", "crew-9", "crew-10", "crew-11", "crew-12"
+        ]);
+        const validStoreMembers = storeMembers.filter(
+          (m) => !dummyIds.has(m.id) && !m.id.startsWith("user-")
+        );
+        if (validStoreMembers.length > 0) {
+          for (const sm of validStoreMembers) {
+            await db.crew.add({
+              companyId: "ORG-DEFAULT",
+              name: sm.name,
+              role: sm.role,
+              contact: sm.contact || "+91 98000 00000",
+              status: sm.status || "Active",
+              trade: sm.trade || "General Construction",
+              site: sm.site || "Main Site",
+              email: sm.email,
+              wageRate: sm.wageRate,
+              avatarBg: sm.avatarBg,
+              joinedDate: sm.joinedDate,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        }
+      }
+
+      const records = await db.crew.toArray();
+
+      // Automatically sync any FIELD_WORKER or SITE_MANAGER users created by Admin in db.users
+      const allDbUsers = await db.users.toArray();
+      const relevantUsers = allDbUsers.filter(
+        (u) => u.role === "FIELD_WORKER" || u.role === "SITE_MANAGER"
+      );
+
+      for (const u of relevantUsers) {
+        const roleLabel: CrewRole =
+          u.role === "SITE_MANAGER" ? "Site Manager" : "Field Worker";
+        const cleanUserEmail = (u.email || "").trim().toLowerCase();
+        const cleanUserName = (u.name || "").trim().toLowerCase();
+
+        const alreadyInCrew = records.some((c) => {
+          const cEmail = (c.email || "").trim().toLowerCase();
+          const cName = (c.name || "").trim().toLowerCase();
+          return (cleanUserEmail && cEmail && cEmail === cleanUserEmail) || cName === cleanUserName;
+        });
+
+        if (!alreadyInCrew) {
+          const newId = await db.crew.add({
+            companyId: u.companyId || "ORG-DEFAULT",
+            name: u.name,
+            role: roleLabel,
+            contact: "+91 98000 00000",
+            email: cleanUserEmail,
+            status: "Active",
+            trade:
+              roleLabel === "Field Worker"
+                ? "General Construction"
+                : "Site Operations",
+            site: "Main Site",
+            avatarBg:
+              roleLabel === "Field Worker"
+                ? "bg-emerald-100 text-emerald-800"
+                : "bg-purple-100 text-purple-800",
+            joinedDate: new Date().toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+            createdAt: new Date().toISOString(),
+          });
+
+          records.push({
+            id: newId as number,
+            companyId: u.companyId || "ORG-DEFAULT",
+            name: u.name,
+            role: roleLabel,
+            contact: "+91 98000 00000",
+            email: cleanUserEmail,
+            status: "Active",
+            trade:
+              roleLabel === "Field Worker"
+                ? "General Construction"
+                : "Site Operations",
+            site: "Main Site",
+            avatarBg:
+              roleLabel === "Field Worker"
+                ? "bg-emerald-100 text-emerald-800"
+                : "bg-purple-100 text-purple-800",
+            joinedDate: new Date().toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      const mapped: CrewMember[] = records.map((c) => ({
+        id: `crew-${c.id}`,
+        name: c.name,
+        role: c.role,
+        contact: c.contact || "+91 98000 00000",
+        status: c.status || "Active",
+        trade:
+          c.trade ||
+          (c.role === "Field Worker"
+            ? "General Construction"
+            : "Site Operations"),
+        site: c.site || "Main Site",
+        email: c.email,
+        wageRate: c.wageRate,
+        avatarBg:
+          c.avatarBg ||
+          (c.role === "Field Worker"
+            ? "bg-emerald-100 text-emerald-800"
+            : c.role === "Site Manager"
+            ? "bg-purple-100 text-purple-800"
+            : "bg-blue-100 text-blue-800"),
+        joinedDate:
+          c.joinedDate ||
+          new Date().toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          }),
+      }));
+
+      setDbCrewMembers(mapped);
+      useCrewStore.getState().setMembers(mapped);
+    } catch (e) {
+      console.error("Failed to load crew from IndexedDB:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDbCrew();
+  }, [loadDbCrew]);
+
+  // Combined real crew from IndexedDB db.crew
+  const allMembers = useMemo(() => {
+    return dbCrewMembers;
+  }, [dbCrewMembers]);
 
   // Search, Role Tab & Assignment Filter State
   const [search, setSearch] = useState("");
@@ -74,13 +231,13 @@ export default function CrewPage() {
     "ALL" | "ASSIGNED" | "AVAILABLE"
   >("ALL");
 
-  // Add Member Modal State
+  // Add Field Worker Modal State
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newRole, setNewRole] = useState<CrewRole>("Field Worker");
   const [newContact, setNewContact] = useState("+91 ");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("123456");
   const [newTrade, setNewTrade] = useState("");
-  const [newSite, setNewSite] = useState("Main Site");
   const [newWage, setNewWage] = useState("");
   const [newStatus, setNewStatus] = useState<CrewStatus>("Active");
   const [addError, setAddError] = useState("");
@@ -156,7 +313,7 @@ export default function CrewPage() {
   const memberJobsMap = useMemo(() => {
     const map: Record<string, AssignedJobSummary[]> = {};
 
-    members.forEach((m) => {
+    allMembers.forEach((m) => {
       map[m.id] = [];
       const mName = m.name.trim().toLowerCase();
 
@@ -202,16 +359,16 @@ export default function CrewPage() {
     });
 
     return map;
-  }, [members, scheduledJobs, tenderJobs]);
+  }, [allMembers, scheduledJobs, tenderJobs]);
 
   // Summary Metrics Counts
   const metrics = useMemo(() => {
-    const total = members.length;
+    const total = allMembers.length;
     let assignedCount = 0;
     let availableCount = 0;
     let siteManagersCount = 0;
 
-    members.forEach((m) => {
+    allMembers.forEach((m) => {
       const hasJob = (memberJobsMap[m.id] || []).length > 0;
       if (hasJob) {
         assignedCount++;
@@ -229,21 +386,21 @@ export default function CrewPage() {
       availableCount,
       siteManagersCount,
     };
-  }, [members, memberJobsMap]);
+  }, [allMembers, memberJobsMap]);
 
   // Role Counts for Tabs
   const roleCounts = useMemo(() => {
     return {
-      ALL: members.length,
-      "Field Worker": members.filter((m) => m.role === "Field Worker").length,
-      "Site Manager": members.filter((m) => m.role === "Site Manager").length,
-      Office: members.filter((m) => m.role === "Office").length,
+      ALL: allMembers.length,
+      "Field Worker": allMembers.filter((m) => m.role === "Field Worker").length,
+      "Site Manager": allMembers.filter((m) => m.role === "Site Manager").length,
+      Office: allMembers.filter((m) => m.role === "Office").length,
     };
-  }, [members]);
+  }, [allMembers]);
 
   // Filtered Members
   const filteredMembers = useMemo(() => {
-    return members.filter((m) => {
+    return allMembers.filter((m) => {
       // Role tab filter
       if (activeRoleTab !== "ALL" && m.role !== activeRoleTab) {
         return false;
@@ -275,7 +432,7 @@ export default function CrewPage() {
         hasMatchingJob
       );
     });
-  }, [members, activeRoleTab, assignmentFilter, search, memberJobsMap]);
+  }, [allMembers, activeRoleTab, assignmentFilter, search, memberJobsMap]);
 
   // Open Assign Job Modal for a Member
   const handleOpenAssignModal = (member: CrewMember) => {
@@ -342,7 +499,30 @@ export default function CrewPage() {
         `Assigned from Crew dashboard to ${assignTargetMember.name}.`,
     });
 
+    // Also mirror to tenderFlowStore so it is displayed in Active Jobs & Work Orders!
+    try {
+      const isSM = currentUser?.role === "SITE_MANAGER";
+      useTenderFlowStore.getState().assignJobToContractor({
+        title: finalTitle,
+        projectName: finalProject,
+        location: finalSite || `${finalProject} Site`,
+        contractorId: "",
+        contractorName: assignTargetMember.name,
+        trade: assignTargetMember.trade || "General Trade",
+        priority: "High",
+        due: assignDate,
+        description: assignNotes || `Assigned from Crew to ${assignTargetMember.name}`,
+        siteManagerId: isSM ? String(currentUser?.id) : undefined,
+        siteManagerName: isSM ? currentUser?.name : undefined,
+      });
+    } catch (e) {
+      console.error("Failed to mirror job to tenderFlowStore:", e);
+    }
+
     setShowAssignModal(false);
+    toast.success("Job Assigned Successfully", {
+      description: `${finalTitle} assigned to ${assignTargetMember.name} on ${assignDate}`,
+    });
   };
 
   // Unassign / Free Worker
@@ -355,44 +535,102 @@ export default function CrewPage() {
       unscheduleJob(jobId);
       setViewingJob(null);
       setViewingAllJobsMember(null);
+      toast.info("Job Unassigned", {
+        description: "Job moved back to the unscheduled backlog.",
+      });
     }
   };
 
-  // Handle Add Member Submit
-  const handleAddSubmit = (e: React.FormEvent) => {
+  // Handle Add Field Worker Submit
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) {
-      setAddError("Please enter the person's full name");
+      setAddError("Please enter the worker's full name");
       return;
     }
     if (!newContact.trim() || newContact.trim() === "+91") {
       setAddError("Please enter a valid contact phone number");
       return;
     }
+    if (!newEmail.trim() || !newEmail.includes("@")) {
+      setAddError("Please enter a valid email address for worker login");
+      return;
+    }
+    if (!newPassword.trim() || newPassword.trim().length < 6) {
+      setAddError("Password must be at least 6 characters for worker login");
+      return;
+    }
 
-    addMember({
-      name: newName.trim(),
-      role: newRole,
-      contact: newContact.trim(),
-      trade:
-        newTrade.trim() ||
-        (newRole === "Field Worker"
-          ? "General Construction"
-          : "Site Operations"),
-      site: newSite.trim() || "Main Site",
-      wageRate: newWage.trim() || undefined,
-      status: newStatus,
+    const cleanEmail = newEmail.trim().toLowerCase();
+    const cleanPassword = newPassword.trim();
+    const cleanName = newName.trim();
+    const cleanContact = newContact.trim();
+    const companyId = currentUser?.companyId || "ORG-DEFAULT";
+
+    // Check if user with this email already exists in db.users
+    const existingUser = await db.users
+      .where("email")
+      .equals(cleanEmail)
+      .first();
+    if (existingUser) {
+      setAddError(`A user with email "${cleanEmail}" already exists. Please use a unique email.`);
+      return;
+    }
+
+    const trade = newTrade.trim() || "General Construction";
+    const avatarBg = "bg-emerald-100 text-emerald-800";
+    const joinedDate = new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
 
-    setNewName("");
-    setNewRole("Field Worker");
-    setNewContact("+91 ");
-    setNewTrade("");
-    setNewSite("Main Site");
-    setNewWage("");
-    setNewStatus("Active");
-    setAddError("");
-    setShowAddModal(false);
+    try {
+      // 1. Create Login Account in db.users so worker can log in directly
+      await db.users.add({
+        companyId,
+        name: cleanName,
+        email: cleanEmail,
+        password: cleanPassword,
+        role: "FIELD_WORKER",
+        size: 1,
+      });
+
+      // 2. Add to db.crew
+      await db.crew.add({
+        companyId,
+        name: cleanName,
+        role: "Field Worker",
+        contact: cleanContact,
+        email: cleanEmail,
+        status: newStatus,
+        trade,
+        site: "", // Unassigned by default, not assigned from this form
+        wageRate: newWage.trim() || undefined,
+        avatarBg,
+        joinedDate,
+        createdAt: new Date().toISOString(),
+      });
+
+      await loadDbCrew();
+
+      setNewName("");
+      setNewContact("+91 ");
+      setNewEmail("");
+      setNewPassword("123456");
+      setNewTrade("");
+      setNewWage("");
+      setNewStatus("Active");
+      setAddError("");
+      setShowAddModal(false);
+
+      toast.success("Field Worker Added", {
+        description: `${cleanName} registered! Can now log in with email: ${cleanEmail}`,
+      });
+    } catch (err) {
+      console.error("Error adding to db.crew or db.users:", err);
+      setAddError("Failed to save field worker. Please try again.");
+    }
   };
 
   // Open Edit Modal
@@ -407,20 +645,86 @@ export default function CrewPage() {
   };
 
   // Handle Save Edit
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember) return;
 
-    updateMember(editingMember.id, {
+    const numId = parseInt(
+      editingMember.id.replace("crew-", "").replace("user-", ""),
+      10
+    );
+
+    const updatedData = {
       name: editName.trim() || editingMember.name,
       role: editRole,
       contact: editContact.trim() || editingMember.contact,
       trade: editTrade.trim() || editingMember.trade,
       site: editSite.trim() || editingMember.site,
       status: editStatus,
-    });
+    };
 
+    if (!isNaN(numId)) {
+      try {
+        await db.crew.update(numId, updatedData);
+      } catch (err) {
+        console.error("Failed to update in db.crew:", err);
+      }
+    }
+
+    if (editingMember.email) {
+      try {
+        const u = await db.users.where("email").equals(editingMember.email).first();
+        if (u?.id) {
+          const userRole = editRole === "Site Manager" ? "SITE_MANAGER" : "FIELD_WORKER";
+          await db.users.update(u.id, { name: updatedData.name, role: userRole });
+        }
+      } catch (e) {}
+    }
+
+    updateMember(editingMember.id, updatedData);
+    await loadDbCrew();
     setEditingMember(null);
+    toast.success("Crew Details Updated", {
+      description: `Updated profile for ${editName.trim()}.`,
+    });
+  };
+
+  // Handle Delete Member
+  const handleDeleteMember = async (member: CrewMember) => {
+    if (
+      !confirm(
+        `Are you sure you want to remove ${member.name} from the crew?`
+      )
+    ) {
+      return;
+    }
+
+    const numId = parseInt(
+      member.id.replace("crew-", "").replace("user-", ""),
+      10
+    );
+    if (!isNaN(numId)) {
+      try {
+        await db.crew.delete(numId);
+      } catch (err) {
+        console.error("Failed to delete from db.crew:", err);
+      }
+    }
+
+    if (member.email) {
+      try {
+        const u = await db.users.where("email").equals(member.email).first();
+        if (u?.id) {
+          await db.users.delete(u.id);
+        }
+      } catch (e) {}
+    }
+
+    deleteMember(member.id);
+    await loadDbCrew();
+    toast.warning("Crew Member Removed", {
+      description: `${member.name} has been removed from the team.`,
+    });
   };
 
   const fieldTradeSuggestions = [
@@ -434,7 +738,6 @@ export default function CrewPage() {
     "General Helper",
   ];
 
-  const currentUser = useAuthStore((state) => state.currentUser);
   const isSiteManager = currentUser?.role === "SITE_MANAGER";
 
   return (
@@ -573,7 +876,7 @@ export default function CrewPage() {
                 className="inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4 py-2 text-xs sm:text-sm font-semibold transition shadow-xs cursor-pointer shrink-0"
               >
                 <Plus className="h-4 w-4 stroke-[2.5]" />
-                <span>Add Person</span>
+                <span>Add Field Worker</span>
               </button>
             </div>
           </div>
@@ -889,15 +1192,7 @@ export default function CrewPage() {
                             {/* Delete Member */}
                             <button
                               type="button"
-                              onClick={() => {
-                                if (
-                                  confirm(
-                                    `Are you sure you want to remove ${member.name} from the crew?`
-                                  )
-                                ) {
-                                  deleteMember(member.id);
-                                }
-                              }}
+                              onClick={() => handleDeleteMember(member)}
                               className="p-1.5 rounded-[6px] text-ash hover:text-danger-text hover:bg-hazard-bg/50 transition cursor-pointer"
                               title="Delete Member"
                             >
@@ -1317,7 +1612,7 @@ export default function CrewPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: ADD NEW PERSON / WORKER                                            */}
+      {/* MODAL: ADD NEW FIELD WORKER                                               */}
       {/* ========================================================================= */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
@@ -1326,10 +1621,10 @@ export default function CrewPage() {
               <div>
                 <h3 className="text-lg font-bold text-onyx flex items-center gap-2">
                   <UserCheck className="h-5 w-5 text-forest" />
-                  <span>Add Person to Crew</span>
+                  <span>Add Field Worker</span>
                 </h3>
                 <p className="text-xs text-ash mt-0.5">
-                  Register a field worker, site manager, or office team member.
+                  Register a field worker for on-site operations. Site and job assignments can be made later from Scheduling.
                 </p>
               </div>
               <button
@@ -1350,30 +1645,6 @@ export default function CrewPage() {
 
             <form onSubmit={handleAddSubmit} className="space-y-4 mt-4">
               <div>
-                <label className="text-xs font-bold text-onyx block mb-1.5">
-                  Select Role <span className="text-danger-text">*</span>
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(
-                    ["Field Worker", "Site Manager", "Office"] as CrewRole[]
-                  ).map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setNewRole(r)}
-                      className={`py-2 px-3 rounded-[8px] text-xs font-bold border transition text-center cursor-pointer ${
-                        newRole === r
-                          ? "border-forest bg-clear-bg text-forest"
-                          : "border-pebble/70 bg-stone/40 text-ash hover:text-onyx"
-                      }`}
-                    >
-                      {r}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
                 <label className="text-xs font-bold text-onyx block mb-1">
                   Full Name <span className="text-danger-text">*</span>
                 </label>
@@ -1390,18 +1661,58 @@ export default function CrewPage() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-onyx block mb-1">
+                    Phone Number <span className="text-danger-text">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="+91 98765 43210"
+                    value={newContact}
+                    onChange={(e) => setNewContact(e.target.value)}
+                    className="w-full rounded-[8px] border border-pebble bg-white px-3 py-2 text-xs sm:text-sm text-onyx placeholder:text-ash focus:outline-none focus:ring-1 focus:ring-forest"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-onyx block mb-1">
+                    Login Email Address <span className="text-danger-text">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="e.g. ramesh.verma@company.com"
+                    value={newEmail}
+                    onChange={(e) => {
+                      setNewEmail(e.target.value);
+                      if (addError) setAddError("");
+                    }}
+                    className="w-full rounded-[8px] border border-pebble bg-white px-3 py-2 text-xs sm:text-sm text-onyx placeholder:text-ash focus:outline-none focus:ring-1 focus:ring-forest"
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-onyx block mb-1">
-                  Phone Number <span className="text-danger-text">*</span>
+                  Login Password <span className="text-danger-text">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="+91 98765 43210"
-                  value={newContact}
-                  onChange={(e) => setNewContact(e.target.value)}
-                  className="w-full rounded-[8px] border border-pebble bg-white px-3 py-2 text-xs sm:text-sm text-onyx placeholder:text-ash focus:outline-none focus:ring-1 focus:ring-forest"
+                  placeholder="Minimum 6 characters (default: 123456)"
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    if (addError) setAddError("");
+                  }}
+                  className="w-full rounded-[8px] border border-pebble bg-white px-3 py-2 text-xs sm:text-sm text-onyx placeholder:text-ash focus:outline-none focus:ring-1 focus:ring-forest font-mono"
                   required
+                  minLength={6}
                 />
+                <p className="text-[11px] text-ash mt-1">
+                  Worker can use this email &amp; password to sign in to the FIRMA field portal.
+                </p>
               </div>
 
               <div>
@@ -1410,59 +1721,30 @@ export default function CrewPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder={
-                    newRole === "Field Worker"
-                      ? "e.g. Masonry, Electrical, Plumbing"
-                      : newRole === "Site Manager"
-                      ? "e.g. Site Supervisor, Safety Engineer"
-                      : "e.g. Accounts, Procurement, Admin"
-                  }
+                  placeholder="e.g. Masonry, Electrical, Plumbing"
                   value={newTrade}
                   onChange={(e) => setNewTrade(e.target.value)}
                   className="w-full rounded-[8px] border border-pebble bg-white px-3 py-2 text-xs sm:text-sm text-onyx placeholder:text-ash focus:outline-none focus:ring-1 focus:ring-forest"
                 />
-                {newRole === "Field Worker" && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {fieldTradeSuggestions.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setNewTrade(t)}
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border cursor-pointer transition ${
-                          newTrade === t
-                            ? "bg-forest text-white border-forest"
-                            : "bg-stone/80 text-ash border-pebble hover:text-onyx"
-                        }`}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {fieldTradeSuggestions.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setNewTrade(t)}
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border cursor-pointer transition ${
+                        newTrade === t
+                          ? "bg-forest text-white border-forest"
+                          : "bg-stone/80 text-ash border-pebble hover:text-onyx"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-onyx block mb-1">
-                    Assigned Site
-                  </label>
-                  <select
-                    value={newSite}
-                    onChange={(e) => setNewSite(e.target.value)}
-                    className="w-full rounded-[8px] border border-pebble bg-white px-3 py-2 text-xs sm:text-sm text-onyx focus:outline-none focus:ring-1 focus:ring-forest cursor-pointer"
-                  >
-                    <option value="Main Site">Main Site</option>
-                    <option value="Skyline Apartments">
-                      Skyline Apartments
-                    </option>
-                    <option value="Warehouse Project">Warehouse Project</option>
-                    <option value="Head Office">Head Office</option>
-                    <option value="Flexible / Multi-site">
-                      Flexible / Multi-site
-                    </option>
-                  </select>
-                </div>
-
                 <div>
                   <label className="text-xs font-bold text-onyx block mb-1">
                     Wage Rate / Salary (Optional)
@@ -1475,30 +1757,30 @@ export default function CrewPage() {
                     className="w-full rounded-[8px] border border-pebble bg-white px-3 py-2 text-xs sm:text-sm text-onyx placeholder:text-ash focus:outline-none focus:ring-1 focus:ring-forest"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="text-xs font-bold text-onyx block mb-1">
-                  Initial Status
-                </label>
-                <div className="flex items-center gap-3">
-                  {(["Active", "On Leave", "Inactive"] as CrewStatus[]).map(
-                    (s) => (
-                      <label
-                        key={s}
-                        className="flex items-center gap-1.5 text-xs text-onyx cursor-pointer"
-                      >
-                        <input
-                          type="radio"
-                          name="status"
-                          checked={newStatus === s}
-                          onChange={() => setNewStatus(s)}
-                          className="accent-forest"
-                        />
-                        <span>{s}</span>
-                      </label>
-                    )
-                  )}
+                <div>
+                  <label className="text-xs font-bold text-onyx block mb-1">
+                    Initial Status
+                  </label>
+                  <div className="flex items-center gap-3 pt-2">
+                    {(["Active", "On Leave", "Inactive"] as CrewStatus[]).map(
+                      (s) => (
+                        <label
+                          key={s}
+                          className="flex items-center gap-1.5 text-xs text-onyx cursor-pointer"
+                        >
+                          <input
+                            type="radio"
+                            name="status"
+                            checked={newStatus === s}
+                            onChange={() => setNewStatus(s)}
+                            className="accent-forest"
+                          />
+                          <span>{s}</span>
+                        </label>
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1515,7 +1797,7 @@ export default function CrewPage() {
                   className="rounded-[8px] bg-forest hover:bg-forest-hover text-white px-5 py-2 text-xs font-semibold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="h-4 w-4" />
-                  <span>Add Person</span>
+                  <span>Add Field Worker</span>
                 </button>
               </div>
             </form>

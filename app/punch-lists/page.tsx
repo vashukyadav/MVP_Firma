@@ -23,47 +23,19 @@ interface PunchItem {
   notes?: string;
 }
 
-const initialPunchList: PunchItem[] = [
-  {
-    id: "P-001",
-    description: "Paint touch-up",
-    location: "Block A",
-    status: "Open",
-    assignee: "Team B (Finishing)",
-    dateAdded: "15 Sep 2025",
-    notes: "Scuff marks behind conference door need primer coat and final eggshell finish.",
-  },
-  {
-    id: "P-002",
-    description: "Door alignment",
-    location: "Block B",
-    status: "Open",
-    assignee: "Metro Builders (Carpentry)",
-    dateAdded: "14 Sep 2025",
-    notes: "Hinges binding at top frame corner; adjust shims and re-check latch engagement.",
-  },
-  {
-    id: "P-003",
-    description: "Electrical socket",
-    location: "Block A",
-    status: "Completed",
-    assignee: "Sharma Electrical",
-    dateAdded: "12 Sep 2025",
-    notes: "Faceplate replaced and earthing continuity tested verified by Site Manager.",
-  },
-];
+const initialPunchList: PunchItem[] = [];
 
 export default function PunchListsPage() {
   const [items, setItems] = useState<PunchItem[]>(initialPunchList);
-  const [activeFilter, setActiveFilter] = useState("All (3)");
+  const [activeFilter, setActiveFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [selectedItem, setSelectedItem] = useState<PunchItem | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
 
   // Form state
   const [newDesc, setNewDesc] = useState("");
-  const [newLoc, setNewLoc] = useState("Block A");
-  const [newAssignee, setNewAssignee] = useState("Team B");
+  const [newLoc, setNewLoc] = useState("");
+  const [newAssignee, setNewAssignee] = useState("");
 
   const filteredItems = items.filter((item) => {
     const matchesSearch =
@@ -72,8 +44,8 @@ export default function PunchListsPage() {
       item.location.toLowerCase().includes(search.toLowerCase());
 
     if (!matchesSearch) return false;
-    if (activeFilter === "Open (2)" || activeFilter === "Open") return item.status === "Open";
-    if (activeFilter === "Completed (1)" || activeFilter === "Completed") return item.status === "Completed";
+    if (activeFilter === "Open") return item.status === "Open";
+    if (activeFilter === "Completed") return item.status === "Completed";
     return true;
   });
 
@@ -82,12 +54,16 @@ export default function PunchListsPage() {
     if (!newDesc) return;
 
     const newItem: PunchItem = {
-      id: `P-00${items.length + 1}`,
+      id: `P-${Math.floor(100 + Math.random() * 900)}`,
       description: newDesc,
-      location: newLoc,
+      location: newLoc || "Site Area",
       status: "Open",
-      assignee: newAssignee,
-      dateAdded: "16 Sep 2025",
+      assignee: newAssignee || "Site Team",
+      dateAdded: new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
       notes: "Snag noted during site walk inspection.",
     };
 
@@ -129,9 +105,9 @@ export default function PunchListsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
               {[
-                { label: `All (${items.length})`, key: "All (3)" },
-                { label: `Open (${items.filter((i) => i.status === "Open").length})`, key: "Open (2)" },
-                { label: `Completed (${items.filter((i) => i.status === "Completed").length})`, key: "Completed (1)" },
+                { label: `All (${items.length})`, key: "All" },
+                { label: `Open (${items.filter((i) => i.status === "Open").length})`, key: "Open" },
+                { label: `Completed (${items.filter((i) => i.status === "Completed").length})`, key: "Completed" },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -323,7 +299,7 @@ export default function PunchListsPage() {
                 type="text"
                 value={newAssignee}
                 onChange={(e) => setNewAssignee(e.target.value)}
-                placeholder="e.g. Sharma Electrical or Finishing Team"
+                placeholder="e.g. Finishing Team or Assigned Contractor"
                 className="w-full bg-white border border-pebble rounded-[8px] p-2 text-xs text-onyx outline-none focus:border-forest"
               />
             </div>

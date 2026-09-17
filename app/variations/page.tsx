@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import { useTenderFlowStore } from "@/store/tenderFlowStore";
+import { useAuthStore } from "@/store/authStore";
+import { isFieldWorker, isJobAssignedToUser } from "@/lib/roleAccess";
 import {
   ArrowLeftRight,
   Plus,
@@ -27,38 +30,26 @@ interface VariationItem {
   details?: string;
 }
 
-const initialVariations: VariationItem[] = [
-  {
-    id: "V-001",
-    job: "J-004",
-    description: "Extra electrical points",
-    value: "₹ 25,000",
-    raisedBy: "Site Manager",
-    status: "Pending",
-    date: "15 Sep 2025",
-    details: "Client requested 6 additional 16A power points in conference room perimeter.",
-  },
-  {
-    id: "V-002",
-    job: "J-002",
-    description: "Additional concrete work",
-    value: "₹ 40,000",
-    raisedBy: "PM - Dinesh",
-    status: "Approved",
-    date: "10 Sep 2025",
-    details: "Sub-base soil stabilization required 8 cubic meters additional grade M25 concrete.",
-  },
-];
+const initialVariations: VariationItem[] = [];
 
 export default function VariationsPage() {
+  const { jobs = [] } = useTenderFlowStore();
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const isWorker = isFieldWorker(currentUser);
+
+  const userJobs = useMemo(() => {
+    if (!isWorker) return jobs;
+    return jobs.filter((j) => isJobAssignedToUser(j, [], [], currentUser));
+  }, [jobs, isWorker, currentUser]);
+
   const [variations, setVariations] = useState<VariationItem[]>(initialVariations);
-  const [activeFilter, setActiveFilter] = useState("All (2)");
+  const [activeFilter, setActiveFilter] = useState("My Variations");
   const [search, setSearch] = useState("");
   const [selectedVar, setSelectedVar] = useState<VariationItem | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
 
   // Form state
-  const [newJob, setNewJob] = useState("J-004");
+  const [newJob, setNewJob] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newValue, setNewValue] = useState("");
 
@@ -70,9 +61,9 @@ export default function VariationsPage() {
       v.raisedBy.toLowerCase().includes(search.toLowerCase());
 
     if (!matchesSearch) return false;
-    if (activeFilter === "Pending (1)" || activeFilter === "Pending") return v.status === "Pending";
-    if (activeFilter === "Approved (1)" || activeFilter === "Approved") return v.status === "Approved";
-    if (activeFilter === "Rejected (0)" || activeFilter === "Rejected") return v.status === "Rejected";
+    if (activeFilter === "Pending") return v.status === "Pending";
+    if (activeFilter === "Approved") return v.status === "Approved";
+    if (activeFilter === "Rejected") return v.status === "Rejected";
     return true;
   });
 
@@ -80,15 +71,19 @@ export default function VariationsPage() {
     e.preventDefault();
     if (!newDesc || !newValue) return;
 
-    const newId = `V-00${variations.length + 1}`;
+    const newId = `V-${Math.floor(100 + Math.random() * 900)}`;
     const newItem: VariationItem = {
       id: newId,
-      job: newJob,
+      job: newJob || (jobs[0]?.id || "General"),
       description: newDesc,
       value: `₹ ${newValue}`,
-      raisedBy: "Site Manager",
+      raisedBy: currentUser?.name || "Site Team",
+      date: new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
       status: "Pending",
-      date: "16 Sep 2025",
       details: "Site scope variation logged for PM and client sign-off.",
     };
 
@@ -110,7 +105,7 @@ export default function VariationsPage() {
             </div>
             <h1 className="text-display-h1 font-bold text-onyx tracking-tight flex items-center gap-2.5">
               <ArrowLeftRight className="h-6 w-6 text-forest" />
-              <span>Variations (Updated)</span>
+              <span>Variations</span>
             </h1>
             <p className="text-xs sm:text-sm text-ash mt-0.5">
               Record on-site scope modifications, extra works, and cost approvals.
@@ -119,28 +114,36 @@ export default function VariationsPage() {
 
           <button
             type="button"
-            onClick={() => setShowNewModal(true)}
+            onClick={() => {
+              setNewJob(jobs[0]?.id || "");
+              setShowNewModal(true);
+            }}
             className="px-4 py-2 rounded-[10px] bg-forest text-white text-xs font-bold hover:bg-forest-hover transition shadow-xs flex items-center gap-2 self-start sm:self-auto cursor-pointer"
           >
             <Plus className="h-4 w-4" /> New Variation
           </button>
         </div>
 
-        {/* Filter Pills & Search */}
+        {/* Filter Pills & Search matching Screen 7 */}
         <div className="rounded-[16px] bg-white border border-pebble/80 p-4 sm:p-5 shadow-2xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
               {[
-                { label: `All (${variations.length})`, key: "All (2)" },
-                { label: `Pending (${variations.filter((v) => v.status === "Pending").length})`, key: "Pending (1)" },
-                { label: `Approved (${variations.filter((v) => v.status === "Approved").length})`, key: "Approved (1)" },
-                { label: `Rejected (${variations.filter((v) => v.status === "Rejected").length})`, key: "Rejected (0)" },
+                { label: `My Variations (${variations.length})`, key: "My Variations" },
+                {
+                  label: `Pending (${variations.filter((v) => v.status === "Pending").length})`,
+                  key: "Pending",
+                },
+                {
+                  label: `Approved (${variations.filter((v) => v.status === "Approved").length})`,
+                  key: "Approved",
+                },
               ].map((tab) => (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => setActiveFilter(tab.key)}
-                  className={`px-3 py-1.5 rounded-[8px] text-xs font-bold transition cursor-pointer shrink-0 ${
+                  className={`px-3.5 py-1.5 rounded-[8px] text-xs font-bold transition cursor-pointer shrink-0 ${
                     activeFilter === tab.key
                       ? "bg-forest text-white shadow-2xs"
                       : "bg-stone text-ash hover:text-onyx hover:bg-mist/70"
@@ -163,52 +166,64 @@ export default function VariationsPage() {
             </div>
           </div>
 
-          {/* Table matching Screen 9 */}
+          {/* Table matching Screen 7 (# | Description | Job | Status | Actions) */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-pebble/80 text-ash text-[11px] font-bold uppercase tracking-wider">
                   <th className="py-2.5 px-3">#</th>
-                  <th className="py-2.5 px-3">Job</th>
                   <th className="py-2.5 px-3">Description</th>
-                  <th className="py-2.5 px-3">Value</th>
-                  <th className="py-2.5 px-3">Raised By</th>
+                  <th className="py-2.5 px-3">Job</th>
                   <th className="py-2.5 px-3">Status</th>
                   <th className="py-2.5 px-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-pebble/40">
-                {filteredVariations.map((v) => (
-                  <tr key={v.id} className="hover:bg-stone/50 transition">
-                    <td className="py-3 px-3 font-bold font-mono text-ash">{v.id}</td>
-                    <td className="py-3 px-3 font-bold text-forest">{v.job}</td>
-                    <td className="py-3 px-3 font-semibold text-onyx">{v.description}</td>
-                    <td className="py-3 px-3 font-bold text-onyx">{v.value}</td>
-                    <td className="py-3 px-3 text-ash font-medium">{v.raisedBy}</td>
-                    <td className="py-3 px-3">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-[4px] text-[10px] font-bold ${
-                          v.status === "Pending"
-                            ? "bg-amber-100 text-amber-800"
-                            : v.status === "Approved"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-rose-100 text-rose-800"
-                        }`}
-                      >
-                        {v.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedVar(v)}
-                        className="px-3 py-1 rounded-[6px] bg-stone hover:bg-forest hover:text-white border border-pebble text-onyx font-bold transition text-xs cursor-pointer"
-                      >
-                        View
-                      </button>
+                {filteredVariations.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-ash text-sm">
+                      <ArrowLeftRight className="h-9 w-9 text-ash/50 mx-auto mb-2 stroke-[1.5]" />
+                      <p className="font-bold text-onyx">No variations recorded yet</p>
+                      <p className="text-xs text-ash mt-1">
+                        Click &quot;+ Raise Variation&quot; above to submit an on-site change order or scope adjustment.
+                      </p>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredVariations.map((v) => (
+                    <tr key={v.id} className="hover:bg-stone/50 transition">
+                      <td className="py-3 px-3 font-bold font-mono text-ash">{v.id}</td>
+                      <td className="py-3 px-3 font-bold text-onyx">{v.description}</td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded-[6px] bg-stone font-bold text-onyx border border-pebble text-[11px]">
+                          {v.job}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-[4px] text-[10px] font-bold ${
+                            v.status === "Pending"
+                              ? "bg-amber-100 text-amber-800"
+                              : v.status === "Approved"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-rose-100 text-rose-800"
+                          }`}
+                        >
+                          {v.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedVar(v)}
+                          className="px-3 py-1 rounded-[6px] bg-stone hover:bg-forest hover:text-white border border-pebble text-onyx font-bold transition text-xs cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -244,11 +259,10 @@ export default function VariationsPage() {
               <div>
                 <span className="text-ash text-[10px] uppercase font-bold block">Status</span>
                 <span
-                  className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold inline-block mt-0.5 ${
-                    selectedVar.status === "Pending"
+                  className={`px-2 py-0.5 rounded-[4px] text-[10px] font-bold inline-block mt-0.5 ${selectedVar.status === "Pending"
                       ? "bg-amber-100 text-amber-800"
                       : "bg-emerald-100 text-emerald-800"
-                  }`}
+                    }`}
                 >
                   {selectedVar.status}
                 </span>
@@ -312,10 +326,16 @@ export default function VariationsPage() {
                 onChange={(e) => setNewJob(e.target.value)}
                 className="w-full bg-white border border-pebble rounded-[8px] p-2 text-xs text-onyx"
               >
-                <option value="J-004">J-004 Electrical Installation</option>
-                <option value="J-001">J-001 Site Preparation</option>
-                <option value="J-002">J-002 Structural Work</option>
-                <option value="J-003">J-003 Plumbing Installation</option>
+                <option value="">-- Select Linked Job --</option>
+                {userJobs.length > 0 ? (
+                  userJobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.id} - {j.title} ({j.projectName})
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>No assigned jobs found</option>
+                )}
               </select>
             </div>
 

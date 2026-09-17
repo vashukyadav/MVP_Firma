@@ -58,6 +58,20 @@
     --color-text-muted: var(--color-ash);
     --color-text-inverse: var(--color-white);
 
+    /* Status Semantic Bindings (from Figma Specification) */
+    --color-status-success-base: var(--color-success);
+    --color-status-success-text: var(--color-success-text);
+    --color-status-success-bg: var(--color-clear-bg);
+    --color-status-warning-base: var(--color-caution);
+    --color-status-warning-text: var(--color-caution-text);
+    --color-status-warning-bg: var(--color-caution-bg);
+    --color-status-danger-base: var(--color-hazard);
+    --color-status-danger-text: var(--color-hazard-text);
+    --color-status-danger-bg: var(--color-hazard-bg);
+    --color-status-neutral-base: var(--color-ash);
+    --color-status-neutral-text: var(--color-onyx);
+    --color-status-neutral-bg: var(--color-mist);
+
     /* =================================================================== */
     /* FIRMA RADIUS                                                        */
     /* =================================================================== */
@@ -278,3 +292,36 @@ nextjs-portal,
 [data-nextjs-dialog-overlay] {
   display: none !important;
 }
+
+/* =================================================================== */
+/* FIRMA TOAST NOTIFICATION ANIMATIONS                                 */
+/* =================================================================== */
+@keyframes toast-slide-in-right {
+  from {
+    transform: translate3d(100%, 0, 0) scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-fade-out {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(20%, 0, 0) scale(0.92);
+    opacity: 0;
+  }
+}
+
+.animate-toast-in {
+  animation: toast-slide-in-right 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-toast-out {
+  animation: toast-fade-out 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

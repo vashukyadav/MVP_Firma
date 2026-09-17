@@ -17,6 +17,8 @@ import {
   Calendar,
 } from "lucide-react";
 
+import { useSiteStore } from "@/store/siteStore";
+
 interface SiteReportItem {
   id: string;
   date: string;
@@ -28,49 +30,25 @@ interface SiteReportItem {
   safetyObservations?: string;
 }
 
-const initialReports: SiteReportItem[] = [
-  {
-    id: "SR-101",
-    date: "16 Sep 2025",
-    weather: "Sunny",
-    workers: 24,
-    keyActivities: "Electrical, Plumbing",
-    siteName: "Riverside Apartments",
-    notes: "Cable trays suspended along corridor ceiling on 2nd floor. Main DB enclosure installed in electrical room.",
-    safetyObservations: "All 24 team members wearing helmets, hi-vis and steel toe boots. No incidents.",
-  },
-  {
-    id: "SR-102",
-    date: "15 Sep 2025",
-    weather: "Cloudy",
-    workers: 20,
-    keyActivities: "Structural work",
-    siteName: "Riverside Apartments",
-    notes: "Reinforcement rebar tied on shear wall grid B. Concreting preparations underway.",
-    safetyObservations: "Scaffolding tag inspection completed. Perimeter edge protection verified.",
-  },
-  {
-    id: "SR-103",
-    date: "14 Sep 2025",
-    weather: "Sunny",
-    workers: 18,
-    keyActivities: "Site preparation",
-    siteName: "Riverside Apartments",
-    notes: "Site clearance and material staging for electrical conduits delivered by Sharma Electrical.",
-    safetyObservations: "Toolbox talk held at 08:30 AM focusing on electrical safety.",
-  },
-];
+const initialReports: SiteReportItem[] = [];
 
 export default function SiteReportsPage() {
+  const { sites = [] } = useSiteStore();
   const [reports, setReports] = useState<SiteReportItem[]>(initialReports);
   const [search, setSearch] = useState("");
   const [selectedReport, setSelectedReport] = useState<SiteReportItem | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
 
   // New report form state
-  const [reportDate, setReportDate] = useState("16 Sep 2025");
+  const [reportDate, setReportDate] = useState(
+    new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+  );
   const [reportWeather, setReportWeather] = useState<"Sunny" | "Cloudy" | "Rainy">("Sunny");
-  const [reportWorkers, setReportWorkers] = useState("25");
+  const [reportWorkers, setReportWorkers] = useState("0");
   const [reportActivities, setReportActivities] = useState("");
   const [reportNotes, setReportNotes] = useState("");
 
@@ -89,9 +67,9 @@ export default function SiteReportsPage() {
       id: `SR-${100 + reports.length + 1}`,
       date: reportDate,
       weather: reportWeather,
-      workers: parseInt(reportWorkers, 10) || 20,
+      workers: parseInt(reportWorkers, 10) || 0,
       keyActivities: reportActivities,
-      siteName: "Riverside Apartments",
+      siteName: sites[0]?.name || "Main Site Area",
       notes: reportNotes || "Daily site report logged by Site Manager.",
       safetyObservations: "Zero safety incidents recorded.",
     };

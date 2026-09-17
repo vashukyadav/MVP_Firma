@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -29,48 +30,124 @@ import {
   AlertTriangle,
   Sparkles,
 } from "lucide-react";
+import { useAuthStore } from "@/store/authStore";
+import { useTenderFlowStore } from "@/store/tenderFlowStore";
+import { useSiteStore } from "@/store/siteStore";
+import { useSchedulingStore } from "@/store/schedulingStore";
+import { useLeadFlowStore } from "@/store/leadFlowStore";
+import {
+  getAssignedProjects,
+  getAssignedSites,
+  getAssignedJobs,
+} from "@/lib/roleAccess";
+import { db } from "@/lib/db";
 
 interface SiteManagerDashboardProps {
   companyName?: string;
 }
 
-// Sample recent photos preview matching Screen 6
-const recentFieldPhotos = [
-  {
-    id: "p1",
-    title: "Cable tray installation",
-    time: "11:32 AM",
-    author: "Rahul Kumar",
-    url: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80",
-    stage: "Containment",
-  },
-  {
-    id: "p2",
-    title: "DB panel setup",
-    time: "02:15 PM",
-    author: "Amit Singh",
-    url: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=600&q=80",
-    stage: "Distribution Panel",
-  },
-  {
-    id: "p3",
-    title: "Conduit piping",
-    time: "04:15 PM",
-    author: "Rahul Kumar",
-    url: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=600&q=80",
-    stage: "Conduit",
-  },
-  {
-    id: "p4",
-    title: "Socket installation",
-    time: "05:30 PM",
-    author: "Sunil Yadav",
-    url: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=600&q=80",
-    stage: "Second Fix",
-  },
-];
-
 export default function SiteManagerDashboard({ companyName }: SiteManagerDashboardProps) {
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const rawJobs = useTenderFlowStore((state) => state.jobs) || [];
+  const rawSites = useSiteStore((state) => state.sites) || [];
+  const rawScheduledJobs = useSchedulingStore((state) => state.scheduledJobs) || [];
+  const allProjects = useLeadFlowStore((state) => state.projects) || [];
+
+  const assignedProjects = useMemo(() => {
+    return getAssignedProjects(allProjects, rawSites, currentUser);
+  }, [allProjects, rawSites, currentUser]);
+
+  const sites = useMemo(() => {
+    return getAssignedSites(rawSites, currentUser, assignedProjects);
+  }, [rawSites, currentUser, assignedProjects]);
+
+  const jobs = useMemo(() => {
+    return getAssignedJobs(rawJobs, assignedProjects, sites, currentUser);
+  }, [rawJobs, assignedProjects, sites, currentUser]);
+
+  const scheduledJobs = useMemo(() => {
+    return rawScheduledJobs.filter((sj) => {
+      const siteMatch = sites.some(
+        (s) =>
+          (s.name && s.name.toLowerCase() === (sj.site || "").toLowerCase()) ||
+          (s.projectName && s.projectName.toLowerCase() === (sj.site || "").toLowerCase())
+      );
+      const jobMatch = jobs.some(
+        (j) => j.id === sj.id || j.title.toLowerCase() === sj.title.toLowerCase()
+      );
+      return siteMatch || jobMatch;
+    });
+  }, [rawScheduledJobs, sites, jobs]);
+
+  const [teamCount, setTeamCount] = useState<number>(0);
+
+  useEffect(() => {
+    db.users.count()
+      .then((count) => setTeamCount(count))
+      .catch(() => {});
+  }, []);
+
+  // Compute metrics from live store data
+  const totalJobs = jobs.length;
+  const inProgressJobs = jobs.filter((j) => j.status === "In Progress").length;
+  const scheduledCount = scheduledJobs.length;
+
+  // Real photos derived directly from store jobs
+  const realFieldPhotos = useMemo(() => {
+    return jobs.flatMap((j) =>
+      (j.photos || []).map((p) => ({
+        id: p.id,
+        title: p.title || j.title,
+        time: p.timestamp,
+        author: p.uploadedBy || j.assignee || "Field Worker",
+        url: p.url,
+        stage: p.stage || j.trade || "Field Progress",
+      }))
+    );
+  }, [jobs]);
+
+  // Real recent activities derived from store jobs & photos
+  const recentActivities = useMemo(() => {
+    const list: Array<{
+      author: string;
+      action: string;
+      target: string;
+      time: string;
+      icon: any;
+      color: string;
+    }> = [];
+
+    // Photos uploaded
+    jobs.forEach((j) => {
+      (j.photos || []).forEach((p) => {
+        list.push({
+          author: p.uploadedBy || "Field Worker",
+          action: "uploaded photo",
+          target: j.title,
+          time: p.timestamp || "Recently",
+          icon: Camera,
+          color: "bg-emerald-100 text-emerald-800",
+        });
+      });
+    });
+
+    // Recent job assignments or progress
+    jobs.slice(0, 5).forEach((j) => {
+      list.push({
+        author: j.assignee || "Assigned Worker",
+        action: `status: ${j.status}`,
+        target: j.title,
+        time: j.due || "Recently",
+        icon: Briefcase,
+        color: j.status === "Completed" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800",
+      });
+    });
+
+    return list.slice(0, 5);
+  }, [jobs]);
+
+  const displayName = currentUser?.name || "Site Manager";
+
   return (
     <div className="space-y-6 mt-2">
       {/* ========================================================================= */}
@@ -83,10 +160,12 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
               <HardHat className="h-3.5 w-3.5 text-emerald-700" />
               <span>Site Manager Workspace</span>
               <span className="text-emerald-300">•</span>
-              <span className="text-emerald-900 font-semibold">{companyName || "Riverside Project"}</span>
+              <span className="text-emerald-900 font-semibold">
+                {companyName || currentUser?.companyId || "Site Operations"}
+              </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-onyx tracking-tight flex items-center gap-2">
-              Good Morning, Rohit! <span>👷</span>
+              Good Morning, {displayName}! <span>👷</span>
             </h1>
             <p className="text-xs sm:text-sm text-ash mt-1">
               On-site execution, daily reporting, crew coordination, and site operations overview.
@@ -96,11 +175,11 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-[10px] bg-stone border border-pebble text-xs text-onyx font-medium">
               <Sun className="h-4 w-4 text-amber-500" />
-              <span>Riverside Site: <strong>24°C Sunny</strong></span>
+              <span>Active Site: <strong>Normal Weather</strong></span>
             </div>
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-[10px] bg-stone border border-pebble text-xs text-ash">
               <Calendar className="h-4 w-4 text-ash" />
-              <span className="font-semibold text-onyx">Tue, 16 Sep 2025</span>
+              <span className="font-semibold text-onyx">Live Workspace</span>
             </div>
           </div>
         </div>
@@ -116,20 +195,22 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
           className="p-5 rounded-[14px] bg-white border border-pebble/80 shadow-2xs hover:shadow-md hover:border-forest/50 transition group flex flex-col justify-between"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-ash">Today's Jobs</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-ash">Active Jobs</span>
             <span className="h-8 w-8 rounded-[8px] bg-emerald-50 text-forest flex items-center justify-center group-hover:bg-forest group-hover:text-white transition">
               <Briefcase className="h-4 w-4" />
             </span>
           </div>
           <div className="mt-4">
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-onyx">8</span>
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                2 In-Progress
-              </span>
+              <span className="text-3xl font-black text-onyx">{totalJobs}</span>
+              {inProgressJobs > 0 && (
+                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                  {inProgressJobs} In-Progress
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-ash mt-1.5 flex items-center justify-between">
-              <span>6 Scheduled for today</span>
+              <span>{scheduledCount} Scheduled on timeline</span>
               <ArrowRight className="h-3 w-3 text-ash group-hover:text-forest group-hover:translate-x-0.5 transition" />
             </p>
           </div>
@@ -137,24 +218,24 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
 
         {/* Card 2: Team On Site */}
         <Link
-          href="/sites"
+          href="/crew"
           className="p-5 rounded-[14px] bg-white border border-pebble/80 shadow-2xs hover:shadow-md hover:border-forest/50 transition group flex flex-col justify-between"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-ash">Team On Site</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-ash">Team Members</span>
             <span className="h-8 w-8 rounded-[8px] bg-blue-50 text-blue-700 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition">
               <Users className="h-4 w-4" />
             </span>
           </div>
           <div className="mt-4">
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-onyx">24</span>
+              <span className="text-3xl font-black text-onyx">{teamCount}</span>
               <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
-                Full Crew
+                Database
               </span>
             </div>
             <p className="text-[11px] text-ash mt-1.5 flex items-center justify-between">
-              <span>14 Internal • 10 Contractors</span>
+              <span>{teamCount > 0 ? "Active registered users" : "No users yet"}</span>
               <ArrowRight className="h-3 w-3 text-ash group-hover:text-forest group-hover:translate-x-0.5 transition" />
             </p>
           </div>
@@ -173,13 +254,13 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
           </div>
           <div className="mt-4">
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-onyx">3</span>
+              <span className="text-3xl font-black text-onyx">0</span>
               <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full">
-                1 Pending
+                0 Pending
               </span>
             </div>
             <p className="text-[11px] text-ash mt-1.5 flex items-center justify-between">
-              <span>R-001 Conduit Routing</span>
+              <span>View &amp; raise RFIs</span>
               <ArrowRight className="h-3 w-3 text-ash group-hover:text-rose-600 group-hover:translate-x-0.5 transition" />
             </p>
           </div>
@@ -191,20 +272,20 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
           className="p-5 rounded-[14px] bg-white border border-pebble/80 shadow-2xs hover:shadow-md hover:border-amber-300 transition group flex flex-col justify-between"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-ash">Open Variations</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-ash">Variations</span>
             <span className="h-8 w-8 rounded-[8px] bg-amber-50 text-amber-700 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition">
               <ArrowLeftRight className="h-4 w-4" />
             </span>
           </div>
           <div className="mt-4">
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-onyx">2</span>
+              <span className="text-3xl font-black text-onyx">0</span>
               <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                +$16,700
+                Clean
               </span>
             </div>
             <p className="text-[11px] text-ash mt-1.5 flex items-center justify-between">
-              <span>V-001 &amp; V-002 Awaiting Review</span>
+              <span>Manage site variations</span>
               <ArrowRight className="h-3 w-3 text-ash group-hover:text-amber-600 group-hover:translate-x-0.5 transition" />
             </p>
           </div>
@@ -215,10 +296,8 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
       {/* 3. MAIN WORKSPACE GRID: SCHEDULE & RECENT ACTIVITIES (SCREEN 1)            */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
         {/* Left 2 Columns: Today's Schedule + Active Sites */}
         <div className="lg:col-span-2 space-y-6">
-          
           {/* Today's Schedule Card */}
           <div className="rounded-[16px] bg-white border border-pebble/80 shadow-2xs overflow-hidden">
             <div className="px-6 py-4 border-b border-pebble/60 flex items-center justify-between">
@@ -227,7 +306,7 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
                   <Calendar className="h-4 w-4 text-forest" />
                   <span>Today's Schedule</span>
                 </h2>
-                <p className="text-xs text-ash mt-0.5">Assigned teams, contractors, and planned execution slots.</p>
+                <p className="text-xs text-ash mt-0.5">Assigned teams, workers, and planned execution slots.</p>
               </div>
               <Link
                 href="/scheduling"
@@ -238,75 +317,69 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
               </Link>
             </div>
 
-            <div className="p-6 space-y-3">
-              {[
-                {
-                  time: "09:00 AM",
-                  title: "Site Prep & Safety Check",
-                  site: "Riverside Apartments (Site A)",
-                  team: "Internal Team A (4 workers)",
-                  status: "In-Progress",
-                  badgeColor: "bg-emerald-100 text-emerald-800",
-                },
-                {
-                  time: "10:00 AM",
-                  title: "J-004 Electrical Installation",
-                  site: "Riverside Apartments (Block B)",
-                  team: "Spark Electric Co. (6 workers)",
-                  status: "Scheduled",
-                  badgeColor: "bg-blue-100 text-blue-800",
-                },
-                {
-                  time: "01:00 PM",
-                  title: "Plumbing Rough-In & Drain Inspection",
-                  site: "Riverside Apartments (Block A)",
-                  team: "Internal Team C (3 workers)",
-                  status: "Scheduled",
-                  badgeColor: "bg-blue-100 text-blue-800",
-                },
-                {
-                  time: "03:30 PM",
-                  title: "Concrete Pouring Inspection",
-                  site: "Metro Mall Site (Foundation)",
-                  team: "Apex Concrete (8 workers)",
-                  status: "Scheduled",
-                  badgeColor: "bg-stone text-onyx border border-pebble",
-                },
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className="p-3.5 rounded-[12px] bg-stone/40 border border-pebble/60 hover:bg-stone/80 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                >
-                  <div className="flex items-start sm:items-center gap-3">
-                    <div className="h-10 w-16 rounded-[8px] bg-white border border-pebble/80 flex items-center justify-center font-black text-xs text-onyx shrink-0 shadow-2xs">
-                      {item.time}
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-onyx">{item.title}</h4>
-                      <p className="text-xs text-ash mt-0.5 flex items-center gap-2">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3 text-ash" /> {item.site}
-                        </span>
-                        <span className="text-pebble">•</span>
-                        <span>{item.team}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 self-start sm:self-center">
-                    <span className={`px-2.5 py-1 rounded-[6px] text-xs font-bold ${item.badgeColor}`}>
-                      {item.status}
-                    </span>
-                    <Link
-                      href="/jobs"
-                      className="p-1.5 rounded-[6px] hover:bg-white text-ash hover:text-onyx transition"
-                      title="View Job"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </div>
+            <div className="p-6">
+              {scheduledJobs.length === 0 ? (
+                <div className="p-8 text-center bg-stone/20 rounded-[12px] border border-dashed border-pebble/80">
+                  <Calendar className="h-8 w-8 text-ash mx-auto mb-2 opacity-50" />
+                  <p className="text-sm font-semibold text-onyx">No jobs scheduled for today</p>
+                  <p className="text-xs text-ash mt-1 max-w-sm mx-auto">
+                    Assign workers to upcoming jobs and plan shifts on the scheduling timeline.
+                  </p>
+                  <Link
+                    href="/scheduling"
+                    className="inline-flex items-center gap-1.5 mt-3 px-3.5 py-1.5 rounded-[8px] bg-forest text-white text-xs font-semibold hover:bg-forest-hover transition cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Go to Scheduling</span>
+                  </Link>
                 </div>
-              ))}
+              ) : (
+                <div className="space-y-3">
+                  {scheduledJobs.slice(0, 5).map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-3.5 rounded-[12px] bg-stone/40 border border-pebble/60 hover:bg-stone/80 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className="h-10 w-16 rounded-[8px] bg-white border border-pebble/80 flex items-center justify-center font-black text-xs text-onyx shrink-0 shadow-2xs">
+                          {item.timeSlot || "Slot"}
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-onyx">{item.title}</h4>
+                          <p className="text-xs text-ash mt-0.5 flex items-center gap-2">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-ash" /> {item.site || "General Site"}
+                            </span>
+                            <span className="text-pebble">•</span>
+                            <span>{item.worker || "Unassigned"}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-start sm:self-center">
+                        <span
+                          className={`px-2.5 py-1 rounded-[6px] text-xs font-bold ${
+                            item.status === "Completed"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : item.status === "In Progress"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-stone text-onyx border border-pebble"
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+                        <Link
+                          href="/jobs"
+                          className="p-1.5 rounded-[6px] hover:bg-white text-ash hover:text-onyx transition"
+                          title="View Job"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -324,86 +397,80 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
                 href="/sites"
                 className="text-xs font-bold text-forest hover:underline flex items-center gap-1"
               >
-                <span>All Sites</span>
+                <span>All Sites ({sites.length})</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Site 1 */}
-              <div className="p-4 rounded-[12px] bg-stone/40 border border-pebble/70 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="px-2 py-0.5 rounded-[4px] bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                      Main Site • Active
-                    </span>
-                    <h4 className="text-sm font-bold text-onyx mt-1">Riverside Apartments</h4>
-                    <p className="text-xs text-ash flex items-center gap-1 mt-0.5">
-                      <MapPin className="h-3 w-3 text-ash" /> Sector 45, Gurugram
-                    </p>
-                  </div>
-                  <span className="text-xs font-black text-onyx">65% Done</span>
+            <div className="p-6">
+              {sites.length === 0 ? (
+                <div className="p-8 text-center bg-stone/20 rounded-[12px] border border-dashed border-pebble/80">
+                  <Building2 className="h-8 w-8 text-ash mx-auto mb-2 opacity-50" />
+                  <p className="text-sm font-semibold text-onyx">No construction sites assigned yet</p>
+                  <p className="text-xs text-ash mt-1 max-w-sm mx-auto">
+                    You do not have any active construction sites assigned to you. Once your Project Manager or Owner assigns a site to you, it will appear here.
+                  </p>
+                  <Link
+                    href="/sites"
+                    className="inline-flex items-center gap-1.5 mt-3 px-3.5 py-1.5 rounded-[8px] bg-forest text-white text-xs font-semibold hover:bg-forest-hover transition cursor-pointer"
+                  >
+                    <span>View Sites Directory</span>
+                  </Link>
                 </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {sites.slice(0, 4).map((site) => {
+                    const siteProgress = site.status === "Completed" ? 100 : site.status === "Active" ? 60 : 25;
+                    const siteLocation = site.city ? `${site.city}, ${site.state}` : site.address || "Location not set";
+                    return (
+                      <div
+                        key={site.id}
+                        className="p-4 rounded-[12px] bg-stone/40 border border-pebble/70 space-y-3"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <span className="px-2 py-0.5 rounded-[4px] bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                              {site.status || "Active"}
+                            </span>
+                            <h4 className="text-sm font-bold text-onyx mt-1">{site.name}</h4>
+                            <p className="text-xs text-ash flex items-center gap-1 mt-0.5">
+                              <MapPin className="h-3 w-3 text-ash" /> {siteLocation}
+                            </p>
+                          </div>
+                          <span className="text-xs font-black text-onyx">{siteProgress}% Done</span>
+                        </div>
 
-                {/* Progress bar */}
-                <div className="w-full bg-pebble/60 h-2 rounded-full overflow-hidden">
-                  <div className="bg-forest h-full rounded-full" style={{ width: "65%" }} />
-                </div>
+                        {/* Progress bar */}
+                        <div className="w-full bg-pebble/60 h-2 rounded-full overflow-hidden">
+                          <div
+                            className="bg-forest h-full rounded-full"
+                            style={{ width: `${siteProgress}%` }}
+                          />
+                        </div>
 
-                <div className="pt-2 border-t border-pebble/50 flex items-center justify-between text-xs text-ash">
-                  <span>14 Workers on-site</span>
-                  <div className="flex items-center gap-2">
-                    <Link href="/site-reports" className="text-forest hover:underline font-semibold">
-                      Daily Report
-                    </Link>
-                    <span>•</span>
-                    <Link href="/punch-lists" className="text-forest hover:underline font-semibold">
-                      Punch List
-                    </Link>
-                  </div>
+                        <div className="pt-2 border-t border-pebble/50 flex items-center justify-between text-xs text-ash">
+                          <span>{site.siteManagerName ? `Manager: ${site.siteManagerName}` : "Active Site"}</span>
+                          <div className="flex items-center gap-2">
+                            <Link href="/site-reports" className="text-forest hover:underline font-semibold">
+                              Daily Report
+                            </Link>
+                            <span>•</span>
+                            <Link href="/punch-lists" className="text-forest hover:underline font-semibold">
+                              Punch List
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-
-              {/* Site 2 */}
-              <div className="p-4 rounded-[12px] bg-stone/40 border border-pebble/70 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="px-2 py-0.5 rounded-[4px] bg-blue-100 text-blue-800 text-[10px] font-bold">
-                      Sub Site • Active
-                    </span>
-                    <h4 className="text-sm font-bold text-onyx mt-1">Metro Mall Site</h4>
-                    <p className="text-xs text-ash flex items-center gap-1 mt-0.5">
-                      <MapPin className="h-3 w-3 text-ash" /> MG Road, Gurugram
-                    </p>
-                  </div>
-                  <span className="text-xs font-black text-onyx">40% Done</span>
-                </div>
-
-                {/* Progress bar */}
-                <div className="w-full bg-pebble/60 h-2 rounded-full overflow-hidden">
-                  <div className="bg-blue-600 h-full rounded-full" style={{ width: "40%" }} />
-                </div>
-
-                <div className="pt-2 border-t border-pebble/50 flex items-center justify-between text-xs text-ash">
-                  <span>10 Workers on-site</span>
-                  <div className="flex items-center gap-2">
-                    <Link href="/site-reports" className="text-forest hover:underline font-semibold">
-                      Daily Report
-                    </Link>
-                    <span>•</span>
-                    <Link href="/safety" className="text-forest hover:underline font-semibold">
-                      Safety Log
-                    </Link>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Right 1 Column: Activity Feed, Quick Actions & Photo Preview */}
         <div className="space-y-6">
-          
           {/* Quick Actions Hub */}
           <div className="rounded-[16px] bg-white border border-pebble/80 shadow-2xs p-5 space-y-3">
             <h3 className="text-sm font-bold text-onyx">Site Quick Actions</h3>
@@ -465,7 +532,7 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
             </div>
           </div>
 
-          {/* Recent Site Activity (Screen 1) */}
+          {/* Recent Site Activity */}
           <div className="rounded-[16px] bg-white border border-pebble/80 shadow-2xs overflow-hidden">
             <div className="px-5 py-4 border-b border-pebble/60 flex items-center justify-between">
               <h3 className="text-sm font-bold text-onyx">Recent Site Activity</h3>
@@ -474,57 +541,38 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
               </span>
             </div>
 
-            <div className="p-5 space-y-4 text-xs">
-              {[
-                {
-                  author: "Rahul Kumar",
-                  action: "uploaded 3 photos",
-                  target: "J-004 Electrical",
-                  time: "15m ago",
-                  icon: Camera,
-                  color: "bg-emerald-100 text-emerald-800",
-                },
-                {
-                  author: "Amit Singh",
-                  action: "submitted daily log",
-                  target: "Report #SR-104",
-                  time: "1h ago",
-                  icon: FileText,
-                  color: "bg-blue-100 text-blue-800",
-                },
-                {
-                  author: "Rohit Verma",
-                  action: "raised RFI R-001",
-                  target: "Conduit Routing",
-                  time: "2h ago",
-                  icon: HelpCircle,
-                  color: "bg-rose-100 text-rose-800",
-                },
-                {
-                  author: "Sunil Yadav",
-                  action: "reported Near Miss",
-                  target: "Scaffold clearance",
-                  time: "3h ago",
-                  icon: ShieldAlert,
-                  color: "bg-amber-100 text-amber-800",
-                },
-              ].map((act, i) => {
-                const Icon = act.icon;
-                return (
-                  <div key={i} className="flex items-start gap-3">
-                    <span className={`h-7 w-7 rounded-full ${act.color} flex items-center justify-center shrink-0`}>
-                      <Icon className="h-3.5 w-3.5" />
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-onyx font-medium leading-snug">
-                        <strong>{act.author}</strong> {act.action} for{" "}
-                        <span className="font-bold text-forest">{act.target}</span>
-                      </p>
-                      <span className="text-[10px] text-ash block mt-0.5">{act.time}</span>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="p-5">
+              {recentActivities.length === 0 ? (
+                <div className="p-4 text-center">
+                  <HardHat className="h-6 w-6 text-ash mx-auto mb-2 opacity-50" />
+                  <p className="text-xs font-semibold text-onyx">No recent site activity</p>
+                  <p className="text-[11px] text-ash mt-0.5">
+                    Field worker logs and job status changes will appear here live.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4 text-xs">
+                  {recentActivities.map((act, i) => {
+                    const Icon = act.icon;
+                    return (
+                      <div key={i} className="flex items-start gap-3">
+                        <span
+                          className={`h-7 w-7 rounded-full ${act.color} flex items-center justify-center shrink-0`}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-onyx font-medium leading-snug">
+                            <strong>{act.author}</strong> {act.action} for{" "}
+                            <span className="font-bold text-forest">{act.target}</span>
+                          </p>
+                          <span className="text-[10px] text-ash block mt-0.5">{act.time}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -539,34 +587,51 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
                 href="/photos"
                 className="text-xs font-bold text-forest hover:underline flex items-center gap-1"
               >
-                <span>View All (5)</span>
+                <span>View All ({realFieldPhotos.length})</span>
                 <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
 
-            <div className="p-4 grid grid-cols-2 gap-2.5">
-              {recentFieldPhotos.map((photo) => (
-                <Link
-                  key={photo.id}
-                  href="/photos"
-                  className="group relative rounded-[10px] overflow-hidden border border-pebble/70 aspect-video bg-stone block"
-                >
-                  <Image
-                    src={photo.url}
-                    alt={photo.title}
-                    fill
-                    unoptimized
-                    className="object-cover group-hover:scale-105 transition duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-2">
-                    <span className="text-[10px] font-bold text-white truncate">{photo.title}</span>
-                    <span className="text-[8px] text-stone truncate">{photo.author}</span>
-                  </div>
-                </Link>
-              ))}
+            <div className="p-4">
+              {realFieldPhotos.length === 0 ? (
+                <div className="p-4 text-center">
+                  <Camera className="h-6 w-6 text-ash mx-auto mb-2 opacity-50" />
+                  <p className="text-xs font-semibold text-onyx">No field photos uploaded</p>
+                  <p className="text-[11px] text-ash mt-0.5">
+                    Workers can attach photos directly from the Job detail view or Field App.
+                  </p>
+                  <Link
+                    href="/photos"
+                    className="inline-block mt-2 text-xs font-bold text-forest hover:underline"
+                  >
+                    Go to Photos Hub
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5">
+                  {realFieldPhotos.slice(0, 4).map((photo) => (
+                    <Link
+                      key={photo.id}
+                      href="/photos"
+                      className="group relative rounded-[10px] overflow-hidden border border-pebble/70 aspect-video bg-stone block"
+                    >
+                      <Image
+                        src={photo.url}
+                        alt={photo.title}
+                        fill
+                        unoptimized
+                        className="object-cover group-hover:scale-105 transition duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-2">
+                        <span className="text-[10px] font-bold text-white truncate">{photo.title}</span>
+                        <span className="text-[8px] text-stone truncate">{photo.author}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-
         </div>
       </div>
     </div>

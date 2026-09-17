@@ -33,6 +33,9 @@ import {
   ExternalLink,
   Trash2,
 } from "lucide-react";
+import { useCrewStore } from "@/store/crewStore";
+import { db } from "@/lib/db";
+import { useMemo } from "react";
 
 function PipelineContent() {
   const router = useRouter();
@@ -63,10 +66,61 @@ function PipelineContent() {
   const [showHandoverModal, setShowHandoverModal] = useState(false);
   const [handedOverProjectId, setHandedOverProjectId] = useState<string | null>(null);
   const [handedOverOpp, setHandedOverOpp] = useState<Opportunity | null>(null);
+  const [handoverSiteManagerName, setHandoverSiteManagerName] = useState("");
+
+  const crewMembers = useCrewStore((state) => state.members) || [];
+  const [dbManagers, setDbManagers] = useState<
+    { id: string; name: string; contact?: string; role: string }[]
+  >([]);
 
   useEffect(() => {
     setMounted(true);
+    async function loadManagers() {
+      try {
+        const users = await db.users.toArray();
+        const siteMgrs = users
+          .filter(
+            (u) =>
+              u.role === "SITE_MANAGER" ||
+              u.role === "PROJECT_MANAGER" ||
+              u.role === "OWNER" ||
+              u.role === "ACCOUNT_ADMIN"
+          )
+          .map((u) => ({
+            id: `user-${u.id}`,
+            name: u.name,
+            role: u.role === "SITE_MANAGER" ? "Site Manager" : u.role.replace("_", " "),
+            contact: "+91 98000 00000",
+          }));
+        setDbManagers(siteMgrs);
+      } catch (err) {}
+    }
+    loadManagers();
   }, []);
+
+  const availableSiteManagers = useMemo(() => {
+    const list = [...dbManagers];
+    const managersFromCrew = crewMembers.filter((m) => m.role === "Site Manager");
+    for (const m of managersFromCrew) {
+      if (!list.some((x) => x.name.toLowerCase() === m.name.toLowerCase())) {
+        list.push({
+          id: m.id,
+          name: m.name,
+          role: m.role,
+          contact: m.contact,
+        });
+      }
+    }
+    if (!list.some((x) => x.name.toLowerCase() === "site manager")) {
+      list.push({
+        id: "user-default-sm",
+        name: "Site Manager",
+        role: "Site Manager",
+        contact: "+91 98000 00000",
+      });
+    }
+    return list;
+  }, [dbManagers, crewMembers]);
 
   const oppList = mounted ? opportunities : [];
 
@@ -152,10 +206,13 @@ function PipelineContent() {
   // Handle Handover to Project (Step 8)
   const handleInitiateHandover = () => {
     if (!selectedOpp) return;
+    const found = availableSiteManagers.find((m) => m.name === handoverSiteManagerName);
     const project = handoverToProject(selectedOpp.id, {
       winReason: selectedOpp.winReason || "Customer accepted quote",
       winNotes: selectedOpp.winNotes || "Project awarded. Handover to execution team.",
       projectManager: "Project Lead",
+      siteManagerId: found?.id || undefined,
+      siteManagerName: handoverSiteManagerName || undefined,
     });
 
     setHandedOverProjectId(project.id);
@@ -469,36 +526,59 @@ function PipelineContent() {
                   </div>
 
                   {/* Handover to Project Action */}
-                  <div className="pt-2 border-t border-green-200/60 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div>
-                      <span className="text-xs font-bold text-onyx block">
-                        Handover to Project
-                      </span>
-                      <p className="text-[11px] text-ash">
-                        {selectedOpp.handedOverToProject
-                          ? `Already handed over as Project #${selectedOpp.linkedProjectId}`
-                          : "Create new project from this opportunity and assign execution team."}
-                      </p>
+                  <div className="pt-2 border-t border-green-200/60 flex flex-col gap-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-onyx block">
+                          Handover to Project
+                        </span>
+                        <p className="text-[11px] text-ash">
+                          {selectedOpp.handedOverToProject
+                            ? `Already handed over as Project #${selectedOpp.linkedProjectId}`
+                            : "Create new project from this opportunity and assign execution team."}
+                        </p>
+                      </div>
+
+                      {selectedOpp.handedOverToProject && (
+                        <Button
+                          type="button"
+                          onClick={() => router.push(`/projects`)}
+                          className="bg-forest hover:bg-forest-hover text-white text-xs h-9 font-medium cursor-pointer"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                          <span>View in Projects</span>
+                        </Button>
+                      )}
                     </div>
 
-                    {selectedOpp.handedOverToProject ? (
-                      <Button
-                        type="button"
-                        onClick={() => router.push(`/projects`)}
-                        className="bg-forest hover:bg-forest-hover text-white text-xs h-9 font-medium cursor-pointer"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                        <span>View in Projects</span>
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        onClick={handleInitiateHandover}
-                        className="bg-forest hover:bg-forest-hover text-white text-xs h-9 font-medium shadow-xs cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Briefcase className="h-3.5 w-3.5" />
-                        <span>Create Project</span>
-                      </Button>
+                    {!selectedOpp.handedOverToProject && (
+                      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 bg-white p-3 rounded-lg border border-pebble">
+                        <div className="flex-1 space-y-1 w-full">
+                          <label className="text-[11px] font-semibold text-onyx block">
+                            Assign Site Manager:
+                          </label>
+                          <select
+                            value={handoverSiteManagerName}
+                            onChange={(e) => setHandoverSiteManagerName(e.target.value)}
+                            className="w-full text-xs h-8 bg-stone/40 border border-pebble rounded-md px-2 text-onyx font-medium outline-none focus:border-forest"
+                          >
+                            <option value="">-- Select Site Manager (Optional) --</option>
+                            {availableSiteManagers.map((m) => (
+                              <option key={m.id} value={m.name}>
+                                {m.name} ({m.role})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={handleInitiateHandover}
+                          className="bg-forest hover:bg-forest-hover text-white text-xs h-8 font-medium shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
+                        >
+                          <Briefcase className="h-3.5 w-3.5" />
+                          <span>Create Project</span>
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -701,7 +781,12 @@ function PipelineContent() {
               </div>
               <div className="flex items-center gap-2.5 text-onyx">
                 <CheckCircle2 className="h-4 w-4 text-forest shrink-0" />
-                <span className="font-medium">Site Manager &amp; PM Assigned</span>
+                <span className="font-medium">
+                  Site Manager Assigned:{" "}
+                  <span className="font-bold text-forest">
+                    {handoverSiteManagerName || "Unassigned"}
+                  </span>
+                </span>
               </div>
             </div>
 

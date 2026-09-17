@@ -35,57 +35,22 @@ import {
   HardHat,
   Users2,
 } from "lucide-react";
+import { toast } from "@/components/ui/toast";
+
+import { db } from "@/lib/db";
+import { useAuthStore } from "@/store/authStore";
+import { isFieldWorker } from "@/lib/roleAccess";
 
 type ViewTab = "CALENDAR" | "LIST" | "UNSCHEDULED";
-
-const fallbackWorkers: FieldWorker[] = [
-  {
-    id: "W-01",
-    name: "Amit Verma",
-    role: "Field Worker",
-    trade: "Electrical",
-    phone: "+91 98112 34501",
-    avatarBg: "bg-emerald-100 text-emerald-800",
-  },
-  {
-    id: "W-02",
-    name: "Ravi Kumar",
-    role: "Field Worker",
-    trade: "Plumbing",
-    phone: "+91 98112 34502",
-    avatarBg: "bg-blue-100 text-blue-800",
-  },
-  {
-    id: "W-03",
-    name: "Suresh Yadav",
-    role: "Field Worker",
-    trade: "HVAC",
-    phone: "+91 98112 34503",
-    avatarBg: "bg-rose-100 text-rose-800",
-  },
-  {
-    id: "W-04",
-    name: "Mohit Singh",
-    role: "Field Worker",
-    trade: "Interior & Carpentry",
-    phone: "+91 98112 34504",
-    avatarBg: "bg-teal-100 text-teal-800",
-  },
-  {
-    id: "W-05",
-    name: "Rajesh Sharma",
-    role: "Field Worker",
-    trade: "Civil & Masonry",
-    phone: "+91 98112 34505",
-    avatarBg: "bg-amber-100 text-amber-800",
-  },
-];
 
 function SchedulingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryJobId = searchParams.get("jobId");
   const autoOpenSchedule = searchParams.get("openSchedule") === "true";
+
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const isWorker = isFieldWorker(currentUser);
 
   // Stores
   const {
@@ -104,9 +69,93 @@ function SchedulingContent() {
     jobs: tenderJobs = [],
     contractors = [],
     updateJobStatus: updateTenderJobStatus,
+    updateJob: updateTenderJob,
   } = useTenderFlowStore();
 
   const { members: crewMembers = [] } = useCrewStore();
+
+  // Load real team members from IndexedDB (db.crew)
+  const [dbWorkers, setDbWorkers] = useState<FieldWorker[]>([]);
+
+  useEffect(() => {
+    async function loadIndexedDbCrew() {
+      try {
+        const crewList = await db.crew.toArray();
+        const allUsers = await db.users.toArray();
+        const workerUsers = allUsers.filter(
+          (u) => u.role === "FIELD_WORKER" || u.role === "SITE_MANAGER"
+        );
+
+        for (const u of workerUsers) {
+          const cleanEmail = (u.email || "").trim().toLowerCase();
+          const cleanName = (u.name || "").trim().toLowerCase();
+          const exists = crewList.some((c) => {
+            const cEmail = (c.email || "").trim().toLowerCase();
+            const cName = (c.name || "").trim().toLowerCase();
+            return (cleanEmail && cEmail && cEmail === cleanEmail) || cName === cleanName;
+          });
+
+          if (!exists) {
+            const roleLabel = u.role === "SITE_MANAGER" ? "Site Manager" : "Field Worker";
+            try {
+              const newId = await db.crew.add({
+                companyId: u.companyId || "ORG-DEFAULT",
+                name: u.name,
+                role: roleLabel,
+                contact: "+91 98000 00000",
+                email: cleanEmail,
+                status: "Active",
+                trade: roleLabel === "Field Worker" ? "General Construction" : "Site Operations",
+                site: "Main Site",
+                avatarBg: roleLabel === "Field Worker" ? "bg-emerald-100 text-emerald-800" : "bg-purple-100 text-purple-800",
+                joinedDate: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+                createdAt: new Date().toISOString(),
+              });
+              crewList.push({
+                id: newId as number,
+                companyId: u.companyId || "ORG-DEFAULT",
+                name: u.name,
+                role: roleLabel,
+                contact: "+91 98000 00000",
+                email: cleanEmail,
+                status: "Active",
+                trade: roleLabel === "Field Worker" ? "General Construction" : "Site Operations",
+                site: "Main Site",
+                avatarBg: roleLabel === "Field Worker" ? "bg-emerald-100 text-emerald-800" : "bg-purple-100 text-purple-800",
+                joinedDate: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+                createdAt: new Date().toISOString(),
+              });
+            } catch (e) {
+              console.error("Auto sync to db.crew failed:", e);
+            }
+          }
+        }
+
+        const mapped: FieldWorker[] = crewList.map((c) => ({
+          id: `crew-${c.id}`,
+          name: c.name,
+          role: c.role,
+          trade:
+            c.trade ||
+            (c.role === "Field Worker"
+              ? "General Construction"
+              : "Site Operations"),
+          phone: c.contact || "+91 98000 00000",
+          avatarBg:
+            c.avatarBg ||
+            (c.role === "Field Worker"
+              ? "bg-emerald-100 text-emerald-800"
+              : c.role === "Site Manager"
+              ? "bg-purple-100 text-purple-800"
+              : "bg-blue-100 text-blue-800"),
+        }));
+        setDbWorkers(mapped);
+      } catch (err) {
+        console.error("Failed to load crew from IndexedDB:", err);
+      }
+    }
+    loadIndexedDbCrew();
+  }, []);
 
   // Active Navigation Tab
   const [activeTab, setActiveTab] = useState<ViewTab>("CALENDAR");
@@ -128,7 +177,7 @@ function SchedulingContent() {
   // Modal State for "Schedule Job (Assign Worker)"
   const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
   const [modalJobId, setModalJobId] = useState<string>("");
-  const [modalWorker, setModalWorker] = useState<string>("Amit Verma");
+  const [modalWorker, setModalWorker] = useState<string>("");
   const [modalDate, setModalDate] = useState<string>("15/09/2026");
   const [modalTime, setModalTime] = useState<string>("09:00 AM - 05:00 PM");
   const [modalNotes, setModalNotes] = useState<string>("");
@@ -140,40 +189,46 @@ function SchedulingContent() {
   // Row Action Menu Open ID
   const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
 
-  // Available Workers (CrewStore members + Store workers + fallback workers + any contractors)
+  // Available Workers (IndexedDB users + CrewStore members + Store workers + contractors)
   const activeWorkers = useMemo(() => {
     const list: FieldWorker[] = [];
 
-    // 1. Crew members from crewStore
-    if (crewMembers && crewMembers.length > 0) {
-      crewMembers.forEach((m) => {
-        list.push({
-          id: m.id,
-          name: m.name,
-          role: m.role,
-          trade:
-            m.trade ||
-            (m.role === "Field Worker"
-              ? "General Construction"
-              : "Site Operations"),
-          phone: m.contact || "+91 98112 34500",
-          avatarBg: m.avatarBg || "bg-emerald-100 text-emerald-800",
-        });
+    // 1. Real crew from IndexedDB (db.crew)
+    if (dbWorkers && dbWorkers.length > 0) {
+      dbWorkers.forEach((dw) => {
+        if (!list.some((w) => w.name.toLowerCase() === dw.name.toLowerCase())) {
+          list.push(dw);
+        }
       });
     }
 
-    // 2. Store workers
+    // 2. Crew members from crewStore
+    if (crewMembers && crewMembers.length > 0) {
+      crewMembers.forEach((m) => {
+        if (!list.some((w) => w.name.toLowerCase() === m.name.toLowerCase())) {
+          list.push({
+            id: m.id,
+            name: m.name,
+            role: m.role,
+            trade:
+              m.trade ||
+              (m.role === "Field Worker"
+                ? "General Construction"
+                : "Site Operations"),
+            phone: m.contact || "+91 98112 34500",
+            avatarBg: m.avatarBg || "bg-emerald-100 text-emerald-800",
+          });
+        }
+      });
+    }
+
+    // 3. Store workers
     if (storeWorkers && storeWorkers.length > 0) {
       for (const sw of storeWorkers) {
         if (!list.some((w) => w.name.toLowerCase() === sw.name.toLowerCase())) {
           list.push(sw);
         }
       }
-    }
-
-    // 3. Fallbacks if list is still empty
-    if (list.length === 0) {
-      list.push(...fallbackWorkers);
     }
 
     // 4. Contractors as selectable assignees
@@ -190,12 +245,13 @@ function SchedulingContent() {
       }
     }
     return list;
-  }, [crewMembers, storeWorkers, contractors]);
+  }, [dbWorkers, crewMembers, storeWorkers, contractors]);
 
   // Derive all unscheduled jobs:
   // 1. Any job from tenderFlowStore that is not yet in scheduledJobs
   // 2. Any job in schedulingStore.unscheduledJobs
   const allUnscheduledJobs = useMemo(() => {
+    if (isWorker) return [];
     const fromTender: UnscheduledJob[] = tenderJobs
       .filter((tj) => !scheduledJobs.some((sj) => sj.id === tj.id))
       .map((tj) => ({
@@ -221,7 +277,31 @@ function SchedulingContent() {
       }
     }
     return combined;
-  }, [tenderJobs, scheduledJobs, storeUnscheduledJobs]);
+  }, [tenderJobs, scheduledJobs, storeUnscheduledJobs, isWorker]);
+
+  // Visible Workers (Only current worker if field worker)
+  const visibleWorkers = useMemo(() => {
+    if (!isWorker) return activeWorkers;
+    const uName = (currentUser?.name || "").trim().toLowerCase();
+    const mine = activeWorkers.filter((w) => {
+      const wName = (w.name || "").trim().toLowerCase();
+      return (
+        wName === uName ||
+        (Boolean(uName) && (wName.includes(uName) || uName.includes(wName)))
+      );
+    });
+    if (mine.length > 0) return mine;
+    return [
+      {
+        id: `user-${currentUser?.id || "worker"}`,
+        name: currentUser?.name || "Field Worker",
+        role: "Field Worker",
+        trade: "Field Operations",
+        phone: "+91 98000 00000",
+        avatarBg: "bg-emerald-100 text-emerald-800",
+      },
+    ];
+  }, [activeWorkers, isWorker, currentUser]);
 
   // Combined options for Job Select dropdown (Unscheduled first, then already scheduled)
   const availableJobOptions = useMemo(() => {
@@ -250,12 +330,12 @@ function SchedulingContent() {
 
   // Helper to suggest worker based on trade
   const suggestWorkerForTrade = (trade?: string) => {
-    if (!trade) return activeWorkers[0]?.name || "Amit Verma";
+    if (!trade) return activeWorkers[0]?.name || "";
     const t = trade.toLowerCase();
     const found = activeWorkers.find((w) =>
       w.trade.toLowerCase().includes(t) || t.includes(w.trade.toLowerCase())
     );
-    return found ? found.name : activeWorkers[0]?.name || "Amit Verma";
+    return found ? found.name : activeWorkers[0]?.name || "";
   };
 
   // Open Schedule Modal with specific or default job pre-filled
@@ -265,24 +345,19 @@ function SchedulingContent() {
     prefilledTime?: string,
     prefilledWorker?: string
   ) => {
+    if (isWorker) return;
     // 1. Pick target job: either requested ID or the first unscheduled job or fallback
     let targetJob = preselectedJobId
       ? availableJobOptions.find((j) => j.id === preselectedJobId)
       : allUnscheduledJobs[0] || availableJobOptions[0];
 
-    // If still no job exists anywhere, fallback to a starter dummy job
-    const defaultJobId = targetJob ? targetJob.id : "JOB-401";
-    const defaultJobTitle = targetJob
-      ? targetJob.title
-      : "Site Execution Works";
-    const defaultJobProject = targetJob
-      ? targetJob.project
-      : "Skyline Apartments";
-    const defaultJobSite = targetJob ? targetJob.site : "Main Site Area";
+    const defaultJobId = targetJob ? targetJob.id : "";
+    const defaultJobTitle = targetJob ? targetJob.title : "";
+    const defaultJobProject = targetJob ? targetJob.project : "";
+    const defaultJobSite = targetJob ? targetJob.site : "";
     const defaultJobNotes = targetJob
-      ? targetJob.description ||
-        `Execute ${defaultJobTitle} per specifications. Ensure safety compliance.`
-      : "Install per specifications. Carry required tools.";
+      ? targetJob.description || `Execute ${defaultJobTitle}.`
+      : "";
 
     setModalJobId(defaultJobId);
     setModalNotes(defaultJobNotes);
@@ -311,12 +386,13 @@ function SchedulingContent() {
 
   // Handle URL search params on mount (e.g. when redirected from /jobs)
   useEffect(() => {
+    if (isWorker) return;
     if (queryJobId) {
       handleOpenScheduleModal(queryJobId);
     } else if (autoOpenSchedule) {
       handleOpenScheduleModal();
     }
-  }, [queryJobId, autoOpenSchedule]);
+  }, [queryJobId, autoOpenSchedule, isWorker]);
 
   // Handle selection change inside modal dropdown
   const handleModalJobChange = (newJobId: string) => {
@@ -355,11 +431,18 @@ function SchedulingContent() {
       notes: modalNotes,
     });
 
-    // Also sync status in tenderFlowStore so jobs page shows it as scheduled
-    updateTenderJobStatus(modalJobId, "Scheduled");
+    // Also sync status and assignee in tenderFlowStore so jobs page shows it as scheduled
+    updateTenderJob(modalJobId, {
+      status: "Scheduled",
+      assignee: modalWorker,
+      contractorName: modalWorker,
+    });
 
     setShowScheduleModal(false);
     setActiveTab("CALENDAR");
+    toast.success("Job Scheduled", {
+      description: `${title} scheduled for ${modalWorker} on ${modalDate}`,
+    });
 
     // Clear query param if it was present
     if (queryJobId || autoOpenSchedule) {
@@ -383,18 +466,21 @@ function SchedulingContent() {
       if (s.name) set.add(s.name);
     });
 
-    if (set.size === 0) {
-      set.add("Main Site");
-      set.add("Tower B");
-      set.add("City Mall");
-      set.add("Main Site Area");
-    }
     return Array.from(set);
   }, [scheduledJobs, allUnscheduledJobs, tenderJobs, storeSites]);
 
   // Filtered Scheduled Jobs
   const filteredScheduledJobs = useMemo(() => {
     return scheduledJobs.filter((job) => {
+      if (isWorker) {
+        const uName = (currentUser?.name || "").trim().toLowerCase();
+        const jWorker = (job.worker || "").trim().toLowerCase();
+        const matchMyJob =
+          Boolean(uName) &&
+          Boolean(jWorker) &&
+          (jWorker === uName || jWorker.includes(uName) || uName.includes(jWorker));
+        if (!matchMyJob) return false;
+      }
       const matchSite = selectedSite === "ALL" || job.site === selectedSite;
       const matchWorker =
         selectedWorker === "ALL" || job.worker.includes(selectedWorker);
@@ -406,7 +492,15 @@ function SchedulingContent() {
         job.dateFormatted === dateFilter;
       return matchSite && matchWorker && matchStatus && matchDate;
     });
-  }, [scheduledJobs, selectedSite, selectedWorker, selectedStatus, dateFilter]);
+  }, [
+    scheduledJobs,
+    selectedSite,
+    selectedWorker,
+    selectedStatus,
+    dateFilter,
+    isWorker,
+    currentUser,
+  ]);
 
   // Helper to normalize dates for bulletproof comparison
   const normalizeJobDate = (dateStr?: string) => {
@@ -592,24 +686,28 @@ function SchedulingContent() {
               Scheduling
             </h1>
             <p className="text-sm text-ash mt-0.5">
-              {activeTab === "CALENDAR" &&
-                "Assign and schedule field workers to jobs."}
-              {activeTab === "LIST" && "View and manage all scheduled jobs."}
-              {activeTab === "UNSCHEDULED" &&
-                "Backlog of assigned jobs awaiting field worker scheduling."}
+              {isWorker
+                ? "Your personal scheduled jobs and site assignments."
+                : activeTab === "CALENDAR"
+                ? "Assign and schedule field workers to jobs."
+                : activeTab === "LIST"
+                ? "View and manage all scheduled jobs."
+                : "Backlog of assigned jobs awaiting field worker scheduling."}
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => handleOpenScheduleModal()}
-              className="flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4 py-2.5 text-sm font-semibold shadow-xs transition cursor-pointer"
-            >
-              <Plus className="h-4 w-4 stroke-[2.5]" />
-              <span>Schedule Job</span>
-            </button>
-          </div>
+          {!isWorker && (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleOpenScheduleModal()}
+                className="flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4 py-2.5 text-sm font-semibold shadow-xs transition cursor-pointer"
+              >
+                <Plus className="h-4 w-4 stroke-[2.5]" />
+                <span>Schedule Job</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ========================================================================= */}
@@ -638,22 +736,24 @@ function SchedulingContent() {
           >
             List View
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("UNSCHEDULED")}
-            className={`pb-3 text-sm font-semibold transition relative cursor-pointer flex items-center gap-2 ${
-              activeTab === "UNSCHEDULED"
-                ? "text-forest border-b-2 border-forest"
-                : "text-ash hover:text-onyx"
-            }`}
-          >
-            <span>Unscheduled Jobs</span>
-            {allUnscheduledJobs.length > 0 && (
-              <span className="bg-breath text-forest px-2 py-0.5 rounded-full text-[11px] font-bold">
-                {allUnscheduledJobs.length}
-              </span>
-            )}
-          </button>
+          {!isWorker && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("UNSCHEDULED")}
+              className={`pb-3 text-sm font-semibold transition relative cursor-pointer flex items-center gap-2 ${
+                activeTab === "UNSCHEDULED"
+                  ? "text-forest border-b-2 border-forest"
+                  : "text-ash hover:text-onyx"
+              }`}
+            >
+              <span>Unscheduled Jobs</span>
+              {allUnscheduledJobs.length > 0 && (
+                <span className="bg-breath text-forest px-2 py-0.5 rounded-full text-[11px] font-bold">
+                  {allUnscheduledJobs.length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* ========================================================================= */}
@@ -748,21 +848,23 @@ function SchedulingContent() {
                 </div>
 
                 {/* Worker Filter */}
-                <div className="relative">
-                  <select
-                    value={selectedWorker}
-                    onChange={(e) => setSelectedWorker(e.target.value)}
-                    className="appearance-none rounded-[8px] border border-pebble/80 bg-white px-3 py-1.5 pr-8 text-xs font-medium text-onyx hover:border-ash focus:outline-none focus:ring-1 focus:ring-forest transition cursor-pointer"
-                  >
-                    <option value="ALL">All Workers</option>
-                    {activeWorkers.map((w) => (
-                      <option key={w.id} value={w.name}>
-                        {w.name} ({w.role})
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ash" />
-                </div>
+                {!isWorker && (
+                  <div className="relative">
+                    <select
+                      value={selectedWorker}
+                      onChange={(e) => setSelectedWorker(e.target.value)}
+                      className="appearance-none rounded-[8px] border border-pebble/80 bg-white px-3 py-1.5 pr-8 text-xs font-medium text-onyx hover:border-ash focus:outline-none focus:ring-1 focus:ring-forest transition cursor-pointer"
+                    >
+                      <option value="ALL">All Workers</option>
+                      {activeWorkers.map((w) => (
+                        <option key={w.id} value={w.name}>
+                          {w.name} ({w.role})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ash" />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -777,7 +879,7 @@ function SchedulingContent() {
                     <div className="p-3 border-r border-pebble/60 text-xs font-bold text-onyx uppercase tracking-wider flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Users2 className="h-4 w-4 text-forest" />
-                        <span>Crew Members ({activeWorkers.length})</span>
+                        <span>Crew Members ({visibleWorkers.length})</span>
                       </div>
                       <span className="text-[10px] text-ash font-medium lowercase">
                         week load
@@ -829,7 +931,7 @@ function SchedulingContent() {
 
                   {/* Worker Rows */}
                   <div className="divide-y divide-pebble/40">
-                    {activeWorkers
+                    {visibleWorkers
                       .filter(
                         (w) => selectedWorker === "ALL" || w.name === selectedWorker
                       )
@@ -888,15 +990,14 @@ function SchedulingContent() {
                                 </div>
                               </div>
 
-                              {totalWorkerHours > 0 ? (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-forest/15 text-forest shrink-0">
+                              <div className="text-right shrink-0">
+                                <span className="text-xs font-black text-onyx block leading-none">
                                   {totalWorkerHours}h
                                 </span>
-                              ) : (
-                                <span className="text-[10px] text-ash/60 shrink-0">
-                                  0h
+                                <span className="text-[10px] text-ash block mt-0.5">
+                                  booked
                                 </span>
-                              )}
+                              </div>
                             </div>
 
                             {/* 7 Day Schedule Cells for this Worker */}
@@ -921,7 +1022,7 @@ function SchedulingContent() {
                                 <div
                                   key={d.day}
                                   onClick={() => {
-                                    if (dayJobs.length === 0) {
+                                    if (dayJobs.length === 0 && !isWorker) {
                                       // Pre-fill worker and exact day
                                       handleOpenScheduleModal(
                                         undefined,
@@ -934,6 +1035,8 @@ function SchedulingContent() {
                                   className={`p-1.5 border-r last:border-r-0 border-pebble/40 relative transition-colors flex flex-col justify-start gap-1.5 min-w-0 ${
                                     dayJobs.length > 0
                                       ? "bg-white"
+                                      : isWorker
+                                      ? "bg-stone/10"
                                       : "hover:bg-breath/30 cursor-pointer group"
                                   }`}
                                 >
@@ -978,7 +1081,7 @@ function SchedulingContent() {
                                     );
                                   })}
 
-                                  {dayJobs.length === 0 && (
+                                  {dayJobs.length === 0 && !isWorker && (
                                     <div className="hidden group-hover:flex items-center justify-center h-full text-forest/70 py-4 gap-1 text-[11px] font-semibold">
                                       <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                                       <span>Assign</span>
@@ -1096,7 +1199,7 @@ function SchedulingContent() {
                             <div
                               key={d.day}
                               onClick={() => {
-                                if (!hasJobs) {
+                                if (!hasJobs && !isWorker) {
                                   handleOpenScheduleModal(
                                     undefined,
                                     d.fullDateDmy,
@@ -1107,6 +1210,8 @@ function SchedulingContent() {
                               className={`p-1.5 border-r last:border-r-0 border-pebble/40 relative transition-colors min-w-0 flex flex-col justify-start gap-1.5 ${
                                 hasJobs
                                   ? "bg-white"
+                                  : isWorker
+                                  ? "bg-stone/10"
                                   : "hover:bg-breath/20 cursor-pointer group"
                               }`}
                             >
@@ -1120,39 +1225,31 @@ function SchedulingContent() {
                                       e.stopPropagation();
                                       setSelectedJobDetails(matchingJob);
                                     }}
-                                    className={`rounded-[7px] p-2 border shadow-2xs transition hover:shadow-md hover:scale-[1.01] cursor-pointer min-w-0 overflow-hidden ${
+                                    className={`rounded-[7px] p-2 border shadow-2xs transition hover:shadow-md hover:scale-[1.01] cursor-pointer min-w-0 ${
                                       getCardClasses(matchingJob.colorScheme).bg
                                     }`}
-                                    title={`${matchingJob.id}: ${matchingJob.title} (${matchingJob.worker}) • ${matchingJob.timeSlot}`}
+                                    title={`${matchingJob.id}: ${matchingJob.title} • ${matchingJob.worker}`}
                                   >
-                                    <div className="flex items-center justify-between gap-1 min-w-0">
-                                      <div className="flex items-center gap-1.5 min-w-0">
-                                        <span className="font-extrabold text-[11px] tracking-tight shrink-0">
-                                          {matchingJob.id}
-                                        </span>
-                                        {duration.hours > 1 && (
-                                          <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-black/10 shrink-0">
-                                            {duration.label}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/10 shrink-0 whitespace-nowrap">
-                                        {matchingJob.timeSlot}
+                                    <div className="flex items-center justify-between gap-1">
+                                      <span className="font-black text-[11px] tracking-tight">
+                                        {matchingJob.id}
+                                      </span>
+                                      <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-black/10">
+                                        {duration.label}
                                       </span>
                                     </div>
                                     <div className="text-[11px] font-bold leading-snug mt-1 truncate text-onyx">
                                       {matchingJob.title}
                                     </div>
                                     <div
-                                      className={`text-[10px] leading-tight mt-1 truncate flex items-center justify-between gap-1 ${
+                                      className={`text-[10px] leading-tight mt-0.5 truncate flex items-center justify-between gap-1 ${
                                         getCardClasses(matchingJob.colorScheme).sub
                                       }`}
                                     >
-                                      <span className="font-semibold truncate flex items-center gap-1">
-                                        <User className="h-3 w-3 shrink-0 opacity-70" />
+                                      <span className="truncate opacity-80">
                                         {matchingJob.worker}
                                       </span>
-                                      <span className="opacity-75 truncate text-[9px] max-w-[80px]">
+                                      <span className="text-[9px] opacity-70 shrink-0">
                                         {matchingJob.site}
                                       </span>
                                     </div>
@@ -1161,7 +1258,7 @@ function SchedulingContent() {
                               })}
 
                               {/* Hover prompt for empty slot */}
-                              {!hasJobs && (
+                              {!hasJobs && !isWorker && (
                                 <div className="hidden group-hover:flex items-center justify-center h-full text-ash/60 py-2">
                                   <Plus className="h-3.5 w-3.5" />
                                 </div>
@@ -1389,28 +1486,32 @@ function SchedulingContent() {
                                       : "Start / In Progress"}
                                   </span>
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    unscheduleJob(job.id);
-                                    setActionMenuOpenId(null);
-                                  }}
-                                  className="w-full px-3 py-1.5 text-xs text-amber-700 hover:bg-stone text-left font-medium transition cursor-pointer flex items-center gap-2"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
-                                  <span>Unschedule Job</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    deleteScheduledJob(job.id);
-                                    setActionMenuOpenId(null);
-                                  }}
-                                  className="w-full px-3 py-1.5 text-xs text-hazard-text hover:bg-hazard-bg text-left font-medium transition cursor-pointer flex items-center gap-2 border-t border-pebble/40 mt-1 pt-1.5"
-                                >
-                                  <X className="h-3.5 w-3.5 text-hazard" />
-                                  <span>Delete Schedule</span>
-                                </button>
+                                {!isWorker && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        unscheduleJob(job.id);
+                                        setActionMenuOpenId(null);
+                                      }}
+                                      className="w-full px-3 py-1.5 text-xs text-amber-700 hover:bg-stone text-left font-medium transition cursor-pointer flex items-center gap-2"
+                                    >
+                                      <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+                                      <span>Unschedule Job</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        deleteScheduledJob(job.id);
+                                        setActionMenuOpenId(null);
+                                      }}
+                                      className="w-full px-3 py-1.5 text-xs text-hazard-text hover:bg-hazard-bg text-left font-medium transition cursor-pointer flex items-center gap-2 border-t border-pebble/40 mt-1 pt-1.5"
+                                    >
+                                      <X className="h-3.5 w-3.5 text-hazard" />
+                                      <span>Delete Schedule</span>
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             )}
                           </td>
@@ -1427,7 +1528,7 @@ function SchedulingContent() {
         {/* ========================================================================= */}
         {/* 3. UNSCHEDULED JOBS TAB                                                  */}
         {/* ========================================================================= */}
-        {activeTab === "UNSCHEDULED" && (
+        {!isWorker && activeTab === "UNSCHEDULED" && (
           <div className="space-y-4 animate-in fade-in duration-150">
             <div className="bg-breath/40 border border-pebble/60 rounded-[12px] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
@@ -1560,8 +1661,8 @@ function SchedulingContent() {
                       className="w-full appearance-none rounded-[10px] border border-pebble/90 bg-white p-3 pr-10 text-xs font-semibold text-onyx focus:border-forest focus:outline-none focus:ring-1 focus:ring-forest transition cursor-pointer"
                     >
                       {availableJobOptions.length === 0 ? (
-                        <option value="JOB-401">
-                          JOB-401 – Site Execution Works
+                        <option value="" disabled>
+                          No jobs available to schedule
                         </option>
                       ) : (
                         availableJobOptions.map((opt) => (
@@ -1580,8 +1681,8 @@ function SchedulingContent() {
                     );
                     return (
                       <p className="text-[11px] text-ash mt-1 pl-0.5">
-                        Project: {currentJob?.project || "Skyline Apartments"} |
-                        Site: {currentJob?.site || "Main Site"}
+                        Project: {currentJob?.project || "No project specified"} |
+                        Site: {currentJob?.site || "Site Location"}
                       </p>
                     );
                   })()}
@@ -1781,28 +1882,42 @@ function SchedulingContent() {
               </div>
 
               <div className="flex items-center justify-between gap-3 pt-5 mt-4 border-t border-pebble/60">
-                <button
-                  type="button"
-                  onClick={() => {
-                    unscheduleJob(selectedJobDetails.id);
-                    setSelectedJobDetails(null);
-                  }}
-                  className="rounded-[10px] border border-amber-300 text-amber-800 hover:bg-amber-50 px-3.5 py-2 text-xs font-semibold transition cursor-pointer"
-                >
-                  Unschedule
-                </button>
+                {!isWorker ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      unscheduleJob(selectedJobDetails.id);
+                      setSelectedJobDetails(null);
+                      toast.info("Job Unscheduled", {
+                        description: `${selectedJobDetails.title} returned to backlog.`,
+                      });
+                    }}
+                    className="rounded-[10px] border border-amber-300 text-amber-800 hover:bg-amber-50 px-3.5 py-2 text-xs font-semibold transition cursor-pointer"
+                  >
+                    Unschedule
+                  </button>
+                ) : (
+                  <div />
+                )}
 
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => {
-                      updateJobStatus(
-                        selectedJobDetails.id,
+                      const nextStatus =
                         selectedJobDetails.status === "Completed"
                           ? "Scheduled"
-                          : "Completed"
-                      );
+                          : "Completed";
+                      updateJobStatus(selectedJobDetails.id, nextStatus);
                       setSelectedJobDetails(null);
+                      toast.success(
+                        nextStatus === "Completed"
+                          ? "Job Completed"
+                          : "Job Reopened",
+                        {
+                          description: `${selectedJobDetails.title} marked as ${nextStatus}.`,
+                        }
+                      );
                     }}
                     className="rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4 py-2 text-xs font-semibold shadow-xs transition cursor-pointer"
                   >

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import { db } from "@/lib/db";
 import {
   useSiteStore,
   type ConstructionSite,
@@ -11,6 +12,8 @@ import {
 import { useCrewStore } from "@/store/crewStore";
 import { useSchedulingStore } from "@/store/schedulingStore";
 import { useLeadFlowStore } from "@/store/leadFlowStore";
+import { useAuthStore } from "@/store/authStore";
+import { getAssignedSites, getAssignedProjects, isSiteManager, isFieldWorker } from "@/lib/roleAccess";
 import {
   MapPin,
   Building2,
@@ -59,8 +62,8 @@ export default function SitesPage() {
   const [newState, setNewState] = useState("Haryana");
   const [newPincode, setNewPincode] = useState("122011");
   const [newManagerId, setNewManagerId] = useState("");
-  const [newManagerName, setNewManagerName] = useState("Mohit Singh");
-  const [newManagerPhone, setNewManagerPhone] = useState("+91 98765 43213");
+  const [newManagerName, setNewManagerName] = useState("");
+  const [newManagerPhone, setNewManagerPhone] = useState("");
   const [newStatus, setNewStatus] = useState<SiteStatus>("Active");
   const [newStartDate, setNewStartDate] = useState("15 Sep 2026");
   const [newExpectedCompletion, setNewExpectedCompletion] =
@@ -88,39 +91,77 @@ export default function SitesPage() {
   // Site Details Modal
   const [viewingSite, setViewingSite] = useState<ConstructionSite | null>(null);
 
-  // Available Site Managers from CrewStore
+  // Available Site Managers from IndexedDB db.users + CrewStore
+  const [dbManagers, setDbManagers] = useState<
+    { id: string; name: string; contact?: string; role: string }[]
+  >([]);
+
+  useEffect(() => {
+    async function loadManagers() {
+      try {
+        const users = await db.users.toArray();
+        const siteMgrs = users
+          .filter(
+            (u) =>
+              u.role === "SITE_MANAGER" ||
+              u.role === "PROJECT_MANAGER" ||
+              u.role === "OWNER" ||
+              u.role === "ACCOUNT_ADMIN"
+          )
+          .map((u) => ({
+            id: `user-${u.id}`,
+            name: u.name,
+            role: "Site Manager",
+            contact: "+91 98000 00000",
+          }));
+        setDbManagers(siteMgrs);
+      } catch (err) {
+        console.error("Failed to load managers from db.users:", err);
+      }
+    }
+    loadManagers();
+  }, []);
+
   const availableSiteManagers = useMemo(() => {
-    const managers = crewMembers.filter((m) => m.role === "Site Manager");
-    if (managers.length > 0) return managers;
-    // Fallback if no site manager found
-    return [
-      {
-        id: "crew-4",
-        name: "Mohit Singh",
-        role: "Site Manager",
-        contact: "+91 98765 43213",
-      },
-      {
-        id: "crew-10",
-        name: "Arun Joshi",
-        role: "Site Manager",
-        contact: "+91 98765 43219",
-      },
-    ];
-  }, [crewMembers]);
+    const list = [...dbManagers];
+    const managersFromCrew = crewMembers.filter((m) => m.role === "Site Manager");
+    for (const m of managersFromCrew) {
+      if (!list.some((x) => x.name.toLowerCase() === m.name.toLowerCase())) {
+        list.push({
+          id: m.id,
+          name: m.name,
+          role: m.role,
+          contact: m.contact,
+        });
+      }
+    }
+    return list;
+  }, [dbManagers, crewMembers]);
+
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const isSM = isSiteManager(currentUser);
+  const isFW = isFieldWorker(currentUser);
+
+  const assignedProjects = useMemo(() => {
+    return getAssignedProjects(projects, sites, currentUser);
+  }, [projects, sites, currentUser]);
+
+  const roleSites = useMemo(() => {
+    return getAssignedSites(sites, currentUser, assignedProjects);
+  }, [sites, currentUser, assignedProjects]);
 
   // Derive Dynamic Stats
   const stats = useMemo(() => {
-    const total = sites.length;
-    const active = sites.filter((s) => s.status === "Active").length;
-    const mobilizing = sites.filter((s) => s.status === "Mobilizing").length;
-    const uniqueManagers = new Set(sites.map((s) => s.siteManagerName)).size;
+    const total = roleSites.length;
+    const active = roleSites.filter((s) => s.status === "Active").length;
+    const mobilizing = roleSites.filter((s) => s.status === "Mobilizing").length;
+    const uniqueManagers = new Set(roleSites.map((s) => s.siteManagerName)).size;
     return { total, active, mobilizing, uniqueManagers };
-  }, [sites]);
+  }, [roleSites]);
 
   // Filtered Sites
   const filteredSites = useMemo(() => {
-    return sites.filter((site) => {
+    return roleSites.filter((site) => {
       // Status filter
       if (statusFilter !== "ALL" && site.status !== statusFilter) {
         return false;
@@ -137,7 +178,7 @@ export default function SitesPage() {
         site.id.toLowerCase().includes(q)
       );
     });
-  }, [sites, statusFilter, search]);
+  }, [roleSites, statusFilter, search]);
 
   // Open Add Site Modal with prefill
   const handleOpenAddSite = () => {
@@ -150,10 +191,11 @@ export default function SitesPage() {
     if (availableSiteManagers.length > 0) {
       setNewManagerId(availableSiteManagers[0].id);
       setNewManagerName(availableSiteManagers[0].name);
-      setNewManagerPhone(availableSiteManagers[0].contact || "+91 98765 43210");
+      setNewManagerPhone(availableSiteManagers[0].contact || "+91 98000 00000");
     } else {
-      setNewManagerName("Mohit Singh");
-      setNewManagerPhone("+91 98765 43213");
+      setNewManagerId("");
+      setNewManagerName("");
+      setNewManagerPhone("");
     }
     setNewStatus("Active");
     setNewStartDate("15 Sep 2026");
@@ -184,8 +226,8 @@ export default function SitesPage() {
       state: newState.trim() || "Haryana",
       pincode: newPincode.trim() || "122001",
       siteManagerId: newManagerId || undefined,
-      siteManagerName: newManagerName.trim() || "Mohit Singh",
-      siteManagerPhone: newManagerPhone.trim() || "+91 98765 43213",
+      siteManagerName: newManagerName.trim() || "Unassigned",
+      siteManagerPhone: newManagerPhone.trim() || undefined,
       status: newStatus,
       startDate: newStartDate.trim() || "15 Sep 2026",
       expectedCompletion: newExpectedCompletion.trim() || "31 Dec 2026",
@@ -219,7 +261,12 @@ export default function SitesPage() {
     e.preventDefault();
     if (!editingSite) return;
 
-    updateSite(editingSite.id, {
+    const selMgr = availableSiteManagers.find(
+      (m) => m.name === editManagerName
+    );
+    const resolvedManagerId = selMgr?.id || editingSite.siteManagerId;
+
+    const siteData = {
       name: editName.trim() || editingSite.name,
       projectName: editProject.trim() || editingSite.projectName,
       address: editAddress.trim() || editingSite.address,
@@ -227,6 +274,7 @@ export default function SitesPage() {
       state: editState.trim() || editingSite.state,
       pincode: editPincode.trim() || editingSite.pincode,
       siteManagerName: editManagerName.trim() || editingSite.siteManagerName,
+      siteManagerId: resolvedManagerId,
       siteManagerPhone: editManagerPhone.trim() || editingSite.siteManagerPhone,
       status: editStatus,
       startDate: editStartDate.trim() || editingSite.startDate,
@@ -234,7 +282,14 @@ export default function SitesPage() {
         editExpectedCompletion.trim() || editingSite.expectedCompletion,
       totalAreaSqFt: editArea.trim() || editingSite.totalAreaSqFt,
       notes: editNotes.trim() || editingSite.notes,
-    });
+    };
+
+    const existsInStore = sites.some((s) => s.id === editingSite.id);
+    if (existsInStore) {
+      updateSite(editingSite.id, siteData);
+    } else {
+      addSite(siteData);
+    }
 
     setEditingSite(null);
   };
@@ -391,14 +446,16 @@ export default function SitesPage() {
                 <Calendar className="h-4 w-4 text-forest" />
                 <span>Site Calendar</span>
               </button>
-              <button
-                type="button"
-                onClick={handleOpenAddSite}
-                className="inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4 py-2 text-xs sm:text-sm font-semibold transition shadow-xs cursor-pointer shrink-0"
-              >
-                <Plus className="h-4 w-4 stroke-[2.5]" />
-                <span>Add Site</span>
-              </button>
+              {!isSM && !isFW && (
+                <button
+                  type="button"
+                  onClick={handleOpenAddSite}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4 py-2 text-xs sm:text-sm font-semibold transition shadow-xs cursor-pointer shrink-0"
+                >
+                  <Plus className="h-4 w-4 stroke-[2.5]" />
+                  <span>Add Site</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -501,9 +558,13 @@ export default function SitesPage() {
           {filteredSites.length === 0 ? (
             <div className="py-16 text-center text-ash">
               <MapPin className="h-10 w-10 mx-auto text-pebble mb-2.5" />
-              <h3 className="text-base font-bold text-onyx">No Sites Found</h3>
+              <h3 className="text-base font-bold text-onyx">
+                {isSM ? "No Construction Sites Assigned to You" : "No Sites Found"}
+              </h3>
               <p className="text-xs text-ash mt-1 max-w-sm mx-auto">
-                {search
+                {isSM
+                  ? `You (${currentUser?.name || "Site Manager"}) are currently not assigned to any active construction sites. Contact your Project Manager or Owner to assign a site to you.`
+                  : search
                   ? `No construction sites matching "${search}". Try another keyword.`
                   : "No sites under this status. Click '+ Add Site' to register a new site yard."}
               </p>
@@ -635,10 +696,11 @@ export default function SitesPage() {
                         </button>
                       </div>
 
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEdit(site)}
+                      {!isFW && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(site)}
                           className="p-1.5 rounded-[6px] text-ash hover:text-onyx hover:bg-stone transition cursor-pointer"
                           title="Edit Site Details & Manager"
                         >
@@ -661,6 +723,7 @@ export default function SitesPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -766,32 +829,36 @@ export default function SitesPage() {
 
                         {/* Actions */}
                         <td className="py-3 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(site)}
-                              className="p-1.5 rounded-[6px] text-ash hover:text-onyx hover:bg-stone transition cursor-pointer"
-                              title="Edit Site"
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (
-                                  confirm(
-                                    `Are you sure you want to delete ${site.name}?`
-                                  )
-                                ) {
-                                  deleteSite(site.id);
-                                }
-                              }}
-                              className="p-1.5 rounded-[6px] text-ash hover:text-danger-text hover:bg-hazard-bg transition cursor-pointer"
-                              title="Delete Site"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
+                          {!isFW ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(site)}
+                                className="p-1.5 rounded-[6px] text-ash hover:text-onyx hover:bg-stone transition cursor-pointer"
+                                title="Edit Site"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (
+                                    confirm(
+                                      `Are you sure you want to delete ${site.name}?`
+                                    )
+                                  ) {
+                                    deleteSite(site.id);
+                                  }
+                                }}
+                                className="p-1.5 rounded-[6px] text-ash hover:text-danger-text hover:bg-hazard-bg transition cursor-pointer"
+                                title="Delete Site"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-ash font-medium">Read-only</span>
+                          )}
                         </td>
                       </tr>
                     );

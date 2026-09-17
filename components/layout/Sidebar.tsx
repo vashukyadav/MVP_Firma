@@ -63,7 +63,13 @@ const menuByRole = {
   FIELD_WORKER: [
     "Dashboard",
     "My Jobs",
-    "Tasks",
+    "Schedule",
+    "Timesheets",
+    "Photos",
+    "Documents",
+    "RFIs",
+    "Variations",
+    "Sites",
   ],
 
   FINANCE_MANAGER: [
@@ -89,7 +95,6 @@ const menuByRole = {
     "Reports",
     "Safety & Incidents",
     "Punch Lists",
-    "Photos",
   ],
 };
 

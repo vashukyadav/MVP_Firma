@@ -99,95 +99,23 @@ export interface JobPhoto {
   notes?: string;
 }
 
-export const sampleJobPhotos: JobPhoto[] = [
-  {
-    id: "photo-figma-1",
-    title: "Cable tray installation",
-    locationTag: "Level 2 – Electrical Room",
-    uploadedBy: "Rahul Kumar",
-    initials: "RK",
-    role: "Field Worker",
-    timestamp: "16 Sep 2025 11:32 AM",
-    date: "16 Sep 2025",
-    time: "11:32 AM",
-    stage: "Cable Tray & Containment",
-    category: "In Progress",
-    verified: true,
-    verifiedBy: "PM_Dinesh",
-    verifiedAt: "16 Sep 2025 12:00 PM",
-    url: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80",
-    caption: "Cable tray installation along ceiling in Level 2 Electrical Room.",
-  },
-  {
-    id: "photo-figma-2",
-    title: "Main distribution panel",
-    locationTag: "Electrical Room",
-    uploadedBy: "Rahul Kumar",
-    initials: "RK",
-    role: "Field Worker",
-    timestamp: "16 Sep 2025 11:28 AM",
-    date: "16 Sep 2025",
-    time: "11:28 AM",
-    stage: "Distribution Panel",
-    category: "In Progress",
-    verified: true,
-    verifiedBy: "PM_Dinesh",
-    verifiedAt: "16 Sep 2025 11:45 AM",
-    url: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=800&q=80",
-    caption: "Main distribution panel wiring and busbar terminations completed.",
-  },
-  {
-    id: "photo-figma-3",
-    title: "Conduit work",
-    locationTag: "Level 1 – Corridor",
-    uploadedBy: "Amit Singh",
-    initials: "AS",
-    role: "Contractor Worker",
-    timestamp: "15 Sep 2025 04:15 PM",
-    date: "15 Sep 2025",
-    time: "04:15 PM",
-    stage: "Conduit & Piping",
-    category: "In Progress",
-    verified: false,
-    url: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=80",
-    caption: "Conduit pipe bending and saddle installations along Level 1 Corridor ceiling.",
-  },
-  {
-    id: "photo-figma-4",
-    title: "Socket installation",
-    locationTag: "Office Area – Zone B",
-    uploadedBy: "Amit Singh",
-    initials: "AS",
-    role: "Contractor Worker",
-    timestamp: "15 Sep 2025 03:50 PM",
-    date: "15 Sep 2025",
-    time: "03:50 PM",
-    stage: "Second Fix Sockets",
-    category: "Completed / Inspection",
-    verified: false,
-    url: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800&q=80",
-    caption: "Twin 13A switched sockets installed on Office Area – Zone B wall.",
-  },
-  {
-    id: "photo-figma-5",
-    title: "Light fitting installation",
-    locationTag: "Main Hall",
-    uploadedBy: "Rahul Kumar",
-    initials: "RK",
-    role: "Field Worker",
-    timestamp: "14 Sep 2025 02:10 PM",
-    date: "14 Sep 2025",
-    time: "02:10 PM",
-    stage: "Lighting Fixtures",
-    category: "In Progress",
-    verified: false,
-    url: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80",
-    caption: "Linear industrial lighting fixtures installed and suspended in Main Hall.",
-  },
-];
+export const sampleJobPhotos: JobPhoto[] = [];
+
+export interface JobMaterial {
+  id: string;
+  name: string;
+  quantity: string;
+}
+
+export interface JobNote {
+  id: string;
+  text: string;
+  author: string;
+  time: string;
+}
 
 export interface JobItem {
-  id: string; // e.g. "JOB-401"
+  id: string; // e.g. "JOB-401" or "J-001"
   title: string;
   projectName: string;
   location: string;
@@ -200,19 +128,29 @@ export interface JobItem {
   priorityColor: string;
   startDate?: string;
   endDate?: string;
+  timeSlot?: string;
   due: string;
   completed: boolean;
-  status: "Scheduled" | "In Progress" | "Completed";
+  status: "Scheduled" | "Travelling" | "On-site" | "In Progress" | "Completed" | "Upcoming" | "Cancelled";
   description?: string;
   assignedDate: string;
   tenderId?: string;
   photos?: JobPhoto[];
+  siteManagerId?: string;
+  siteManagerName?: string;
+  client?: string;
+  siteContact?: string;
+  siteContactPhone?: string;
+  safetyNotes?: string;
+  materials?: JobMaterial[];
+  notes?: JobNote[];
 }
 
 interface TenderFlowState {
   currentStep: TenderFlowStep;
   activeOpportunityId: string;
   activeTenderId: string;
+  completeTenderFlow: () => void;
 
   opportunities: ProjectOpportunity[];
   tenders: TenderItem[];
@@ -225,7 +163,6 @@ interface TenderFlowState {
   setStep: (step: TenderFlowStep) => void;
   setActiveOpportunity: (id: string) => void;
   setActiveTender: (id: string) => void;
-  completeTenderFlow: () => void;
 
   // Flow actions
   createOpportunity: (opp: Omit<ProjectOpportunity, "id">) => string;
@@ -241,22 +178,31 @@ interface TenderFlowState {
   addSupplier: (data: { name: string; trade: string; email: string; phone?: string }) => string;
   toggleSupplierSelection: (supplierId: string) => void;
   sendRfqToSelectedSuppliers: (tenderId: string) => void;
-  awardTenderToSupplier: (tenderId: string, supplierId: string) => void;
+  awardTenderToSupplier: (tenderId: string, supplierId: string, awardAmount?: number) => void;
   assignJobToContractor: (data: {
     title: string;
     projectName: string;
     location: string;
-    contractorId: string;
-    contractorName: string;
+    contractorId?: string;
+    contractorName?: string;
     trade?: string;
     priority: "High" | "Medium" | "Low";
     due: string;
     description?: string;
     tenderId?: string;
     photos?: JobPhoto[];
+    siteManagerId?: string;
+    siteManagerName?: string;
   }) => string;
   toggleJob: (id: string) => void;
-  updateJobStatus: (id: string, status: "Scheduled" | "In Progress" | "Completed") => void;
+  updateJobStatus: (
+    id: string,
+    status: "Scheduled" | "Travelling" | "On-site" | "In Progress" | "Completed" | "Upcoming" | "Cancelled"
+  ) => void;
+  updateJob: (id: string, data: Partial<JobItem>) => void;
+  addMaterialToJob: (jobId: string, material: { name: string; quantity: string }) => void;
+  addNoteToJob: (jobId: string, note: { text: string; author: string }) => void;
+  requestSelfAssignment: (jobId: string, workerName: string, reason?: string) => void;
   addPhotoToJob: (
     jobId: string,
     photo: Omit<JobPhoto, "id" | "timestamp"> & { timestamp?: string }
@@ -507,11 +453,11 @@ export const useTenderFlowStore = create<TenderFlowState>()(
           title: data.title,
           projectName: data.projectName,
           location: data.location,
-          assignee: data.contractorName,
+          assignee: data.contractorName || "Site Team",
           contractorId: data.contractorId,
           contractorName: data.contractorName,
           trade: data.trade,
-          isContractorJob: true,
+          isContractorJob: Boolean(data.contractorId),
           priority: data.priority,
           priorityColor: priorityColors[data.priority] || priorityColors.Medium,
           due: data.due || "Next Week",
@@ -524,7 +470,9 @@ export const useTenderFlowStore = create<TenderFlowState>()(
             year: "numeric",
           }),
           tenderId: data.tenderId,
-          photos: data.photos || sampleJobPhotos,
+          photos: data.photos || [],
+          siteManagerId: data.siteManagerId,
+          siteManagerName: data.siteManagerName,
         };
 
         set((state) => ({
@@ -567,6 +515,85 @@ export const useTenderFlowStore = create<TenderFlowState>()(
         }));
       },
 
+      updateJob: (id, data) => {
+        set((state) => ({
+          jobs: (state.jobs || []).map((j) =>
+            j.id === id ? { ...j, ...data } : j
+          ),
+        }));
+      },
+
+      addMaterialToJob: (jobId, material) => {
+        set((state) => ({
+          jobs: (state.jobs || []).map((j) =>
+            j.id === jobId
+              ? {
+                  ...j,
+                  materials: [
+                    ...(j.materials || []),
+                    { id: `mat-${Date.now()}`, ...material },
+                  ],
+                }
+              : j
+          ),
+        }));
+      },
+
+      addNoteToJob: (jobId, note) => {
+        set((state) => ({
+          jobs: (state.jobs || []).map((j) =>
+            j.id === jobId
+              ? {
+                  ...j,
+                  notes: [
+                    ...(j.notes || []),
+                    {
+                      id: `note-${Date.now()}`,
+                      text: note.text,
+                      author: note.author,
+                      time: new Date().toLocaleString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }),
+                    },
+                  ],
+                }
+              : j
+          ),
+        }));
+      },
+
+      requestSelfAssignment: (jobId, workerName, reason) => {
+        set((state) => ({
+          jobs: (state.jobs || []).map((j) =>
+            j.id === jobId
+              ? {
+                  ...j,
+                  assignee: workerName,
+                  notes: [
+                    ...(j.notes || []),
+                    {
+                      id: `req-${Date.now()}`,
+                      text: `Self-assignment requested by ${workerName}. Reason: ${reason || "Available to take on site tasks."} (Pending PM approval)`,
+                      author: workerName,
+                      time: new Date().toLocaleString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }),
+                    },
+                  ],
+                }
+              : j
+          ),
+        }));
+      },
+
       addPhotoToJob: (jobId, photoData) => {
         const photoId = `PHOTO-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
         const now = new Date();
@@ -579,7 +606,7 @@ export const useTenderFlowStore = create<TenderFlowState>()(
           id: photoId,
           url: photoData.url,
           caption: photoData.caption || "Site execution progress update",
-          uploadedBy: photoData.uploadedBy || "Amit Verma (Field Worker)",
+          uploadedBy: photoData.uploadedBy || "Field Worker",
           role: photoData.role || "Field Worker",
           timestamp: photoData.timestamp || timeFormatted,
           category: photoData.category || "In Progress",
@@ -793,19 +820,35 @@ export const useTenderFlowStore = create<TenderFlowState>()(
         getItem: (name: string) => {
           if (typeof window === "undefined") return null;
           try {
-            const localVal = localStorage.getItem(name);
-            if (localVal) return JSON.parse(localVal);
-            // Fallback to legacy sessionStorage if user had session data
-            const sessionVal =
-              sessionStorage.getItem("mini-firma-tender-flow-v2") ||
-              sessionStorage.getItem(name);
-            if (sessionVal) {
-              try {
-                localStorage.setItem(name, sessionVal);
-                return JSON.parse(sessionVal);
-              } catch {
-                return JSON.parse(sessionVal);
+            const raw =
+              localStorage.getItem(name) ||
+              sessionStorage.getItem(name) ||
+              sessionStorage.getItem("mini-firma-tender-flow-v2");
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed?.state?.jobs && Array.isArray(parsed.state.jobs)) {
+                const dummyJobIds = new Set([
+                  "JOB-401",
+                  "JOB-402",
+                  "JOB-403",
+                  "JOB-404",
+                  "JOB-405",
+                  "JOB-406",
+                  "J-001",
+                  "J-002",
+                  "J-003",
+                  "J-004",
+                  "J-005",
+                ]);
+                parsed.state.jobs = parsed.state.jobs.filter(
+                  (j: JobItem) =>
+                    !dummyJobIds.has(j.id) &&
+                    !/^J-00\d/.test(j.id) &&
+                    !/^JOB-40\d/.test(j.id) &&
+                    !/^JOB-10\d/.test(j.id)
+                );
               }
+              return parsed;
             }
           } catch (e) {
             console.error("Failed to read tender store:", e);
@@ -842,17 +885,30 @@ export const useTenderFlowStore = create<TenderFlowState>()(
             "JOB-404",
             "JOB-405",
             "JOB-406",
+            "J-001",
+            "J-002",
+            "J-003",
+            "J-004",
+            "J-005",
           ]);
-          state.jobs = state.jobs.filter(
-            (j) => !dummyJobIds.has(j.id) || j.isContractorJob
-          ).map((j) => {
-            return {
-              ...j,
-              startDate: j.startDate || "15 Sep 2025",
-              endDate: j.endDate || "30 Sep 2025",
-              photos: (!j.photos || j.photos.length < 5) ? sampleJobPhotos : j.photos,
-            };
-          });
+          state.jobs = state.jobs
+            .filter(
+              (j) =>
+                !dummyJobIds.has(j.id) &&
+                !/^J-00\d/.test(j.id) &&
+                !/^JOB-40\d/.test(j.id) &&
+                !/^JOB-10\d/.test(j.id)
+            )
+            .map((j) => {
+              return {
+                ...j,
+                startDate: j.startDate || "15 Sep 2025",
+                endDate: j.endDate || "30 Sep 2025",
+                photos: (j.photos || []).filter(
+                  (p) => !p.id?.startsWith("p1") && !p.caption?.includes("Conduit layout")
+                ),
+              };
+            });
         }
         if (state.tenders && state.tenders.length > 0) {
           const awardedTenders = state.tenders.filter(

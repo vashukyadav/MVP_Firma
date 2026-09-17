@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/store/authStore";
@@ -41,6 +41,11 @@ import {
   ShieldAlert,
   ListChecks,
   Camera,
+  Store,
+  Sparkles,
+  UserCircle,
+  ChevronRight,
+  LifeBuoy,
 } from "lucide-react";
 
 interface FirmaLayoutProps {
@@ -66,16 +71,57 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [hasAdmin, setHasAdmin] = useState(false);
 
+  // Bottom Left Sidebar Profile Menu State
+  const [sidebarMenuOpen, setSidebarMenuOpen] = useState(false);
+  const sidebarMenuRef = useRef<HTMLDivElement>(null);
+
   const user = currentUser || {
     id: 0,
     companyId: "ORG-DEFAULT",
-    name: "User",
-    email: "",
+    name: "vashukyadav",
+    email: "vashu@firma.com",
     role: "OWNER" as const,
     size: 0,
   };
 
+  const displayName = user.name || currentUser?.name || "vashukyadav";
+
+  const getInitials = (name?: string) => {
+    if (!name) return "VA";
+    const trimmed = name.trim();
+    const parts = trimmed.split(/\s+/);
+    if (parts.length > 1) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return trimmed.slice(0, 2).toUpperCase();
+  };
+
   const userInitial = (currentUser?.name?.charAt(0) || "U").toUpperCase();
+
+  // Close bottom sidebar menu on click outside or escape
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        sidebarMenuRef.current &&
+        !sidebarMenuRef.current.contains(event.target as Node)
+      ) {
+        setSidebarMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSidebarMenuOpen(false);
+      }
+    };
+    if (sidebarMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [sidebarMenuOpen]);
 
   // Check if an Account Admin has already been created in this company
   useEffect(() => {
@@ -212,9 +258,9 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                         : pathname.startsWith("/quotations")
                           ? "Quotations"
                           : pathname.startsWith("/jobs")
-                            ? "Jobs"
+                            ? (user.role === "FIELD_WORKER" ? "My Jobs" : "Jobs")
                             : pathname.startsWith("/scheduling")
-                              ? "Scheduling"
+                              ? (user.role === "FIELD_WORKER" ? "Schedule" : "Scheduling")
                               : pathname.startsWith("/variations")
                                 ? "Variations"
                                 : pathname.startsWith("/rfis")
@@ -245,6 +291,18 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                                                           ? "Help & Support"
                                                           : "");
 
+  const fieldWorkerNavItems = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "My Jobs", href: "/jobs", icon: ClipboardList },
+    { name: "Schedule", href: "/scheduling", icon: Calendar },
+    { name: "Timesheets", href: "/timesheets", icon: Clock },
+    { name: "Photos", href: "/photos", icon: Camera },
+    { name: "Documents", href: "/documents", icon: FileText },
+    { name: "RFIs", href: "/rfis", icon: HelpCircle },
+    { name: "Variations", href: "/variations", icon: ArrowLeftRight },
+    { name: "Sites", href: "/sites", icon: MapPin },
+  ];
+
   const siteManagerNavItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Projects", href: "/projects", icon: Building2 },
@@ -261,7 +319,6 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
     { name: "Reports", href: "/site-reports", icon: BarChart3 },
     { name: "Safety & Incidents", href: "/safety", icon: ShieldAlert },
     { name: "Punch Lists", href: "/punch-lists", icon: ListChecks },
-    { name: "Photos", href: "/photos", icon: Camera },
   ];
 
   const ownerNavItems = [
@@ -332,11 +389,12 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
   const isSiteManagerRoute =
     pathname.startsWith("/site-reports") ||
     pathname.startsWith("/safety") ||
-    pathname.startsWith("/punch-lists") ||
-    pathname.startsWith("/photos");
+    pathname.startsWith("/punch-lists");
 
   const navItems =
-    user.role === "SITE_MANAGER" || (user.role !== "OWNER" && user.role !== "ACCOUNT_ADMIN" && isSiteManagerRoute)
+    user.role === "FIELD_WORKER"
+      ? fieldWorkerNavItems
+      : user.role === "SITE_MANAGER" || (user.role !== "OWNER" && user.role !== "ACCOUNT_ADMIN" && isSiteManagerRoute)
       ? siteManagerNavItems
       : user.role === "OWNER"
       ? ownerNavItems
@@ -402,58 +460,134 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
           </nav>
         </div>
 
-        {/* Sidebar Bottom: Settings for Project Manager, or Promo Card for Owner */}
-        {isProjectManager ? (
-          <div className="pt-2 border-t border-pebble/60 mt-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => router.push("/setting")}
-              className={`flex w-full items-center gap-3 px-3.5 py-2.5 transition text-left cursor-pointer ${currentNav === "Settings"
-                  ? "rounded-[10px] bg-breath font-semibold text-onyx shadow-2xs"
-                  : "rounded-[10px] font-medium text-ash hover:bg-mist/70 hover:text-onyx"
-                }`}
-            >
-              <Settings
-                className={`h-4 w-4 shrink-0 ${currentNav === "Settings" ? "text-onyx" : "text-ash"
-                  }`}
-              />
-              <span>Settings</span>
-            </button>
-          </div>
-        ) : (
-          /* Sidebar Bottom Promo Card ("Smarter people. Stronger projects.") */
-          <div className="mt-6 rounded-[10px] bg-breath p-4 relative overflow-hidden flex flex-col justify-between h-36 shadow-xs border border-pebble/50 group shrink-0">
-            <div className="absolute right-0 top-0 bottom-0 w-1/2 pointer-events-none opacity-85">
-              <Image
-                src="/images/sidebar_leaves.jpg"
-                alt="Botanical Leaves"
-                fill
-                sizes="(max-width: 768px) 100vw, 200px"
-                className="object-cover object-right mix-blend-multiply"
-              />
-            </div>
-            <div className="relative z-10">
-              <p className="text-sm font-bold text-onyx leading-snug">
-                Smarter
-                <br />
-                people.
-                <br />
-                Stronger
-                <br />
-                projects.
-              </p>
-            </div>
-            <div className="relative z-10 flex justify-end">
+        {/* Sidebar Bottom: User Profile Pill & Popup Menu for All Roles */}
+        <div ref={sidebarMenuRef} className="pt-2 border-t border-pebble/60 mt-2 shrink-0 relative">
+          {/* Popup Menu */}
+          {sidebarMenuOpen && (
+            <div className="absolute bottom-full left-0 mb-2 w-full rounded-[18px] bg-[#222222] border border-white/10 p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+              {/* Profile Header Item */}
               <button
                 type="button"
-                onClick={() => router.push("/team")}
-                className="w-7 h-7 rounded-full bg-bark text-white flex items-center justify-center hover:bg-onyx hover:scale-105 transition shadow-xs cursor-pointer"
+                onClick={() => {
+                  setSidebarMenuOpen(false);
+                  router.push("/setting");
+                }}
+                className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-white/5 transition text-left cursor-pointer group"
               >
-                <ArrowRight className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="h-8 w-8 rounded-full bg-[#ea7a65] text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                    {getInitials(displayName)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-white truncate leading-tight">
+                      {displayName}
+                    </p>
+                    <p className="text-[11px] text-neutral-400 font-medium leading-tight mt-0.5">
+                      Go
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-neutral-400 group-hover:text-white transition shrink-0 ml-1" />
+              </button>
+
+              <div className="my-1.5 border-t border-white/10" />
+
+              {/* Upgrade plan: ONLY visible to OWNER */}
+              {user.role === "OWNER" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSidebarMenuOpen(false);
+                    router.push("/subscription");
+                  }}
+                  className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-neutral-200 hover:text-white hover:bg-white/5 transition text-left cursor-pointer"
+                >
+                  <Sparkles className="h-4 w-4 text-neutral-300 shrink-0" />
+                  <span>Upgrade plan</span>
+                </button>
+              )}
+
+              {/* Profile */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSidebarMenuOpen(false);
+                  router.push("/setting");
+                }}
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-neutral-200 hover:text-white hover:bg-white/5 transition text-left cursor-pointer"
+              >
+                <UserCircle className="h-4 w-4 text-neutral-300 shrink-0" />
+                <span>Profile</span>
+              </button>
+
+              {/* Settings */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSidebarMenuOpen(false);
+                  router.push("/setting");
+                }}
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-neutral-200 hover:text-white hover:bg-white/5 transition text-left cursor-pointer"
+              >
+                <Settings className="h-4 w-4 text-neutral-300 shrink-0" />
+                <span>Settings</span>
+              </button>
+
+              <div className="my-1.5 border-t border-white/10" />
+
+              {/* Help */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSidebarMenuOpen(false);
+                  router.push("/help");
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] font-medium text-neutral-200 hover:text-white hover:bg-white/5 transition text-left cursor-pointer group"
+              >
+                <div className="flex items-center gap-3">
+                  <LifeBuoy className="h-4 w-4 text-neutral-300 shrink-0" />
+                  <span>Help</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-neutral-400 group-hover:text-white transition shrink-0" />
+              </button>
+
+              {/* Log out */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSidebarMenuOpen(false);
+                  handleLogout();
+                }}
+                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-neutral-200 hover:text-rose-400 hover:bg-rose-500/10 transition text-left cursor-pointer"
+              >
+                <LogOut className="h-4 w-4 text-neutral-300 shrink-0" />
+                <span>Log out</span>
               </button>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Bottom Trigger Pill */}
+          <button
+            type="button"
+            onClick={() => setSidebarMenuOpen((prev) => !prev)}
+            className="w-full rounded-[14px] bg-[#1a1a1a] hover:bg-[#252528] text-white p-2.5 flex items-center justify-between cursor-pointer transition border border-white/5 shadow-xs"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-8 w-8 rounded-full bg-[#ea7a65] text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                {getInitials(displayName)}
+              </div>
+              <div className="min-w-0 text-left">
+                <p className="text-xs font-bold text-white truncate leading-tight">
+                  {displayName}
+                </p>
+                <p className="text-[11px] text-neutral-400 font-medium leading-tight mt-0.5">
+                  Go
+                </p>
+              </div>
+            </div>
+            <Store className="h-4 w-4 text-neutral-400 shrink-0 ml-2" />
+          </button>
+        </div>
       </aside>
 
       {/* ========================================================================= */}
@@ -512,7 +646,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                 </div>
                 <div className="text-left hidden sm:block">
                   <p className="text-xs font-bold text-onyx leading-tight">
-                    {user.role === "SITE_MANAGER" && !currentUser?.name ? "Rohit Verma" : user.name}
+                    {user.name || currentUser?.name || "User"}
                   </p>
                   <p className="text-[10px] font-medium text-ash leading-none capitalize">
                     {user.role === "SITE_MANAGER" ? "Site Manager" : user.role?.toLowerCase() || "Owner"}
@@ -525,7 +659,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                 <div className="absolute right-0 mt-2 w-56 rounded-[10px] border border-pebble bg-white py-1.5 shadow-lg z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="px-3.5 py-2 border-b border-pebble/60">
                     <p className="text-xs font-semibold text-onyx">
-                      {user.role === "SITE_MANAGER" && !currentUser?.name ? "Rohit Verma" : user.name}
+                      {user.name || currentUser?.name || "User"}
                     </p>
                     <p className="text-[10px] text-ash capitalize">
                       {user.role === "SITE_MANAGER" ? "Site Manager" : user.role?.toLowerCase().replace("_", " ") || "owner"}
@@ -542,12 +676,12 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                         type="button"
                         onClick={() => {
                           setUser({
-                            id: 99,
+                            id: currentUser?.id || 99,
                             companyId: currentUser?.companyId || "ORG-DEFAULT",
-                            name: "Rohit Verma",
-                            email: "rohit.verma@firma.com",
+                            name: currentUser?.name || "Site Manager",
+                            email: currentUser?.email || "sitemanager@firma.com",
                             role: "SITE_MANAGER",
-                            size: 24,
+                            size: currentUser?.size || 10,
                           });
                           setUserDropdownOpen(false);
                           router.push("/dashboard");
@@ -565,10 +699,10 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                           setUser({
                             id: currentUser?.id || 1,
                             companyId: currentUser?.companyId || "ORG-DEFAULT",
-                            name: "Rahul Mehta",
-                            email: currentUser?.email || "rahul@firma.com",
+                            name: currentUser?.name || "Project Manager",
+                            email: currentUser?.email || "pm@firma.com",
                             role: "PROJECT_MANAGER",
-                            size: 25,
+                            size: currentUser?.size || 10,
                           });
                           setUserDropdownOpen(false);
                           router.push("/dashboard");
@@ -586,8 +720,8 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                           setUser({
                             id: currentUser?.id || 1,
                             companyId: currentUser?.companyId || "ORG-DEFAULT",
-                            name: currentUser?.name || "Owner User",
-                            email: currentUser?.email || "owner@firma.com",
+                            name: currentUser?.name || "vashukyadav",
+                            email: currentUser?.email || "vashu@firma.com",
                             role: "OWNER",
                             size: 10,
                           });

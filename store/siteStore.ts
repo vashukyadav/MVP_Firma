@@ -30,26 +30,7 @@ interface SiteState {
   resetToDefaults: () => void;
 }
 
-export const defaultSitesList: ConstructionSite[] = [
-  {
-    id: "SITE-01",
-    name: "Skyline Apartments • Main Site Area",
-    projectName: "Skyline Apartments",
-    address: "Plot 42, Sector 62, Golf Course Extension Road",
-    city: "Gurugram",
-    state: "Haryana",
-    pincode: "122011",
-    siteManagerId: "crew-4",
-    siteManagerName: "Mohit Singh",
-    siteManagerPhone: "+91 98765 43213",
-    status: "Active",
-    startDate: "15 Jul 2025",
-    expectedCompletion: "30 Dec 2026",
-    totalAreaSqFt: "85,000 sq.ft",
-    notes: "High-rise residential tower execution. Structural framing and MEP ongoing on 14th floor.",
-    createdAt: "2025-07-15",
-  },
-];
+export const defaultSitesList: ConstructionSite[] = [];
 
 export const useSiteStore = create<SiteState>()(
   persist(
@@ -85,17 +66,42 @@ export const useSiteStore = create<SiteState>()(
       },
 
       resetToDefaults: () => {
-        set({ sites: defaultSitesList });
+        set({ sites: [] });
       },
     }),
     {
-      name: "mini-firma-sites-store-v1",
-      storage: createJSONStorage(() => sessionStorage),
-      onRehydrateStorage: () => (state) => {
-        if (!state) return;
-        if (!state.sites || state.sites.length === 0) {
-          state.sites = [...defaultSitesList];
-        }
+      name: "mini-firma-sites-store-v2",
+      storage: {
+        getItem: (name: string) => {
+          if (typeof window === "undefined") return null;
+          try {
+            const localVal = localStorage.getItem(name);
+            if (localVal) return JSON.parse(localVal);
+            const sessionVal = sessionStorage.getItem(name);
+            if (sessionVal) {
+              localStorage.setItem(name, sessionVal);
+              return JSON.parse(sessionVal);
+            }
+          } catch (e) {
+            console.error("Failed to read site store:", e);
+          }
+          return null;
+        },
+        setItem: (name: string, value: unknown) => {
+          if (typeof window === "undefined") return;
+          try {
+            localStorage.setItem(name, JSON.stringify(value));
+          } catch (e) {
+            console.error("Failed to save site store:", e);
+          }
+        },
+        removeItem: (name: string) => {
+          if (typeof window === "undefined") return;
+          try {
+            localStorage.removeItem(name);
+            sessionStorage.removeItem(name);
+          } catch (e) {}
+        },
       },
     }
   )

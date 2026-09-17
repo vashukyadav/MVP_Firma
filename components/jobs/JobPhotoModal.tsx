@@ -6,6 +6,8 @@ import {
   JobPhoto,
   useTenderFlowStore,
 } from "@/store/tenderFlowStore";
+import { useAuthStore } from "@/store/authStore";
+import { isFieldWorker } from "@/lib/roleAccess";
 import {
   X,
   Camera,
@@ -68,12 +70,15 @@ export default function JobPhotoModal({
   onClose,
   currentUserName = "Project Manager",
 }: JobPhotoModalProps) {
+  const currentUser = useAuthStore((state) => state.currentUser);
+  const isWorker = isFieldWorker(currentUser);
+
   const { addPhotoToJob, deletePhotoFromJob, verifyJobPhoto } =
     useTenderFlowStore();
 
   const photos = job.photos || [];
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [showUploadForm, setShowUploadForm] = useState(photos.length === 0);
+  const [showUploadForm, setShowUploadForm] = useState(isWorker && photos.length === 0);
 
   // New photo form state
   const [newPhotoUrl, setNewPhotoUrl] = useState("");
@@ -82,7 +87,7 @@ export default function JobPhotoModal({
     "In Progress" | "Completed / Inspection" | "Issue / Snag" | "Safety"
   >("In Progress");
   const [newWorkerName, setNewWorkerName] = useState(
-    job.assignee || "Amit Verma (Field Worker)"
+    job.assignee || "Field Worker"
   );
   const [isUploading, setIsUploading] = useState(false);
 
@@ -191,18 +196,20 @@ export default function JobPhotoModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0 ml-3">
-            <button
-              type="button"
-              onClick={() => setShowUploadForm(!showUploadForm)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-xs font-bold transition cursor-pointer ${
-                showUploadForm
-                  ? "bg-stone border border-pebble text-onyx"
-                  : "bg-forest text-white hover:bg-forest-hover shadow-xs"
-              }`}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>{showUploadForm ? "View Photos" : "+ Add Photo"}</span>
-            </button>
+            {isWorker && (
+              <button
+                type="button"
+                onClick={() => setShowUploadForm(!showUploadForm)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-xs font-bold transition cursor-pointer ${
+                  showUploadForm
+                    ? "bg-stone border border-pebble text-onyx"
+                    : "bg-forest text-white hover:bg-forest-hover shadow-xs"
+                }`}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>{showUploadForm ? "View Photos" : "+ Add Photo"}</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -361,7 +368,7 @@ export default function JobPhotoModal({
                       type="text"
                       value={newWorkerName}
                       onChange={(e) => setNewWorkerName(e.target.value)}
-                      placeholder="e.g. Amit Verma (Apex Power)"
+                      placeholder="e.g. Assigned Worker / Contractor"
                       className="w-full px-3 py-2 text-xs bg-stone rounded-[8px] border border-pebble outline-none focus:border-forest text-onyx"
                     />
                   </div>
@@ -412,16 +419,20 @@ export default function JobPhotoModal({
               </div>
               <h3 className="text-sm font-bold text-onyx">No Site Photos Yet</h3>
               <p className="text-xs text-ash max-w-sm mx-auto">
-                No photos have been submitted for this work order yet. Field technicians can send photos using the field dashboard or you can attach evidence directly.
+                {isWorker
+                  ? "No photos have been submitted for this work order yet. Click below to attach your first field progress photo."
+                  : "No site photos have been submitted by the assigned field worker yet."}
               </p>
-              <button
-                type="button"
-                onClick={() => setShowUploadForm(true)}
-                className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-[8px] bg-forest hover:bg-forest-hover text-white text-xs font-bold shadow-xs cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Attach First Field Photo</span>
-              </button>
+              {isWorker && (
+                <button
+                  type="button"
+                  onClick={() => setShowUploadForm(true)}
+                  className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-[8px] bg-forest hover:bg-forest-hover text-white text-xs font-bold shadow-xs cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Attach First Field Photo</span>
+                </button>
+              )}
             </div>
           ) : (
             /* --------------------------------------------------------------------- */

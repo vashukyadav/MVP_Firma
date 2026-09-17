@@ -88,6 +88,25 @@ export interface Customer {
   notes?: string;
 }
 
+export type CrewRole = "Field Worker" | "Site Manager" | "Office";
+export type CrewStatus = "Active" | "On Leave" | "Inactive";
+
+export interface CrewMemberRecord {
+  id?: number;
+  companyId: string;
+  name: string;
+  role: CrewRole;
+  contact: string;
+  status: CrewStatus;
+  trade?: string;
+  site?: string;
+  email?: string;
+  wageRate?: string;
+  avatarBg?: string;
+  joinedDate?: string;
+  createdAt?: string;
+}
+
 export function generateCompanyId(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let randomPart = "";
@@ -103,6 +122,8 @@ class FirmaDB extends Dexie {
   company!: Table<Company, number>;
   customer!: Table<Customer, number>;
   enquiry!: Table<Enquiry, number>;
+  crew!: Table<CrewMemberRecord, number>;
+
   constructor() {
     super("MiniFIRMA");
 
@@ -139,6 +160,15 @@ class FirmaDB extends Dexie {
           }
         });
       });
+
+    this.version(4).stores({
+      users: "++id,email,companyId,size,role",
+      onboarding: "userId,companyId,plan",
+      company: "userId,companyId",
+      customer: "++id,companyId,phone,email,companyName",
+      enquiry: "++id,companyId,customerId,status,assignedTo,createdAt",
+      crew: "++id,companyId,name,role,status,trade,site",
+    });
   }
 }
 
