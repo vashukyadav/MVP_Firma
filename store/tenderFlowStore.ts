@@ -114,6 +114,74 @@ export interface JobNote {
   time: string;
 }
 
+export interface CrewMemberAssignment {
+  id: string;
+  name: string;
+  role: string;
+  contact: string;
+  status: "On Site" | "Not Started" | "Travelling" | "Off Site";
+  avatar?: string;
+  initials: string;
+}
+
+export interface JobRFI {
+  id: string;
+  rfiNumber: string;
+  title: string;
+  raisedBy: string;
+  date: string;
+  priority: "High" | "Medium" | "Low";
+  status: "Open" | "In Review" | "Resolved";
+  response?: string;
+}
+
+export interface JobVariation {
+  id: string;
+  variationNumber: string;
+  title: string;
+  amount: number;
+  date: string;
+  status: "Approved" | "Pending PM Approval" | "Draft";
+  impact: string;
+}
+
+export interface JobDocument {
+  id: string;
+  name: string;
+  type: string;
+  size: string;
+  uploadedDate: string;
+  category: "Drawings" | "Specifications" | "Permits" | "Manuals";
+  url?: string;
+}
+
+export interface JobSafetyItem {
+  id: string;
+  title: string;
+  type: "PPE" | "Clearance" | "Incident" | "Hazard";
+  status: "Compliant" | "Pending Check" | "Reported";
+  details: string;
+  date: string;
+}
+
+export interface JobPunchItem {
+  id: string;
+  title: string;
+  location: string;
+  severity: "High" | "Medium" | "Low";
+  status: "Open" | "In Progress" | "Resolved";
+  reportedDate: string;
+}
+
+export interface JobTimesheetEntry {
+  id: string;
+  workerName: string;
+  role: string;
+  date: string;
+  hours: number;
+  description: string;
+}
+
 export interface JobItem {
   id: string; // e.g. "JOB-401" or "J-001"
   title: string;
@@ -144,6 +212,20 @@ export interface JobItem {
   safetyNotes?: string;
   materials?: JobMaterial[];
   notes?: JobNote[];
+  crew?: CrewMemberAssignment[];
+  rfis?: JobRFI[];
+  variations?: JobVariation[];
+  documents?: JobDocument[];
+  safety?: JobSafetyItem[];
+  punchLists?: JobPunchItem[];
+  timesheets?: JobTimesheetEntry[];
+  scopeOfWork?: string[];
+  expectedDuration?: string;
+  block?: string;
+  progressPercent?: number;
+  tasksCompletedCount?: number;
+  tasksTotalCount?: number;
+  hoursLogged?: number;
 }
 
 interface TenderFlowState {
@@ -180,6 +262,8 @@ interface TenderFlowState {
   sendRfqToSelectedSuppliers: (tenderId: string) => void;
   awardTenderToSupplier: (tenderId: string, supplierId: string, awardAmount?: number) => void;
   assignJobToContractor: (data: {
+    id?: string;
+    jobId?: string;
     title: string;
     projectName: string;
     location: string;
@@ -202,6 +286,15 @@ interface TenderFlowState {
   updateJob: (id: string, data: Partial<JobItem>) => void;
   addMaterialToJob: (jobId: string, material: { name: string; quantity: string }) => void;
   addNoteToJob: (jobId: string, note: { text: string; author: string }) => void;
+  addCrewToJob: (jobId: string, crew: CrewMemberAssignment) => void;
+  updateCrewStatus: (jobId: string, crewId: string, status: CrewMemberAssignment["status"]) => void;
+  removeCrewFromJob: (jobId: string, crewId: string) => void;
+  addRfiToJob: (jobId: string, rfi: Omit<JobRFI, "id">) => void;
+  addVariationToJob: (jobId: string, variation: Omit<JobVariation, "id">) => void;
+  addDocumentToJob: (jobId: string, doc: Omit<JobDocument, "id">) => void;
+  addSafetyItemToJob: (jobId: string, item: Omit<JobSafetyItem, "id">) => void;
+  addPunchItemToJob: (jobId: string, item: Omit<JobPunchItem, "id">) => void;
+  addTimesheetToJob: (jobId: string, entry: Omit<JobTimesheetEntry, "id">) => void;
   requestSelfAssignment: (jobId: string, workerName: string, reason?: string) => void;
   addPhotoToJob: (
     jobId: string,
@@ -441,7 +534,7 @@ export const useTenderFlowStore = create<TenderFlowState>()(
 
       assignJobToContractor: (data) => {
         const nextNum = (get().jobs || []).length + 401;
-        const jobId = `JOB-${nextNum}`;
+        const jobId = data.id || data.jobId || `JOB-${nextNum}`;
         const priorityColors = {
           High: "bg-hazard-bg text-hazard-text border-pebble",
           Medium: "bg-caution-bg text-caution-text border-pebble",
@@ -476,7 +569,7 @@ export const useTenderFlowStore = create<TenderFlowState>()(
         };
 
         set((state) => ({
-          jobs: [newJob, ...(state.jobs || [])],
+          jobs: [newJob, ...(state.jobs || []).filter((j) => j.id !== jobId)],
           contractors: (state.contractors || []).map((c) =>
             c.id === data.contractorId
               ? { ...c, assignedJobsCount: (c.assignedJobsCount || 0) + 1, status: "Active" }
@@ -502,17 +595,42 @@ export const useTenderFlowStore = create<TenderFlowState>()(
       },
 
       updateJobStatus: (id, status) => {
-        set((state) => ({
-          jobs: (state.jobs || []).map((j) =>
-            j.id === id
-              ? {
-                  ...j,
-                  status,
-                  completed: status === "Completed",
-                }
-              : j
-          ),
-        }));
+        set((state) => {
+          const currentJobs = state.jobs || [];
+          const exists = currentJobs.some((j) => j.id === id);
+          if (exists) {
+            return {
+              jobs: currentJobs.map((j) =>
+                j.id === id
+                  ? {
+                      ...j,
+                      status,
+                      completed: status === "Completed",
+                    }
+                  : j
+              ),
+            };
+          } else {
+            const newJob: JobItem = {
+              id,
+              title: "Site Execution Work",
+              projectName: "FameHouse Makers Warehouse Project",
+              location: "Site Zone 1",
+              assignee: "Field Worker",
+              isContractorJob: false,
+              priority: "High",
+              priorityColor: "bg-caution-bg text-caution-text border-pebble",
+              due: "16 Sep 2026",
+              completed: status === "Completed",
+              status,
+              assignedDate: "16 Sep 2026",
+              photos: [],
+              materials: [],
+              notes: [],
+            };
+            return { jobs: [newJob, ...currentJobs] };
+          }
+        });
       },
 
       updateJob: (id, data) => {
@@ -524,42 +642,187 @@ export const useTenderFlowStore = create<TenderFlowState>()(
       },
 
       addMaterialToJob: (jobId, material) => {
+        const newMat = { id: `mat-${Date.now()}`, ...material };
+        set((state) => {
+          const currentJobs = state.jobs || [];
+          const exists = currentJobs.some((j) => j.id === jobId);
+          if (exists) {
+            return {
+              jobs: currentJobs.map((j) =>
+                j.id === jobId
+                  ? {
+                      ...j,
+                      materials: [...(j.materials || []), newMat],
+                    }
+                  : j
+              ),
+            };
+          } else {
+            const newJob: JobItem = {
+              id: jobId,
+              title: "Site Execution Work",
+              projectName: "FameHouse Makers Warehouse Project",
+              location: "Site Zone 1",
+              assignee: "Field Worker",
+              isContractorJob: false,
+              priority: "High",
+              priorityColor: "bg-caution-bg text-caution-text border-pebble",
+              due: "16 Sep 2026",
+              completed: false,
+              status: "In Progress",
+              assignedDate: "16 Sep 2026",
+              photos: [],
+              materials: [newMat],
+              notes: [],
+            };
+            return { jobs: [newJob, ...currentJobs] };
+          }
+        });
+      },
+
+      addNoteToJob: (jobId, note) => {
+        const newNoteItem = {
+          id: `note-${Date.now()}`,
+          text: note.text,
+          author: note.author,
+          time: new Date().toLocaleString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        };
+        set((state) => {
+          const currentJobs = state.jobs || [];
+          const exists = currentJobs.some((j) => j.id === jobId);
+          if (exists) {
+            return {
+              jobs: currentJobs.map((j) =>
+                j.id === jobId
+                  ? {
+                      ...j,
+                      notes: [...(j.notes || []), newNoteItem],
+                    }
+                  : j
+              ),
+            };
+          } else {
+            const newJob: JobItem = {
+              id: jobId,
+              title: "Site Execution Work",
+              projectName: "FameHouse Makers Warehouse Project",
+              location: "Site Zone 1",
+              assignee: note.author || "Field Worker",
+              isContractorJob: false,
+              priority: "High",
+              priorityColor: "bg-caution-bg text-caution-text border-pebble",
+              due: "16 Sep 2026",
+              completed: false,
+              status: "In Progress",
+              assignedDate: "16 Sep 2026",
+              photos: [],
+              materials: [],
+              notes: [newNoteItem],
+            };
+            return { jobs: [newJob, ...currentJobs] };
+          }
+        });
+      },
+
+      addCrewToJob: (jobId, crew) => {
+        set((state) => ({
+          jobs: (state.jobs || []).map((j) =>
+            j.id === jobId ? { ...j, crew: [...(j.crew || []), crew] } : j
+          ),
+        }));
+      },
+
+      updateCrewStatus: (jobId, crewId, status) => {
         set((state) => ({
           jobs: (state.jobs || []).map((j) =>
             j.id === jobId
               ? {
                   ...j,
-                  materials: [
-                    ...(j.materials || []),
-                    { id: `mat-${Date.now()}`, ...material },
-                  ],
+                  crew: (j.crew || []).map((c) =>
+                    c.id === crewId ? { ...c, status } : c
+                  ),
                 }
               : j
           ),
         }));
       },
 
-      addNoteToJob: (jobId, note) => {
+      removeCrewFromJob: (jobId, crewId) => {
+        set((state) => ({
+          jobs: (state.jobs || []).map((j) =>
+            j.id === jobId
+              ? { ...j, crew: (j.crew || []).filter((c) => c.id !== crewId) }
+              : j
+          ),
+        }));
+      },
+
+      addRfiToJob: (jobId, rfi) => {
+        const newRfi: JobRFI = { id: `rfi-${Date.now()}`, ...rfi };
+        set((state) => ({
+          jobs: (state.jobs || []).map((j) =>
+            j.id === jobId ? { ...j, rfis: [...(j.rfis || []), newRfi] } : j
+          ),
+        }));
+      },
+
+      addVariationToJob: (jobId, variation) => {
+        const newVar: JobVariation = { id: `var-${Date.now()}`, ...variation };
+        set((state) => ({
+          jobs: (state.jobs || []).map((j) =>
+            j.id === jobId
+              ? { ...j, variations: [...(j.variations || []), newVar] }
+              : j
+          ),
+        }));
+      },
+
+      addDocumentToJob: (jobId, doc) => {
+        const newDoc: JobDocument = { id: `doc-${Date.now()}`, ...doc };
+        set((state) => ({
+          jobs: (state.jobs || []).map((j) =>
+            j.id === jobId
+              ? { ...j, documents: [...(j.documents || []), newDoc] }
+              : j
+          ),
+        }));
+      },
+
+      addSafetyItemToJob: (jobId, item) => {
+        const newSafety: JobSafetyItem = { id: `safe-${Date.now()}`, ...item };
+        set((state) => ({
+          jobs: (state.jobs || []).map((j) =>
+            j.id === jobId ? { ...j, safety: [...(j.safety || []), newSafety] } : j
+          ),
+        }));
+      },
+
+      addPunchItemToJob: (jobId, item) => {
+        const newPunch: JobPunchItem = { id: `punch-${Date.now()}`, ...item };
+        set((state) => ({
+          jobs: (state.jobs || []).map((j) =>
+            j.id === jobId
+              ? { ...j, punchLists: [...(j.punchLists || []), newPunch] }
+              : j
+          ),
+        }));
+      },
+
+      addTimesheetToJob: (jobId, entry) => {
+        const newTs: JobTimesheetEntry = { id: `ts-${Date.now()}`, ...entry };
         set((state) => ({
           jobs: (state.jobs || []).map((j) =>
             j.id === jobId
               ? {
                   ...j,
-                  notes: [
-                    ...(j.notes || []),
-                    {
-                      id: `note-${Date.now()}`,
-                      text: note.text,
-                      author: note.author,
-                      time: new Date().toLocaleString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }),
-                    },
-                  ],
+                  timesheets: [...(j.timesheets || []), newTs],
+                  hoursLogged: (j.hoursLogged || 0) + entry.hours,
                 }
               : j
           ),
@@ -605,25 +868,60 @@ export const useTenderFlowStore = create<TenderFlowState>()(
         const newPhoto: JobPhoto = {
           id: photoId,
           url: photoData.url,
+          title: photoData.title || photoData.caption || "Site Execution Photo",
           caption: photoData.caption || "Site execution progress update",
+          locationTag: photoData.locationTag || "Site Zone 1",
           uploadedBy: photoData.uploadedBy || "Field Worker",
+          initials: photoData.initials,
           role: photoData.role || "Field Worker",
           timestamp: photoData.timestamp || timeFormatted,
+          date: photoData.date,
+          time: photoData.time,
+          stage: photoData.stage || "Progress",
           category: photoData.category || "In Progress",
           verified: false,
           notes: photoData.notes || "",
         };
 
-        set((state) => ({
-          jobs: (state.jobs || []).map((j) =>
-            j.id === jobId
-              ? {
-                  ...j,
-                  photos: [newPhoto, ...(j.photos || [])],
-                }
-              : j
-          ),
-        }));
+        set((state) => {
+          const currentJobs = state.jobs || [];
+          const exists = currentJobs.some((j) => j.id === jobId);
+          if (exists) {
+            return {
+              jobs: currentJobs.map((j) =>
+                j.id === jobId
+                  ? {
+                      ...j,
+                      photos: [newPhoto, ...(j.photos || [])],
+                    }
+                  : j
+              ),
+            };
+          } else {
+            const newJob: JobItem = {
+              id: jobId,
+              title: "Site Execution Work",
+              projectName: "Site Execution Project",
+              location: photoData.locationTag || "Site Location",
+              assignee: photoData.uploadedBy || "Field Worker",
+              isContractorJob: false,
+              priority: "High",
+              priorityColor: "bg-caution-bg text-caution-text border-pebble",
+              due: "",
+              completed: false,
+              status: "In Progress",
+              assignedDate: new Date().toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              }),
+              photos: [newPhoto],
+              materials: [],
+              notes: [],
+            };
+            return { jobs: [newJob, ...currentJobs] };
+          }
+        });
       },
 
       deletePhotoFromJob: (jobId, photoId) => {
@@ -827,25 +1125,9 @@ export const useTenderFlowStore = create<TenderFlowState>()(
             if (raw) {
               const parsed = JSON.parse(raw);
               if (parsed?.state?.jobs && Array.isArray(parsed.state.jobs)) {
-                const dummyJobIds = new Set([
-                  "JOB-401",
-                  "JOB-402",
-                  "JOB-403",
-                  "JOB-404",
-                  "JOB-405",
-                  "JOB-406",
-                  "J-001",
-                  "J-002",
-                  "J-003",
-                  "J-004",
-                  "J-005",
-                ]);
+                // Keep all real user jobs
                 parsed.state.jobs = parsed.state.jobs.filter(
-                  (j: JobItem) =>
-                    !dummyJobIds.has(j.id) &&
-                    !/^J-00\d/.test(j.id) &&
-                    !/^JOB-40\d/.test(j.id) &&
-                    !/^JOB-10\d/.test(j.id)
+                  (j: JobItem) => j && j.id && j.id !== "dummy-test-seed"
                 );
               }
               return parsed;
@@ -877,36 +1159,14 @@ export const useTenderFlowStore = create<TenderFlowState>()(
         if (!state.jobs) {
           state.jobs = [];
         } else {
-          // Remove any legacy dummy mock jobs
-          const dummyJobIds = new Set([
-            "JOB-401",
-            "JOB-402",
-            "JOB-403",
-            "JOB-404",
-            "JOB-405",
-            "JOB-406",
-            "J-001",
-            "J-002",
-            "J-003",
-            "J-004",
-            "J-005",
-          ]);
           state.jobs = state.jobs
-            .filter(
-              (j) =>
-                !dummyJobIds.has(j.id) &&
-                !/^J-00\d/.test(j.id) &&
-                !/^JOB-40\d/.test(j.id) &&
-                !/^JOB-10\d/.test(j.id)
-            )
+            .filter((j) => j && j.id && j.id !== "dummy-test-seed" && j.id !== "JOB-403")
             .map((j) => {
               return {
                 ...j,
-                startDate: j.startDate || "15 Sep 2025",
-                endDate: j.endDate || "30 Sep 2025",
-                photos: (j.photos || []).filter(
-                  (p) => !p.id?.startsWith("p1") && !p.caption?.includes("Conduit layout")
-                ),
+                photos: j.photos || [],
+                materials: j.materials || [],
+                notes: j.notes || [],
               };
             });
         }

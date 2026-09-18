@@ -3,15 +3,21 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTenderFlowStore } from "@/store/tenderFlowStore";
+import { useAuthStore } from "@/store/authStore";
 
 export default function OpportunitiesPage() {
   const router = useRouter();
   const { setStep } = useTenderFlowStore();
+  const currentUser = useAuthStore((state) => state.currentUser);
 
   useEffect(() => {
+    if (currentUser?.role === "SITE_MANAGER" || currentUser?.role === "FIELD_WORKER") {
+      router.replace("/dashboard");
+      return;
+    }
     setStep(1);
     router.replace("/tenders");
-  }, [router, setStep]);
+  }, [router, setStep, currentUser]);
 
   return (
     <div className="min-h-screen bg-stone flex items-center justify-center">

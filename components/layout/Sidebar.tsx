@@ -16,8 +16,6 @@ const menuByRole = {
     "Jobs",
     "Contractors",
     "Reports",
-    "Settings",
-    "Help & Support",
   ],
 
   ACCOUNT_ADMIN: [
@@ -31,8 +29,6 @@ const menuByRole = {
     "Jobs",
     "Contractors",
     "Reports",
-    "Settings",
-    "Help & Support",
   ],
 
   SALES_MANAGER: [
@@ -57,7 +53,6 @@ const menuByRole = {
     "Documents",
     "Timesheets",
     "Reports",
-    "Settings",
   ],
 
   FIELD_WORKER: [
@@ -75,14 +70,19 @@ const menuByRole = {
   FINANCE_MANAGER: [
     "Dashboard",
     "Invoices",
+    "Purchase Orders",
+    "Bills & Supplier Invoices",
     "Payments",
-    "Finance Reports",
+    "Job Costs",
+    "Budgets",
+    "Financial Reports",
+    "People & Suppliers",
+    "Settings",
   ],
 
   SITE_MANAGER: [
     "Dashboard",
     "Projects",
-    "Tenders",
     "Jobs",
     "Scheduling",
     "Variations",
@@ -95,6 +95,7 @@ const menuByRole = {
     "Reports",
     "Safety & Incidents",
     "Punch Lists",
+    "Photos",
   ],
 };
 

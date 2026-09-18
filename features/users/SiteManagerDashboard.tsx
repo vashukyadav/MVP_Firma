@@ -92,19 +92,47 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
   const inProgressJobs = jobs.filter((j) => j.status === "In Progress").length;
   const scheduledCount = scheduledJobs.length;
 
-  // Real photos derived directly from store jobs
+  // Real photos derived from all jobs (tenderFlow + scheduled)
   const realFieldPhotos = useMemo(() => {
-    return jobs.flatMap((j) =>
-      (j.photos || []).map((p) => ({
-        id: p.id,
-        title: p.title || j.title,
-        time: p.timestamp,
-        author: p.uploadedBy || j.assignee || "Field Worker",
-        url: p.url,
-        stage: p.stage || j.trade || "Field Progress",
-      }))
-    );
-  }, [jobs]);
+    const seenIds = new Set<string>();
+    const allPhotos: Array<{ id: string; title: string; time: string; author: string; url: string; stage: string }> = [];
+
+    // From tenderFlow jobs
+    jobs.forEach((j) => {
+      (j.photos || []).forEach((p) => {
+        if (!seenIds.has(p.id)) {
+          seenIds.add(p.id);
+          allPhotos.push({
+            id: p.id,
+            title: p.title || j.title,
+            time: p.timestamp || "",
+            author: p.uploadedBy || j.assignee || "Field Worker",
+            url: p.url,
+            stage: p.stage || j.trade || "Field Progress",
+          });
+        }
+      });
+    });
+
+    // From scheduledJobs
+    scheduledJobs.forEach((sj) => {
+      (sj.photos || []).forEach((p) => {
+        if (!seenIds.has(p.id)) {
+          seenIds.add(p.id);
+          allPhotos.push({
+            id: p.id,
+            title: (p as any).title || sj.title,
+            time: (p as any).timestamp || "",
+            author: (p as any).uploadedBy || sj.worker || "Field Worker",
+            url: p.url,
+            stage: (p as any).stage || "Field Progress",
+          });
+        }
+      });
+    });
+
+    return allPhotos;
+  }, [jobs, scheduledJobs]);
 
   // Real recent activities derived from store jobs & photos
   const recentActivities = useMemo(() => {

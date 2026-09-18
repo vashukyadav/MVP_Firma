@@ -306,7 +306,6 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
   const siteManagerNavItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Projects", href: "/projects", icon: Building2 },
-    { name: "Tenders", href: "/tenders", icon: Gavel },
     { name: "Jobs", href: "/jobs", icon: ClipboardList },
     { name: "Scheduling", href: "/scheduling", icon: Calendar },
     { name: "Variations", href: "/variations", icon: ArrowLeftRight },
@@ -319,6 +318,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
     { name: "Reports", href: "/site-reports", icon: BarChart3 },
     { name: "Safety & Incidents", href: "/safety", icon: ShieldAlert },
     { name: "Punch Lists", href: "/punch-lists", icon: ListChecks },
+    { name: "Photos", href: "/photos", icon: Camera },
   ];
 
   const ownerNavItems = [
@@ -334,8 +334,6 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
     { name: "Jobs", href: "/jobs", icon: Briefcase },
     { name: "Contractors", href: "/contractors", icon: HardHat },
     { name: "Reports", href: "/reports", icon: BarChart3 },
-    { name: "Settings", href: "/setting", icon: Settings },
-    { name: "Help & Support", href: "/help", icon: HelpCircle },
   ];
 
   const adminNavItems = [
@@ -349,8 +347,6 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
     { name: "Jobs", href: "/jobs", icon: Briefcase },
     { name: "Contractors", href: "/contractors", icon: HardHat },
     { name: "Reports", href: "/reports", icon: BarChart3 },
-    { name: "Settings", href: "/setting", icon: Settings },
-    { name: "Help & Support", href: "/help", icon: HelpCircle },
   ];
 
   const salesmanagerNavItems = [
@@ -361,8 +357,6 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
     { name: "Tenders", href: "/tenders", icon: FolderKanban },
     { name: "Pipeline", href: "/pipeline", icon: Briefcase },
     { name: "Reports", href: "/reports", icon: BarChart3 },
-    { name: "Settings", href: "/setting", icon: Settings },
-    { name: "Help & Support", href: "/help", icon: HelpCircle },
   ];
 
   // Project Manager Menubar Items (Matching PDF / Screenshot Flow)
@@ -382,6 +376,19 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
     { name: "Reports", href: "/reports", icon: BarChart3 },
   ];
 
+  const financeManagerNavItems = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Invoices", href: "/finance", icon: FileText },
+    { name: "Purchase Orders", href: "/finance", icon: ClipboardList },
+    { name: "Bills & Supplier Invoices", href: "/finance", icon: FileCheck2 },
+    { name: "Payments", href: "/finance", icon: CreditCard },
+    { name: "Job Costs", href: "/jobs", icon: Briefcase },
+    { name: "Budgets", href: "/finance", icon: BarChart3 },
+    { name: "Financial Reports", href: "/reports", icon: BarChart3 },
+    { name: "People & Suppliers", href: "/contractors", icon: Users },
+    { name: "Settings", href: "/setting", icon: Settings },
+  ];
+
   const isProjectManager =
     user.role === "PROJECT_MANAGER" ||
     (user.role !== "OWNER" && user.role !== "ACCOUNT_ADMIN" && user.role !== "SALES_MANAGER" && isPmRoute);
@@ -396,6 +403,8 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
       ? fieldWorkerNavItems
       : user.role === "SITE_MANAGER" || (user.role !== "OWNER" && user.role !== "ACCOUNT_ADMIN" && isSiteManagerRoute)
       ? siteManagerNavItems
+      : user.role === "FINANCE_MANAGER"
+      ? financeManagerNavItems
       : user.role === "OWNER"
       ? ownerNavItems
       : user.role === "ACCOUNT_ADMIN"
@@ -464,7 +473,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
         <div ref={sidebarMenuRef} className="pt-2 border-t border-pebble/60 mt-2 shrink-0 relative">
           {/* Popup Menu */}
           {sidebarMenuOpen && (
-            <div className="absolute bottom-full left-0 mb-2 w-full rounded-[18px] bg-[#222222] border border-white/10 p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+            <div className="absolute bottom-full left-0 mb-2 w-full rounded-[14px] bg-white border border-pebble p-1.5 shadow-xl shadow-onyx/10 z-50 animate-in fade-in zoom-in-95 duration-150">
               {/* Profile Header Item */}
               <button
                 type="button"
@@ -472,25 +481,25 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                   setSidebarMenuOpen(false);
                   router.push("/setting");
                 }}
-                className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-white/5 transition text-left cursor-pointer group"
+                className="w-full flex items-center justify-between p-2 rounded-[10px] hover:bg-stone transition text-left cursor-pointer group"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="h-8 w-8 rounded-full bg-[#ea7a65] text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                  <div className="h-8 w-8 rounded-full bg-onyx text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
                     {getInitials(displayName)}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-white truncate leading-tight">
+                    <p className="text-[13px] font-bold text-onyx truncate leading-tight group-hover:text-forest transition">
                       {displayName}
                     </p>
-                    <p className="text-[11px] text-neutral-400 font-medium leading-tight mt-0.5">
+                    <p className="text-[11px] text-ash font-medium leading-tight mt-0.5">
                       Go
                     </p>
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-neutral-400 group-hover:text-white transition shrink-0 ml-1" />
+                <ChevronRight className="h-4 w-4 text-ash group-hover:text-onyx transition shrink-0 ml-1" />
               </button>
 
-              <div className="my-1.5 border-t border-white/10" />
+              <div className="my-1 border-t border-pebble/60" />
 
               {/* Upgrade plan: ONLY visible to OWNER */}
               {user.role === "OWNER" && (
@@ -500,9 +509,9 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                     setSidebarMenuOpen(false);
                     router.push("/subscription");
                   }}
-                  className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-neutral-200 hover:text-white hover:bg-white/5 transition text-left cursor-pointer"
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-[10px] text-xs font-semibold text-forest hover:bg-forest/10 transition text-left cursor-pointer group"
                 >
-                  <Sparkles className="h-4 w-4 text-neutral-300 shrink-0" />
+                  <Sparkles className="h-4 w-4 text-forest shrink-0" />
                   <span>Upgrade plan</span>
                 </button>
               )}
@@ -514,9 +523,9 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                   setSidebarMenuOpen(false);
                   router.push("/setting");
                 }}
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-neutral-200 hover:text-white hover:bg-white/5 transition text-left cursor-pointer"
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-[10px] text-xs font-medium text-onyx hover:bg-mist/70 transition text-left cursor-pointer group"
               >
-                <UserCircle className="h-4 w-4 text-neutral-300 shrink-0" />
+                <UserCircle className="h-4 w-4 text-ash group-hover:text-onyx transition shrink-0" />
                 <span>Profile</span>
               </button>
 
@@ -527,13 +536,13 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                   setSidebarMenuOpen(false);
                   router.push("/setting");
                 }}
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-neutral-200 hover:text-white hover:bg-white/5 transition text-left cursor-pointer"
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-[10px] text-xs font-medium text-onyx hover:bg-mist/70 transition text-left cursor-pointer group"
               >
-                <Settings className="h-4 w-4 text-neutral-300 shrink-0" />
+                <Settings className="h-4 w-4 text-ash group-hover:text-onyx transition shrink-0" />
                 <span>Settings</span>
               </button>
 
-              <div className="my-1.5 border-t border-white/10" />
+              <div className="my-1 border-t border-pebble/60" />
 
               {/* Help */}
               <button
@@ -542,13 +551,13 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                   setSidebarMenuOpen(false);
                   router.push("/help");
                 }}
-                className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-[13px] font-medium text-neutral-200 hover:text-white hover:bg-white/5 transition text-left cursor-pointer group"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-[10px] text-xs font-medium text-onyx hover:bg-mist/70 transition text-left cursor-pointer group"
               >
                 <div className="flex items-center gap-3">
-                  <LifeBuoy className="h-4 w-4 text-neutral-300 shrink-0" />
+                  <LifeBuoy className="h-4 w-4 text-ash group-hover:text-onyx transition shrink-0" />
                   <span>Help</span>
                 </div>
-                <ChevronRight className="h-4 w-4 text-neutral-400 group-hover:text-white transition shrink-0" />
+                <ChevronRight className="h-4 w-4 text-ash group-hover:text-onyx transition shrink-0" />
               </button>
 
               {/* Log out */}
@@ -558,9 +567,9 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                   setSidebarMenuOpen(false);
                   handleLogout();
                 }}
-                className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium text-neutral-200 hover:text-rose-400 hover:bg-rose-500/10 transition text-left cursor-pointer"
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-[10px] text-xs font-medium text-hazard-text hover:bg-hazard-bg transition text-left cursor-pointer group"
               >
-                <LogOut className="h-4 w-4 text-neutral-300 shrink-0" />
+                <LogOut className="h-4 w-4 text-hazard-text/80 group-hover:text-hazard-text transition shrink-0" />
                 <span>Log out</span>
               </button>
             </div>
@@ -570,22 +579,26 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
           <button
             type="button"
             onClick={() => setSidebarMenuOpen((prev) => !prev)}
-            className="w-full rounded-[14px] bg-[#1a1a1a] hover:bg-[#252528] text-white p-2.5 flex items-center justify-between cursor-pointer transition border border-white/5 shadow-xs"
+            className={`w-full rounded-[12px] p-2.5 flex items-center justify-between cursor-pointer transition border shadow-2xs group ${
+              sidebarMenuOpen
+                ? "bg-white border-forest/40 ring-2 ring-forest/15"
+                : "bg-white border-pebble/80 hover:border-pebble hover:bg-mist/40"
+            }`}
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="h-8 w-8 rounded-full bg-[#ea7a65] text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+              <div className="h-8 w-8 rounded-full bg-onyx text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
                 {getInitials(displayName)}
               </div>
               <div className="min-w-0 text-left">
-                <p className="text-xs font-bold text-white truncate leading-tight">
+                <p className="text-xs font-bold text-onyx truncate leading-tight group-hover:text-forest transition">
                   {displayName}
                 </p>
-                <p className="text-[11px] text-neutral-400 font-medium leading-tight mt-0.5">
+                <p className="text-[11px] text-ash font-medium leading-tight mt-0.5">
                   Go
                 </p>
               </div>
             </div>
-            <Store className="h-4 w-4 text-neutral-400 shrink-0 ml-2" />
+            <Store className="h-4 w-4 text-ash group-hover:text-onyx transition shrink-0 ml-2" />
           </button>
         </div>
       </aside>
@@ -625,6 +638,21 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
               </div>
             )}
 
+            {/* Finance Manager Top Header Pill (Matching Design Screenshot) */}
+            {user.role === "FINANCE_MANAGER" && (
+              <div className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-[12px] bg-white border border-pebble/80 shadow-2xs text-left">
+                <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-forest text-white">
+                  <CreditCard className="h-4 w-4 text-white" />
+                </div>
+                <div className="leading-tight">
+                  <span className="text-xs font-bold text-onyx block">Role: Finance Manager</span>
+                  <span className="text-[10px] text-ash block leading-tight truncate max-w-[280px]">
+                    Invoicing, cash flow, payment reconciliations, bills &amp; approvals
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Notification Bell */}
             <button
               type="button"
@@ -642,14 +670,14 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                 className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2 hover:bg-mist/70 transition cursor-pointer"
               >
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-onyx text-xs font-bold text-white shadow-xs">
-                  {user.role === "SITE_MANAGER" ? "SM" : userInitial}
+                  {user.role === "SITE_MANAGER" ? "SM" : user.role === "FINANCE_MANAGER" ? "FM" : userInitial}
                 </div>
                 <div className="text-left hidden sm:block">
                   <p className="text-xs font-bold text-onyx leading-tight">
                     {user.name || currentUser?.name || "User"}
                   </p>
                   <p className="text-[10px] font-medium text-ash leading-none capitalize">
-                    {user.role === "SITE_MANAGER" ? "Site Manager" : user.role?.toLowerCase() || "Owner"}
+                    {user.role === "SITE_MANAGER" ? "Site Manager" : user.role === "FINANCE_MANAGER" ? "Finance Manager" : user.role?.toLowerCase() || "Owner"}
                   </p>
                 </div>
                 <ChevronDown className="h-3.5 w-3.5 text-ash" />
@@ -776,6 +804,27 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                           }`}
                       >
                         Admin
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUser({
+                            id: currentUser?.id || 105,
+                            companyId: currentUser?.companyId || "ORG-DEFAULT",
+                            name: currentUser?.name || "Finance Manager",
+                            email: currentUser?.email || "finance@firma.com",
+                            role: "FINANCE_MANAGER",
+                            size: 10,
+                          });
+                          setUserDropdownOpen(false);
+                          router.push("/dashboard");
+                        }}
+                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "FINANCE_MANAGER"
+                            ? "bg-forest text-white font-semibold shadow-2xs"
+                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
+                          }`}
+                      >
+                        Finance Mgr
                       </button>
                     </div>
                   </div>

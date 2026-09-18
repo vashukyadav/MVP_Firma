@@ -89,6 +89,13 @@ export default function TenderPage() {
 
   // Registered Clients and Pipeline Opportunities for auto-filling
   const currentUser = useAuthStore((state) => state.currentUser);
+
+  useEffect(() => {
+    if (currentUser && (currentUser.role === "SITE_MANAGER" || currentUser.role === "FIELD_WORKER")) {
+      router.replace("/dashboard");
+    }
+  }, [currentUser, router]);
+
   const leadOpportunities = useLeadFlowStore((state) => state.opportunities || []);
   const leadList = useLeadFlowStore((state) => state.leads || []);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -482,25 +489,25 @@ export default function TenderPage() {
       ? Math.min(100, Math.round((tenderAwardedAmount / projectTotalValue) * 100))
       : 0;
 
-  const isSiteManager = currentUser?.role === "SITE_MANAGER";
+  if (currentUser?.role === "SITE_MANAGER" || currentUser?.role === "FIELD_WORKER") {
+    return (
+      <FirmaLayout activeNav="Dashboard">
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
+          <div className="h-12 w-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
+            <Eye className="h-6 w-6" />
+          </div>
+          <h2 className="text-lg font-bold text-onyx">Access Restricted</h2>
+          <p className="text-xs text-ash max-w-md">
+            Tenders, bidding, and procurement workflows are restricted to Project Managers and Administrators. Redirecting to Dashboard...
+          </p>
+        </div>
+      </FirmaLayout>
+    );
+  }
 
   return (
     <FirmaLayout activeNav="Tenders">
       <div className="space-y-6 mt-1">
-        {/* Site Manager Read-Only Notice */}
-        {isSiteManager && (
-          <div className="rounded-[12px] bg-amber-50 border border-amber-200 p-3.5 flex items-center justify-between text-xs text-amber-900 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <Eye className="h-4 w-4 text-amber-700 shrink-0" />
-              <span>
-                <strong>Site Manager View (Read-Only Scope):</strong> Relevant tender packages, trade specifications, and contractor quotes are visible here for field coordination. Creating tenders and awarding contracts is managed by the Project Manager.
-              </span>
-            </div>
-            <span className="px-2.5 py-1 rounded-[6px] bg-amber-200/80 text-amber-900 font-bold text-[10px] shrink-0 uppercase tracking-wider">
-              👁️ Read-Only
-            </span>
-          </div>
-        )}
 
         {/* ========================================================================= */}
         {/* FLOW STEPPER PROGRESS BAR (8 Steps from user diagram)                     */}
@@ -610,7 +617,7 @@ export default function TenderPage() {
                 className="bg-forest hover:bg-forest-hover text-white rounded-[10px] px-4.5 py-2.5 text-sm font-medium shadow-xs flex items-center gap-2 self-start sm:self-auto cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
-                <span>+ New Opportunity</span>
+                <span>New Opportunity</span>
               </Button>
             </div>
 

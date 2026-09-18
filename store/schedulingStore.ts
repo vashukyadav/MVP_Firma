@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { JobPhoto, JobMaterial, JobNote } from "./tenderFlowStore";
 
 export interface ScheduledJob {
   id: string; // e.g. "JOB-101"
@@ -18,6 +19,10 @@ export interface ScheduledJob {
   colorScheme: "emerald" | "indigo" | "rose" | "teal" | "amber";
   dayOfWeek: "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
   dayDate: string; // "15 Sep"
+  // Field-worker submission data
+  photos?: JobPhoto[];
+  materials?: JobMaterial[];
+  notesList?: JobNote[];
 }
 
 export interface UnscheduledJob {
@@ -70,6 +75,9 @@ interface SchedulingState {
   deleteScheduledJob: (id: string) => void;
   unscheduleJob: (id: string) => void;
   updateJobStatus: (id: string, status: ScheduledJob["status"]) => void;
+  addPhotoToScheduledJob: (jobId: string, photo: JobPhoto) => void;
+  addMaterialToScheduledJob: (jobId: string, material: JobMaterial) => void;
+  addNoteToScheduledJob: (jobId: string, note: JobNote) => void;
   resetToDefaults: () => void;
 }
 
@@ -210,6 +218,36 @@ export const useSchedulingStore = create<SchedulingState>()(
         set((state) => ({
           scheduledJobs: state.scheduledJobs.map((j) =>
             j.id === id ? { ...j, status } : j
+          ),
+        }));
+      },
+
+      addPhotoToScheduledJob: (jobId, photo) => {
+        set((state) => ({
+          scheduledJobs: state.scheduledJobs.map((j) =>
+            j.id === jobId
+              ? { ...j, photos: [photo, ...(j.photos || [])] }
+              : j
+          ),
+        }));
+      },
+
+      addMaterialToScheduledJob: (jobId, material) => {
+        set((state) => ({
+          scheduledJobs: state.scheduledJobs.map((j) =>
+            j.id === jobId
+              ? { ...j, materials: [...(j.materials || []), material] }
+              : j
+          ),
+        }));
+      },
+
+      addNoteToScheduledJob: (jobId, note) => {
+        set((state) => ({
+          scheduledJobs: state.scheduledJobs.map((j) =>
+            j.id === jobId
+              ? { ...j, notesList: [...(j.notesList || []), note] }
+              : j
           ),
         }));
       },

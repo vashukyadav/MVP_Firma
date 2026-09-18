@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { useTenderFlowStore } from "@/store/tenderFlowStore";
+import { useSchedulingStore } from "@/store/schedulingStore";
 import { useAuthStore } from "@/store/authStore";
 import { isFieldWorker, isJobAssignedToUser } from "@/lib/roleAccess";
 import { toast } from "@/components/ui/toast";
@@ -34,60 +35,73 @@ interface PhotoItem {
 export default function PhotosPage() {
   const router = useRouter();
   const { jobs = [], addPhotoToJob } = useTenderFlowStore();
+  const { scheduledJobs = [] } = useSchedulingStore();
   const currentUser = useAuthStore((state) => state.currentUser);
   const isWorker = isFieldWorker(currentUser);
 
-  // Strictly restrict this page to Field Worker role
-  useEffect(() => {
-    if (currentUser && !isWorker) {
-      toast.error("Photos gallery is restricted to Field Workers.");
-      router.replace("/dashboard");
-    }
-  }, [currentUser, isWorker, router]);
-
   // Available jobs for current user (filtered for field workers)
   const userJobs = useMemo(() => {
-    if (!isWorker) return [];
+    if (!isWorker) return jobs;
     return jobs.filter((j) => isJobAssignedToUser(j, [], [], currentUser));
   }, [jobs, isWorker, currentUser]);
 
   const realPhotos = useMemo(() => {
     const list: PhotoItem[] = [];
+    const seenIds = new Set<string>();
     const targetJobs = isWorker ? userJobs : jobs;
     const uName = (currentUser?.name || "").trim().toLowerCase();
 
-    targetJobs.forEach((j) => {
-      (j.photos || []).forEach((p) => {
-        const pAuthor = (p.uploadedBy || "").trim().toLowerCase();
-
-        // If field worker, only include photos uploaded by this worker (or assigned to this worker's job)
-        if (isWorker) {
-          if (pAuthor) {
-            const matchAuthor =
-              pAuthor === uName ||
-              pAuthor.includes(uName) ||
-              uName.includes(pAuthor);
-            if (!matchAuthor) return;
-          }
-        }
-
-        list.push({
-          id: p.id,
-          title: p.title || p.caption || "Site Photo",
-          time: p.timestamp || p.time || "",
-          date: p.date || "",
-          author: p.uploadedBy || currentUser?.name || "Field Worker",
-          role: p.role || (isWorker ? "Field Worker" : "Site Team"),
-          avatarBg: "bg-emerald-700",
-          url: p.url,
-          stage: p.stage || p.category || "In Progress",
-          jobId: j.id,
-          jobTitle: j.title,
-        });
+    // Helper to push a photo into the list if not already added
+    const pushPhoto = (p: { id: string; title?: string; caption?: string; timestamp?: string; time?: string; date?: string; uploadedBy?: string; role?: string; url: string; stage?: string; category?: string }, jobId: string, jobTitle: string) => {
+      if (seenIds.has(p.id)) return;
+      seenIds.add(p.id);
+      const pAuthor = (p.uploadedBy || "").trim().toLowerCase();
+      // If field worker, only include photos they uploaded
+      if (isWorker && pAuthor) {
+        const matchAuthor =
+          pAuthor === uName ||
+          pAuthor.includes(uName) ||
+          uName.includes(pAuthor);
+        if (!matchAuthor) return;
+      }
+      list.push({
+        id: p.id,
+        title: p.title || p.caption || "Site Photo",
+        time: p.timestamp || p.time || "",
+        date: p.date || "",
+        author: p.uploadedBy || currentUser?.name || "Field Worker",
+        role: p.role || (isWorker ? "Field Worker" : "Site Team"),
+        avatarBg: "bg-emerald-700",
+        url: p.url,
+        stage: p.stage || (p.category as string) || "In Progress",
+        jobId,
+        jobTitle,
       });
+    };
+
+    // Photos from tenderFlowStore jobs
+    targetJobs.forEach((j) => {
+      (j.photos || []).forEach((p) => pushPhoto(p, j.id, j.title));
     });
+
+    // Photos from schedulingStore scheduledJobs (in case field worker uploaded to a scheduled-only job)
+    if (!isWorker) {
+      // Managers see all scheduled job photos
+      scheduledJobs.forEach((sj) => {
+        (sj.photos || []).forEach((p) => pushPhoto(p, sj.id, sj.title));
+      });
+    } else {
+      // Field worker sees only their own scheduled job photos
+      const workerName = uName;
+      scheduledJobs
+        .filter((sj) => (sj.worker || "").trim().toLowerCase() === workerName)
+        .forEach((sj) => {
+          (sj.photos || []).forEach((p) => pushPhoto(p, sj.id, sj.title));
+        });
+    }
+
     return list;
-  }, [jobs, userJobs, isWorker, currentUser]);
+  }, [jobs, scheduledJobs, userJobs, isWorker, currentUser]);
 
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoItem | null>(null);
   const [filterMode, setFilterMode] = useState("All Photos");
@@ -149,10 +163,6 @@ export default function PhotosPage() {
     setUploadCaption("");
   };
 
-  if (!isWorker) {
-    return null;
-  }
-
   return (
     <FirmaLayout activeNav="Photos">
       <div className="space-y-6 mt-2">
@@ -174,13 +184,15 @@ export default function PhotosPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setUploadOpen(true)}
-            className="px-4 py-2 rounded-[10px] bg-forest text-white text-xs font-bold hover:bg-forest-hover transition shadow-xs flex items-center gap-2 self-start sm:self-auto cursor-pointer"
-          >
-            <Plus className="h-4 w-4" /> Upload Photos
-          </button>
+          {isWorker && (
+            <button
+              type="button"
+              onClick={() => setUploadOpen(true)}
+              className="px-4 py-2 rounded-[10px] bg-forest text-white text-xs font-bold hover:bg-forest-hover transition shadow-xs flex items-center gap-2 self-start sm:self-auto cursor-pointer"
+            >
+              <Plus className="h-4 w-4" /> Upload Photos
+            </button>
+          )}
         </div>
 
         {/* Photos Container */}

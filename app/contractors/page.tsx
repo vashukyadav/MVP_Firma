@@ -435,14 +435,16 @@ export default function ContractorsPage() {
                 <span>Load Won Project Bidders</span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => router.push("/tenders")}
-              className="flex items-center gap-2 rounded-[10px] bg-white border border-pebble hover:bg-stone text-onyx px-3.5 py-2 text-xs font-semibold shadow-2xs transition cursor-pointer"
-            >
-              <Gavel className="h-4 w-4 text-forest" />
-              <span>Tenders Flow</span>
-            </button>
+            {!isSiteManager && (
+              <button
+                type="button"
+                onClick={() => router.push("/tenders")}
+                className="flex items-center gap-2 rounded-[10px] bg-white border border-pebble hover:bg-stone text-onyx px-3.5 py-2 text-xs font-semibold shadow-2xs transition cursor-pointer"
+              >
+                <Gavel className="h-4 w-4 text-forest" />
+                <span>Tenders Flow</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => router.push("/jobs")}
@@ -1018,6 +1020,10 @@ export default function ContractorsPage() {
                             <ClipboardList className="h-3.5 w-3.5" />
                             <span>Assign Job in Jobs →</span>
                           </button>
+                        ) : isSiteManager ? (
+                          <span className="text-[11px] font-medium text-ash italic px-2 py-1 bg-stone rounded-[6px]">
+                            Awaiting PM Award
+                          </span>
                         ) : (
                           <>
                             <button

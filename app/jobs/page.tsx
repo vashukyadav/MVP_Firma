@@ -93,7 +93,39 @@ function JobsContent() {
   const combinedJobs = useMemo(() => {
     const list = [...jobs];
     for (const sj of scheduledJobs) {
-      if (!list.some((j) => j.id === sj.id)) {
+      const existingIdx = list.findIndex((j) => j.id === sj.id);
+      if (existingIdx >= 0) {
+        // Merge photos/materials/notes from scheduledJob into the tenderFlow job
+        const existing = list[existingIdx];
+        list[existingIdx] = {
+          ...existing,
+          photos: [
+            ...(existing.photos || []),
+            ...(sj.photos || []).filter(
+              (sp) => !(existing.photos || []).some((ep) => ep.id === sp.id)
+            ),
+          ],
+          materials: [
+            ...(existing.materials || []),
+            ...(sj.materials || []).filter(
+              (sm) => !(existing.materials || []).some((em) => em.id === sm.id)
+            ),
+          ],
+          notes: [
+            ...(existing.notes || []),
+            ...(sj.notesList || []).filter(
+              (sn) => !(existing.notes || []).some((en) => en.id === sn.id)
+            ),
+          ],
+          status:
+            sj.status === "Completed"
+              ? "Completed"
+              : sj.status === "In Progress"
+              ? "In Progress"
+              : existing.status,
+          completed: sj.status === "Completed" || existing.completed,
+        };
+      } else {
         list.push({
           id: sj.id,
           title: sj.title,
@@ -116,6 +148,9 @@ function JobsContent() {
           assignedDate: sj.dateFormatted || "15 Sep 2026",
           siteManagerName: isSM ? currentUser?.name : undefined,
           siteManagerId: isSM ? String(currentUser?.id) : undefined,
+          photos: sj.photos || [],
+          materials: sj.materials || [],
+          notes: sj.notesList || [],
         });
       }
     }
@@ -130,10 +165,15 @@ function JobsContent() {
     return getAssignedContractors(contractors, assignedProjects, assignedSites, currentUser);
   }, [contractors, assignedProjects, assignedSites, currentUser]);
 
+  // Always look up from live combinedJobs so store updates (photos, notes, materials) are reactive
   const selectedJob = useMemo(() => {
     if (!selectedJobId) return null;
-    return (roleJobs || []).find((j) => j.id === selectedJobId) || null;
-  }, [roleJobs, selectedJobId]);
+    return (
+      combinedJobs.find((j) => j.id === selectedJobId) ||
+      roleJobs.find((j) => j.id === selectedJobId) ||
+      null
+    );
+  }, [combinedJobs, roleJobs, selectedJobId]);
 
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
@@ -370,96 +410,97 @@ function JobsContent() {
     });
   }, [roleContractors, roleJobs]);
 
-  // Field Worker flow: My Jobs & Job Detail View (Strictly restricted to Field Worker)
-  if (isFW) {
-    if (selectedJob) {
-      return (
-        <FirmaLayout activeNav="My Jobs">
-          <JobDetailView
-            job={selectedJob}
-            onBack={() => {
-              setSelectedJobId(null);
-              router.push("/jobs");
-            }}
-            onOpenSchedule={() => {
-              router.push(`/scheduling?jobId=${selectedJob.id}&openSchedule=true`);
-            }}
-            onOpenReassign={() => {
-              setReassignTargetJob(selectedJob);
-              setReassignContractorId(
-                selectedJob.contractorId || (contractors[0]?.id || "")
-              );
-              setShowReassignModal(true);
-            }}
-          />
+  // If a job is selected (e.g. clicked on card or ?jobId=JOB-401), render the dedicated Job Detail View for all roles!
+  if (selectedJob) {
+    return (
+      <FirmaLayout activeNav={isFW ? "My Jobs" : "Jobs"}>
+        <JobDetailView
+          job={selectedJob}
+          onBack={() => {
+            setSelectedJobId(null);
+            router.push("/jobs");
+          }}
+          onOpenSchedule={() => {
+            router.push(`/scheduling?jobId=${selectedJob.id}&openSchedule=true`);
+          }}
+          onOpenReassign={() => {
+            setReassignTargetJob(selectedJob);
+            setReassignContractorId(
+              selectedJob.contractorId || (contractors[0]?.id || "")
+            );
+            setShowReassignModal(true);
+          }}
+        />
 
-          {/* Reassign Modal if opened from detail view */}
-          {showReassignModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-onyx/40 backdrop-blur-xs animate-in fade-in duration-150">
-              <div className="w-full max-w-md rounded-[16px] bg-white p-6 shadow-2xl border border-pebble relative">
-                <button
-                  type="button"
-                  onClick={() => setShowReassignModal(false)}
-                  className="absolute right-4 top-4 rounded-lg p-1.5 text-ash hover:bg-stone hover:text-onyx transition cursor-pointer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+        {/* Reassign Modal if opened from detail view */}
+        {showReassignModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-onyx/40 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="w-full max-w-md rounded-[16px] bg-white p-6 shadow-2xl border border-pebble relative">
+              <button
+                type="button"
+                onClick={() => setShowReassignModal(false)}
+                className="absolute right-4 top-4 rounded-lg p-1.5 text-ash hover:bg-stone hover:text-onyx transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
 
-                <div className="flex items-center gap-3 pb-3 border-b border-pebble">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-forest text-white">
-                    <User className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-bold text-onyx">
-                      Reassign Work Order
-                    </h2>
-                    <p className="text-xs text-ash">
-                      Assign {reassignTargetJob?.id} to a different contractor
-                    </p>
-                  </div>
+              <div className="flex items-center gap-3 pb-3 border-b border-pebble">
+                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-forest text-white">
+                  <User className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-onyx">
+                    Reassign Work Order
+                  </h2>
+                  <p className="text-xs text-ash">
+                    Assign {reassignTargetJob?.id} to a different contractor
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleReassignSubmit} className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-onyx mb-1.5">
+                    Select New Contractor
+                  </label>
+                  <select
+                    value={reassignContractorId}
+                    onChange={(e) => setReassignContractorId(e.target.value)}
+                    className="w-full h-9.5 px-3 text-xs bg-stone text-onyx font-medium rounded-[8px] border border-pebble outline-none focus:border-forest cursor-pointer"
+                  >
+                    {contractors.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.trade} • {c.projectName})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                <form onSubmit={handleReassignSubmit} className="mt-4 space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-onyx mb-1.5">
-                      Select New Contractor
-                    </label>
-                    <select
-                      value={reassignContractorId}
-                      onChange={(e) => setReassignContractorId(e.target.value)}
-                      className="w-full h-9.5 px-3 text-xs bg-stone text-onyx font-medium rounded-[8px] border border-pebble outline-none focus:border-forest cursor-pointer"
-                    >
-                      {contractors.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.trade} • {c.projectName})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-pebble">
-                    <button
-                      type="button"
-                      onClick={() => setShowReassignModal(false)}
-                      className="px-4 py-2 rounded-[8px] text-xs font-semibold text-ash hover:bg-stone transition cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4.5 py-2 rounded-[8px] bg-forest hover:bg-forest-hover text-white text-xs font-bold shadow-xs transition cursor-pointer"
-                    >
-                      Confirm Reassign
-                    </button>
-                  </div>
-                </form>
-              </div>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-pebble">
+                  <button
+                    type="button"
+                    onClick={() => setShowReassignModal(false)}
+                    className="px-4 py-2 rounded-[8px] text-xs font-semibold text-ash hover:bg-stone transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4.5 py-2 rounded-[8px] bg-forest hover:bg-forest-hover text-white text-xs font-bold shadow-xs transition cursor-pointer"
+                  >
+                    Confirm Reassign
+                  </button>
+                </div>
+              </form>
             </div>
-          )}
-        </FirmaLayout>
-      );
-    }
+          </div>
+        )}
+      </FirmaLayout>
+    );
+  }
 
+  // Field Worker "My Jobs" Screen (Screen 2)
+  if (isFW) {
     return (
       <FirmaLayout activeNav="My Jobs">
         <FieldWorkerJobsView
@@ -679,7 +720,11 @@ function JobsContent() {
             filtered.map((item) => (
               <div
                 key={item.id}
-                className={`flex flex-col gap-3.5 p-4.5 rounded-[12px] border transition ${
+                onClick={() => {
+                  setSelectedJobId(item.id);
+                  router.push(`/jobs?jobId=${item.id}`);
+                }}
+                className={`flex flex-col gap-3.5 p-4.5 rounded-[12px] border transition cursor-pointer hover:border-forest hover:shadow-xs ${
                   item.completed
                     ? "bg-stone/50 border-pebble/70 opacity-60"
                     : item.isContractorJob
@@ -1041,18 +1086,20 @@ function JobsContent() {
                     </label>
                     {contractors.length === 0 ? (
                       <div className="p-3 bg-sunfleck/40 rounded-[8px] border border-pebble text-xs text-ash space-y-2">
-                        <p>No contractors awarded through Tenders yet.</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowAssignModal(false);
-                            router.push("/tenders");
-                          }}
-                          className="text-forest font-bold hover:underline flex items-center gap-1"
-                        >
-                          <span>Open Tenders to award a contractor</span>
-                          <ArrowRight className="h-3 w-3" />
-                        </button>
+                        <p>{isSM ? "No contractors awarded or assigned for this project yet." : "No contractors awarded through Tenders yet."}</p>
+                        {!isSM && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAssignModal(false);
+                              router.push("/tenders");
+                            }}
+                            className="text-forest font-bold hover:underline flex items-center gap-1"
+                          >
+                            <span>Open Tenders to award a contractor</span>
+                            <ArrowRight className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div className="relative">
