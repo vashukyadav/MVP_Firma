@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
@@ -10,6 +10,7 @@ import {
   Search,
   X,
   UploadCloud,
+  Trash2,
 } from "lucide-react";
 
 import { useTenderFlowStore } from "@/store/tenderFlowStore";
@@ -17,6 +18,7 @@ import { useSchedulingStore } from "@/store/schedulingStore";
 import { useAuthStore } from "@/store/authStore";
 import { isFieldWorker, isJobAssignedToUser } from "@/lib/roleAccess";
 import { toast } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
 interface PhotoItem {
   id: string;
@@ -110,6 +112,78 @@ export default function PhotosPage() {
   const [uploadJobId, setUploadJobId] = useState<string>("");
   const [uploadStage, setUploadStage] = useState<string>("In Progress");
   const [uploadCaption, setUploadCaption] = useState<string>("");
+  const [uploadPhotoUrl, setUploadPhotoUrl] = useState<string>("");
+  const [uploadFileName, setUploadFileName] = useState<string>("");
+  const [uploadFileSize, setUploadFileSize] = useState<string>("");
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Pre-select first assigned job if not yet set when opening modal
+  useEffect(() => {
+    if (uploadOpen && !uploadJobId && userJobs.length > 0) {
+      setUploadJobId(userJobs[0].id);
+    }
+  }, [uploadOpen, uploadJobId, userJobs]);
+
+  const resetUploadForm = () => {
+    setUploadPhotoUrl("");
+    setUploadFileName("");
+    setUploadFileSize("");
+    setUploadCaption("");
+    setIsDragging(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file (PNG, JPG, WebP, etc.).");
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("Image file size must be less than 15MB.");
+      return;
+    }
+
+    const sizeStr =
+      file.size > 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+        : `${Math.round(file.size / 1024)} KB`;
+
+    setUploadFileName(file.name);
+    setUploadFileSize(sizeStr);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (typeof e.target?.result === "string") {
+        setUploadPhotoUrl(e.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleFile(file);
+    }
+  };
 
   const filteredPhotos = useMemo(() => {
     let list = [...realPhotos];
@@ -141,6 +215,11 @@ export default function PhotosPage() {
 
   const handleUploadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!uploadPhotoUrl) {
+      toast.warning("Please choose or capture a site photo first.");
+      return;
+    }
+
     const targetJobId = uploadJobId || userJobs[0]?.id;
     if (!targetJobId) {
       toast.error("Please select a job to attach the photo to.");
@@ -149,8 +228,8 @@ export default function PhotosPage() {
 
     if (addPhotoToJob) {
       addPhotoToJob(targetJobId, {
-        url: "/images/field_engineer.jpg",
-        caption: uploadCaption || "Field site inspection photo",
+        url: uploadPhotoUrl,
+        caption: uploadCaption || uploadFileName || "Field site inspection photo",
         stage: uploadStage,
         uploadedBy: currentUser?.name || "Field Worker",
         time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -160,7 +239,7 @@ export default function PhotosPage() {
 
     toast.success("Photo uploaded successfully!");
     setUploadOpen(false);
-    setUploadCaption("");
+    resetUploadForm();
   };
 
   return (
@@ -414,18 +493,98 @@ export default function PhotosPage() {
               </h3>
               <button
                 type="button"
-                onClick={() => setUploadOpen(false)}
+                onClick={() => {
+                  setUploadOpen(false);
+                  resetUploadForm();
+                }}
                 className="h-7 w-7 rounded-full bg-stone hover:bg-pebble/50 flex items-center justify-center text-onyx cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="border-2 border-dashed border-pebble rounded-[12px] p-6 text-center bg-stone/40 hover:bg-stone/80 transition cursor-pointer">
-              <Camera className="h-8 w-8 text-ash mx-auto mb-2" />
-              <p className="text-xs font-bold text-onyx">Click to choose or drag &amp; drop photos</p>
-              <p className="text-[10px] text-ash mt-1">Direct upload from mobile camera or field device</p>
-            </div>
+            {/* Hidden native file input with camera capture support */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+              }}
+            />
+
+            {/* Upload Area / Image Preview */}
+            {uploadPhotoUrl ? (
+              <div className="relative rounded-[12px] border border-pebble overflow-hidden bg-stone/50 p-2.5">
+                <div className="relative h-48 w-full rounded-[8px] overflow-hidden bg-onyx/5 border border-pebble/40">
+                  <Image
+                    src={uploadPhotoUrl}
+                    alt="Captured photo preview"
+                    fill
+                    unoptimized
+                    className="object-contain"
+                  />
+                </div>
+                <div className="mt-2.5 flex items-center justify-between px-1">
+                  <div className="min-w-0 pr-2">
+                    <p className="text-xs font-bold text-onyx truncate">
+                      {uploadFileName || "Site Photo Captured"}
+                    </p>
+                    <p className="text-[10px] text-ash">
+                      {uploadFileSize} • Ready to upload
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-2.5 py-1 text-[11px] font-bold text-forest bg-forest/10 hover:bg-forest/20 rounded-[6px] transition cursor-pointer"
+                    >
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUploadPhotoUrl("");
+                        setUploadFileName("");
+                        setUploadFileSize("");
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
+                      className="p-1 text-ash hover:text-red-600 hover:bg-red-50 rounded-[6px] transition cursor-pointer"
+                      title="Remove photo"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={cn(
+                  "border-2 border-dashed rounded-[12px] p-6 text-center transition cursor-pointer group",
+                  isDragging
+                    ? "border-forest bg-forest/10 scale-[0.99]"
+                    : "border-pebble bg-stone/40 hover:bg-stone/80 hover:border-forest/50"
+                )}
+              >
+                <div className="h-10 w-10 rounded-full bg-forest/10 flex items-center justify-center mx-auto mb-2 text-forest group-hover:scale-110 transition">
+                  <Camera className="h-5 w-5" />
+                </div>
+                <p className="text-xs font-bold text-onyx">
+                  Click to choose or drag &amp; drop photos
+                </p>
+                <p className="text-[10px] text-ash mt-1">
+                  Direct upload from mobile camera or gallery (PNG, JPG, WebP)
+                </p>
+              </div>
+            )}
 
             <div className="space-y-3 text-xs">
               <div>
@@ -476,15 +635,18 @@ export default function PhotosPage() {
             <div className="flex justify-end gap-2 pt-2 border-t border-pebble/60">
               <button
                 type="button"
-                onClick={() => setUploadOpen(false)}
+                onClick={() => {
+                  setUploadOpen(false);
+                  resetUploadForm();
+                }}
                 className="px-3.5 py-1.5 rounded-[8px] border border-pebble text-onyx text-xs font-bold hover:bg-stone cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={userJobs.length === 0}
-                className="px-4 py-1.5 rounded-[8px] bg-forest text-white text-xs font-bold hover:bg-forest-hover shadow-xs cursor-pointer disabled:opacity-50"
+                disabled={userJobs.length === 0 || !uploadPhotoUrl}
+                className="px-4 py-1.5 rounded-[8px] bg-forest text-white text-xs font-bold hover:bg-forest-hover shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Upload Photo
               </button>

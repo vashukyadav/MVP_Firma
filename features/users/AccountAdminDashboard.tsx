@@ -9,6 +9,7 @@ import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast";
 
 const createUserSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -61,7 +62,7 @@ export default function CreateUser() {
       .first();
 
     if (existingUser) {
-      alert("User with this email already exists");
+      toast.error("User with this email already exists");
       return;
     }
 
@@ -112,7 +113,7 @@ export default function CreateUser() {
       }
     }
 
-    alert(`${data.role} created successfully`);
+    toast.success(`${data.role} created successfully!`);
 
     reset();
 

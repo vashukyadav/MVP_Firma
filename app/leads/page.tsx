@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast";
 import {
   Target,
   Plus,
@@ -195,7 +196,7 @@ export default function LeadsPage() {
     if (!currentLead) return;
 
     if (!editCompanyName.trim() || !editContactPerson.trim()) {
-      alert("Please provide Company Name and Contact Person.");
+      toast.warning("Please provide Company Name and Contact Person.");
       return;
     }
 
@@ -266,7 +267,7 @@ export default function LeadsPage() {
   // Convert Modal Form State
   const [oppName, setOppName] = useState("");
   const [oppValue, setOppValue] = useState("");
-  const [oppCloseDate, setOppCloseDate] = useState("2025-11-30");
+  const [oppCloseDate, setOppCloseDate] = useState("2026-11-30");
   const [oppStage, setOppStage] = useState<OpportunityStage>("QUALIFIED");
   const [oppDescription, setOppDescription] = useState("");
   const [chkCreateCustomer, setChkCreateCustomer] = useState(true);
@@ -325,7 +326,7 @@ export default function LeadsPage() {
   const handleOpenConvertModal = (lead: Lead) => {
     setOppName(`${lead.companyName} Warehouse Project`);
     setOppValue(lead.estimatedValue.toString());
-    setOppCloseDate("2025-11-30");
+    setOppCloseDate("2026-11-30");
     setOppStage("QUALIFIED");
     setOppDescription(
       `${lead.requirement || "Construction project"} in ${lead.location}. Customer ready for proposal.`
@@ -361,7 +362,7 @@ export default function LeadsPage() {
   const handleCreateNewLead = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCompanyName.trim() || !newContactPerson.trim()) {
-      alert("Please provide Company Name and Contact Person.");
+      toast.warning("Please provide Company Name and Contact Person.");
       return;
     }
 

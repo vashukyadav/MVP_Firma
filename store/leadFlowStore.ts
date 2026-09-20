@@ -80,9 +80,15 @@ export interface ProjectItem {
   status: "IN_PROGRESS" | "AT_RISK" | "COMPLETED";
   lead: string;
   due: string;
+  startDate?: string;
+  endDate?: string;
   sourceOpportunityId?: string;
   siteManagerId?: string;
   siteManagerName?: string;
+  quoteId?: string;
+  quoteNo?: string;
+  quoteValue?: number;
+  lineItems?: QuoteLineItem[];
 }
 
 interface LeadFlowState {
@@ -142,6 +148,7 @@ interface LeadFlowState {
   // Generic project actions
   addProject: (project: ProjectItem) => void;
   updateProject: (projectId: string, data: Partial<ProjectItem>) => void;
+  updateProjectLineItems: (projectId: string, lineItems: QuoteLineItem[]) => void;
   deleteProject: (projectId: string) => void;
 
   // Purge & cleanup
@@ -152,7 +159,50 @@ interface LeadFlowState {
 const defaultLeads: Lead[] = [];
 const defaultOpportunities: Opportunity[] = [];
 const defaultQuotes: Quote[] = [];
-const defaultProjects: ProjectItem[] = [];
+export const defaultProjects: ProjectItem[] = [
+  {
+    id: "PRJ-ABC",
+    name: "ABC Commercial Building",
+    location: "Bhopal Site, MP",
+    client: "ABC Commercial Ltd",
+    budget: "₹1,25,00,000",
+    progress: 45,
+    status: "IN_PROGRESS",
+    lead: "Project Manager",
+    startDate: "20 Sep 2026",
+    endDate: "02 Feb 2027",
+    due: "02 Feb 2027",
+    siteManagerName: "Site Manager",
+  },
+  {
+    id: "PRJ-SKY",
+    name: "Skyline Apartments • Phase 1",
+    location: "Sector 62, Golf Course Ext Road, Gurugram",
+    client: "Skyline Realty Ltd",
+    budget: "₹2,80,00,000",
+    progress: 60,
+    status: "IN_PROGRESS",
+    lead: "Project Lead",
+    startDate: "01 Sep 2026",
+    endDate: "15 Jan 2027",
+    due: "15 Jan 2027",
+    siteManagerName: "Site Manager",
+  },
+  {
+    id: "PRJ-CORP",
+    name: "Apex Tech Park & Corporate Towers",
+    location: "Plot 14, Electronic City, Noida",
+    client: "Apex Infrastructures",
+    budget: "₹4,50,00,000",
+    progress: 25,
+    status: "IN_PROGRESS",
+    lead: "Project Director",
+    startDate: "15 Aug 2026",
+    endDate: "28 Feb 2027",
+    due: "28 Feb 2027",
+    siteManagerName: "Site Manager",
+  },
+];
 
 export const useLeadFlowStore = create<LeadFlowState>()(
   persist(
@@ -341,21 +391,52 @@ export const useLeadFlowStore = create<LeadFlowState>()(
         const opp = get().opportunities.find((o) => o.id === opportunityId);
         const projectId = `PRJ-${Math.floor(100 + Math.random() * 900)}`;
 
+        // Look up quotation linked to this opportunity
+        const linkedQuote =
+          get().quotes.find(
+            (q) => q.opportunityId === opportunityId && q.status === "ACCEPTED"
+          ) ||
+          get().quotes.find((q) => q.opportunityId === opportunityId) ||
+          (opp
+            ? get().quotes.find(
+                (q) =>
+                  q.opportunityTitle?.trim().toLowerCase() === opp.title?.trim().toLowerCase() ||
+                  q.customerName?.trim().toLowerCase() === opp.customerName?.trim().toLowerCase()
+              )
+            : undefined);
+
+        const projectBudget = linkedQuote
+          ? `₹${linkedQuote.value.toLocaleString("en-IN")}`
+          : opp?.estimatedValue
+          ? `₹${opp.estimatedValue.toLocaleString("en-IN")}`
+          : "₹0";
+
+        const projStartDate = new Date().toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+        const projEndDate = opp?.expectedCloseDate || linkedQuote?.validUntil || "02 Feb 2027";
+
         const newProject: ProjectItem = {
           id: projectId,
           name: opp?.title || "New Project",
           location: opp?.customerName ? `${opp.customerName} Site` : "Project Site",
           client: opp?.customerName || "Client",
-          budget: opp?.estimatedValue
-            ? `₹${opp.estimatedValue.toLocaleString("en-IN")}`
-            : "₹0",
+          budget: projectBudget,
           progress: 0,
           status: "IN_PROGRESS",
           lead: data?.projectManager || "Project Lead",
-          due: opp?.expectedCloseDate || "Ongoing",
+          startDate: projStartDate,
+          endDate: projEndDate,
+          due: projEndDate,
           sourceOpportunityId: opportunityId,
           siteManagerId: data?.siteManagerId,
           siteManagerName: data?.siteManagerName,
+          quoteId: linkedQuote?.id,
+          quoteNo: linkedQuote?.quoteNo,
+          quoteValue: linkedQuote?.value,
+          lineItems: linkedQuote?.lineItems ? [...linkedQuote.lineItems] : [],
         };
 
         set((state) => ({
@@ -387,6 +468,25 @@ export const useLeadFlowStore = create<LeadFlowState>()(
         set((state) => ({
           projects: state.projects.map((p) =>
             p.id === projectId ? { ...p, ...data } : p
+          ),
+        }));
+      },
+
+      updateProjectLineItems: (projectId, lineItems) => {
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === projectId
+              ? {
+                  ...p,
+                  lineItems,
+                  budget:
+                    lineItems.length > 0
+                      ? `₹${lineItems
+                          .reduce((sum, item) => sum + (item.amount || 0), 0)
+                          .toLocaleString("en-IN")}`
+                      : p.budget,
+                }
+              : p
           ),
         }));
       },
@@ -446,6 +546,24 @@ export const useLeadFlowStore = create<LeadFlowState>()(
             ? persistedState.projects.filter((p: any) => !isDummyProject(p))
             : [],
         };
+      },
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        if (!state.projects || state.projects.length === 0) {
+          state.projects = [...defaultProjects];
+        } else if (state.projects.length < 3) {
+          defaultProjects.forEach((dp) => {
+            if (
+              !state.projects.some(
+                (p) =>
+                  p.name.toLowerCase() === dp.name.toLowerCase() ||
+                  p.id === dp.id
+              )
+            ) {
+              state.projects.push(dp);
+            }
+          });
+        }
       },
     }
   )

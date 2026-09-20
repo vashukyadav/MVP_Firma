@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { db, type PlanType } from "@/lib/db";
+import { toast } from "@/components/ui/toast";
 import { OnboardingHeader } from "@/components/onboarding/OnboardingHeader";
 import { OnboardingStepper } from "@/components/onboarding/OnboardingStepper";
 import {
@@ -91,7 +92,7 @@ export default function BillingPage() {
     if (e) e.preventDefault();
 
     if (!currentUser?.id) {
-      alert("User not found. Please login again.");
+      toast.error("User not found. Please login again.");
       return;
     }
 
@@ -105,7 +106,7 @@ export default function BillingPage() {
       router.push("/onboarding/complete");
     } catch (error) {
       console.error(error);
-      alert("Something went wrong with payment processing.");
+      toast.error("Something went wrong with payment processing.");
     } finally {
       setLoading(false);
     }

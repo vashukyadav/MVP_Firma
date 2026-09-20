@@ -8,6 +8,7 @@ import {
 } from "@/store/tenderFlowStore";
 import { useAuthStore } from "@/store/authStore";
 import { isFieldWorker } from "@/lib/roleAccess";
+import { toast } from "@/components/ui/toast";
 import {
   X,
   Camera,
@@ -114,7 +115,7 @@ export default function JobPhotoModal({
   const handleUploadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPhotoUrl) {
-      alert("Please select or paste a photo.");
+      toast.warning("Please select or paste a photo.");
       return;
     }
 
@@ -133,6 +134,7 @@ export default function JobPhotoModal({
     setNewPhotoUrl("");
     setNewPhotoCaption("");
     setShowUploadForm(false);
+    toast.success("Photo uploaded to job successfully!");
     setSelectedIndex(0);
   };
 

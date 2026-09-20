@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/components/ui/toast";
 import JobPhotoModal from "@/components/jobs/JobPhotoModal";
+import { getJobScheduleState, formatDisplayDate } from "@/lib/dateValidation";
 
 interface FieldWorkerDashboardProps {
   companyName: string;
@@ -45,6 +46,10 @@ export default function FieldWorkerDashboard({
   const [showSelfAssignModal, setShowSelfAssignModal] = useState(false);
   const [selectedAvailableJob, setSelectedAvailableJob] = useState("");
   const [selfAssignReason, setSelfAssignReason] = useState("");
+
+  // Tab state between today's jobs vs upcoming (tomorrow/future)
+  const [scheduleTab, setScheduleTab] = useState<"TODAY" | "UPCOMING">("TODAY");
+  const [earlyTravelConfirmJob, setEarlyTravelConfirmJob] = useState<JobItem | null>(null);
 
   const firstName = currentUser?.name ? currentUser.name.split(" ")[0] : "Worker";
 
@@ -70,9 +75,23 @@ export default function FieldWorkerDashboard({
     );
   }, [jobs, myJobs]);
 
-  // Today's jobs
+  // Distinct Today's jobs vs Upcoming jobs (Tomorrow / Future)
   const todayJobs = useMemo(() => {
-    return myJobs.filter((j) => !j.completed || j.status !== "Completed");
+    return myJobs.filter((j) => {
+      if (j.completed || j.status === "Completed") return false;
+      if (j.status === "Travelling" || j.status === "On-site" || j.status === "In Progress") return true;
+      const sched = getJobScheduleState(j.startDate || j.due);
+      return sched.category === "TODAY" || sched.category === "OVERDUE";
+    });
+  }, [myJobs]);
+
+  const upcomingJobs = useMemo(() => {
+    return myJobs.filter((j) => {
+      if (j.completed || j.status === "Completed") return false;
+      if (j.status === "Travelling" || j.status === "On-site" || j.status === "In Progress") return false;
+      const sched = getJobScheduleState(j.startDate || j.due);
+      return sched.category === "TOMORROW" || sched.category === "FUTURE";
+    });
   }, [myJobs]);
 
   const inProgressJobs = useMemo(() => {
@@ -104,6 +123,19 @@ export default function FieldWorkerDashboard({
 
     updateJobStatus(job.id, nextStatus);
     toast.success(message);
+  };
+
+  // Guard for travel: if job is tomorrow or future, ask for confirmation
+  const handleJobTravelAction = (job: JobItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (job.status === "Scheduled") {
+      const sched = getJobScheduleState(job.startDate || job.due);
+      if (!sched.allowDirectTravel) {
+        setEarlyTravelConfirmJob(job);
+        return;
+      }
+    }
+    handleAdvanceStatus(job, e);
   };
 
   const handleSelfAssignSubmit = (e: React.FormEvent) => {
@@ -246,105 +278,169 @@ export default function FieldWorkerDashboard({
         {/* Left Column: Today's Jobs (8 cols) */}
         <div className="lg:col-span-7 xl:col-span-8 rounded-[16px] bg-white border border-pebble/80 p-5 sm:p-6 shadow-2xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <h2 className="text-base font-bold text-onyx tracking-tight">
-                Today&apos;s Jobs
-              </h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setScheduleTab("TODAY")}
+                  className={`px-3 py-1.5 rounded-[8px] text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    scheduleTab === "TODAY"
+                      ? "bg-forest text-white shadow-xs"
+                      : "bg-stone text-ash hover:text-onyx"
+                  }`}
+                >
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span>Today&apos;s Jobs ({todayJobs.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleTab("UPCOMING")}
+                  className={`px-3 py-1.5 rounded-[8px] text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    scheduleTab === "UPCOMING"
+                      ? "bg-forest text-white shadow-xs"
+                      : "bg-stone text-ash hover:text-onyx"
+                  }`}
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>Upcoming &amp; Tomorrow ({upcomingJobs.length})</span>
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={() => router.push("/jobs")}
-                className="text-xs font-bold text-forest hover:underline cursor-pointer"
+                className="text-xs font-bold text-forest hover:underline cursor-pointer self-end sm:self-auto"
               >
-                View All
+                View All &rarr;
               </button>
             </div>
 
             {/* Job Items List */}
             <div className="space-y-3">
-              {todayJobs.length === 0 ? (
-                <div className="text-center py-10 px-4 rounded-[12px] border border-dashed border-pebble bg-stone/30">
-                  <Calendar className="h-8 w-8 text-ash/60 mx-auto mb-2.5" />
-                  <p className="text-sm font-semibold text-onyx">No jobs scheduled for today</p>
-                  <p className="text-xs text-ash mt-1 max-w-sm mx-auto">
-                    When tasks are assigned to you by your Site Manager or Project Manager, they will appear here.
-                  </p>
-                </div>
-              ) : (
-                todayJobs.map((job) => (
-                  <div
-                    key={job.id}
-                    onClick={() => router.push(`/jobs?jobId=${job.id}`)}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-3.5 sm:p-4 rounded-[12px] border border-pebble/80 hover:bg-stone/50 transition cursor-pointer bg-white group"
-                  >
-                    <div className="flex items-start sm:items-center gap-3 min-w-0">
-                      <div className="rounded-[8px] bg-stone px-2 py-1 text-xs font-bold text-onyx border border-pebble/70 shrink-0">
-                        {job.id}
+              {(() => {
+                const currentList = scheduleTab === "TODAY" ? todayJobs : upcomingJobs;
+                if (currentList.length === 0) {
+                  return (
+                    <div className="text-center py-10 px-4 rounded-[12px] border border-dashed border-pebble bg-stone/30">
+                      <Calendar className="h-8 w-8 text-ash/60 mx-auto mb-2.5" />
+                      <p className="text-sm font-semibold text-onyx">
+                        {scheduleTab === "TODAY"
+                          ? "No jobs scheduled for today"
+                          : "No upcoming jobs scheduled"}
+                      </p>
+                      <p className="text-xs text-ash mt-1 max-w-sm mx-auto">
+                        {scheduleTab === "TODAY"
+                          ? "Check the Upcoming tab to see work orders scheduled for tomorrow or future dates."
+                          : "New work orders assigned by your Site Manager or Project Manager will appear here."}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return currentList.map((job) => {
+                  const schedState = getJobScheduleState(job.startDate || job.due);
+                  return (
+                    <div
+                      key={job.id}
+                      onClick={() => router.push(`/jobs?jobId=${job.id}`)}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-3.5 sm:p-4 rounded-[12px] border border-pebble/80 hover:bg-stone/50 transition cursor-pointer bg-white group"
+                    >
+                      <div className="flex items-start sm:items-center gap-3 min-w-0">
+                        <div className="rounded-[8px] bg-stone px-2 py-1 text-xs font-bold text-onyx border border-pebble/70 shrink-0">
+                          {job.id}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-bold text-onyx truncate group-hover:text-forest transition">
+                            {job.title}
+                          </p>
+                          <p className="text-[11px] text-ash truncate mt-0.5">
+                            {job.projectName || job.location || "Assigned Site"}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs sm:text-sm font-bold text-onyx truncate group-hover:text-forest transition">
-                          {job.title}
-                        </p>
-                        <p className="text-[11px] text-ash truncate mt-0.5">
-                          {job.projectName || job.location || "Assigned Site"}
-                        </p>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-pebble/50">
+                        {/* Schedule Badge */}
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border whitespace-nowrap ${schedState.badgeColor}`}
+                          title={`Scheduled: ${schedState.scheduledDateFormatted}`}
+                        >
+                          {schedState.badgeText}
+                        </span>
+
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
+                            job.status === "Travelling"
+                              ? "bg-purple-50 text-purple-800 border-purple-200"
+                              : job.status === "On-site" || job.status === "In Progress"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : job.status === "Completed"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : "bg-sky-50 text-sky-800 border-sky-200"
+                          }`}
+                        >
+                          {job.status || "Scheduled"}
+                        </span>
+
+                        {job.status === "Scheduled" ? (
+                          schedState.allowDirectTravel ? (
+                            <button
+                              type="button"
+                              onClick={(e) => handleJobTravelAction(job, e)}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-[8px] bg-forest hover:bg-[#083a2d] text-white text-xs font-bold transition shadow-2xs cursor-pointer"
+                            >
+                              <Car className="h-3.5 w-3.5" />
+                              <span>Start Travel</span>
+                            </button>
+                          ) : schedState.category === "TOMORROW" ? (
+                            <button
+                              type="button"
+                              onClick={(e) => handleJobTravelAction(job, e)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-[8px] bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition shadow-2xs cursor-pointer"
+                              title="Job is scheduled for tomorrow. Click to confirm early travel if mobilizing early."
+                            >
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>Starts Tomorrow</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => handleJobTravelAction(job, e)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-[8px] bg-stone hover:bg-mist text-onyx border border-pebble text-xs font-semibold transition shadow-2xs cursor-pointer"
+                              title={`Scheduled for ${schedState.scheduledDateFormatted}. Click to confirm early travel.`}
+                            >
+                              <Calendar className="h-3.5 w-3.5 text-ash" />
+                              <span>{schedState.scheduledDateFormatted}</span>
+                            </button>
+                          )
+                        ) : job.status === "Travelling" ? (
+                          <button
+                            type="button"
+                            onClick={(e) => handleAdvanceStatus(job, e)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-[8px] bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-2xs cursor-pointer"
+                          >
+                            <MapPin className="h-3.5 w-3.5" />
+                            <span>Arrive On-site</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/jobs?jobId=${job.id}`);
+                            }}
+                            className="px-3 py-1.5 rounded-[8px] bg-white hover:bg-stone text-onyx border border-pebble text-xs font-semibold transition shadow-2xs cursor-pointer"
+                          >
+                            View Details
+                          </button>
+                        )}
+
+                        <ChevronRight className="h-4 w-4 text-ash group-hover:text-onyx transition shrink-0 hidden sm:block" />
                       </div>
                     </div>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-pebble/50">
-                      <span className="text-xs text-ash font-medium whitespace-nowrap">
-                        {job.timeSlot || job.due || "Today"}
-                      </span>
-
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
-                          job.status === "Travelling"
-                            ? "bg-purple-50 text-purple-800 border-purple-200"
-                            : job.status === "On-site" || job.status === "In Progress"
-                            ? "bg-amber-50 text-amber-800 border-amber-200"
-                            : job.status === "Completed"
-                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                            : "bg-sky-50 text-sky-800 border-sky-200"
-                        }`}
-                      >
-                        {job.status || "Scheduled"}
-                      </span>
-
-                      {job.status === "Scheduled" ? (
-                        <button
-                          type="button"
-                          onClick={(e) => handleAdvanceStatus(job, e)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-[8px] bg-forest hover:bg-[#083a2d] text-white text-xs font-bold transition shadow-2xs cursor-pointer"
-                        >
-                          <Car className="h-3.5 w-3.5" />
-                          <span>Start Travel</span>
-                        </button>
-                      ) : job.status === "Travelling" ? (
-                        <button
-                          type="button"
-                          onClick={(e) => handleAdvanceStatus(job, e)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-[8px] bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-2xs cursor-pointer"
-                        >
-                          <MapPin className="h-3.5 w-3.5" />
-                          <span>Arrive On-site</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/jobs?jobId=${job.id}`);
-                          }}
-                          className="px-3 py-1.5 rounded-[8px] bg-white hover:bg-stone text-onyx border border-pebble text-xs font-semibold transition shadow-2xs cursor-pointer"
-                        >
-                          View Details
-                        </button>
-                      )}
-
-                      <ChevronRight className="h-4 w-4 text-ash group-hover:text-onyx transition shrink-0 hidden sm:block" />
-                    </div>
-                  </div>
-                ))
-              )}
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>
@@ -541,6 +637,76 @@ export default function FieldWorkerDashboard({
           }}
           currentUserName={currentUser?.name || "Rahul Kumar"}
         />
+      )}
+
+      {/* Early Travel Confirmation Modal */}
+      {earlyTravelConfirmJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-[16px] bg-white border border-pebble p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-pebble/60 pb-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-600" />
+                <h3 className="text-base font-bold text-onyx">Early Travel Confirmation</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEarlyTravelConfirmJob(null)}
+                className="text-ash hover:text-onyx cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3.5 rounded-[10px] bg-amber-50 border border-amber-200 text-amber-900 space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-xs">
+                  <Calendar className="h-4 w-4 text-amber-700 shrink-0" />
+                  <span>
+                    Job is scheduled for{" "}
+                    {getJobScheduleState(earlyTravelConfirmJob.startDate || earlyTravelConfirmJob.due).scheduledDateFormatted} (
+                    {getJobScheduleState(earlyTravelConfirmJob.startDate || earlyTravelConfirmJob.due).category === "TOMORROW"
+                      ? "Tomorrow"
+                      : "Future Date"}
+                    )
+                  </span>
+                </p>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Your Project Manager or Site Manager scheduled this work order for a later date. Starting travel now will update your live status to <strong>Travelling</strong> on the management dashboard.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-[8px] bg-stone/70 border border-pebble space-y-1">
+                <p className="font-bold text-onyx">{earlyTravelConfirmJob.id}: {earlyTravelConfirmJob.title}</p>
+                <p className="text-[11px] text-ash">
+                  Site: {earlyTravelConfirmJob.projectName || earlyTravelConfirmJob.location || "Assigned Site"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-3 border-t border-pebble/60">
+              <button
+                type="button"
+                onClick={() => setEarlyTravelConfirmJob(null)}
+                className="px-3.5 py-2 rounded-[8px] bg-stone hover:bg-mist text-ash hover:text-onyx font-bold text-xs transition cursor-pointer"
+              >
+                Cancel (Wait for Scheduled Date)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const j = earlyTravelConfirmJob;
+                  setEarlyTravelConfirmJob(null);
+                  updateJobStatus(j.id, "Travelling");
+                  toast.success(`${j.id}: Status changed to Travelling (mobilized ahead of schedule). Safe travels!`);
+                }}
+                className="px-4 py-2 rounded-[8px] bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition shadow-2xs cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Car className="h-3.5 w-3.5" />
+                <span>Confirm &amp; Start Travel Early</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast";
 import {
   FileCheck2,
   Plus,
@@ -57,7 +58,7 @@ function QuotationsContent() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedOppId, setSelectedOppId] = useState<string>("");
   const [quoteNo, setQuoteNo] = useState("");
-  const [validUntil, setValidUntil] = useState("2025-11-30");
+  const [validUntil, setValidUntil] = useState("2026-11-30");
   const [lineItems, setLineItems] = useState<QuoteLineItem[]>([
     { id: 1, description: "", qty: 1, rate: 0, amount: 0 },
   ]);
@@ -720,7 +721,7 @@ function QuotationsContent() {
                 <Button
                   type="button"
                   onClick={() => {
-                    alert("Quotation PDF generated successfully!");
+                    toast.success("Quotation PDF generated successfully!");
                   }}
                   className="bg-forest hover:bg-forest-hover text-white text-xs"
                 >

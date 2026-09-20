@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { useToast, ToastItem } from "./toast";
+import { useToast, ToastItem, toast } from "./toast";
 import { cn } from "@/lib/utils";
 
 export type ToasterPosition =
@@ -36,6 +36,27 @@ export function Toaster({
 
   React.useEffect(() => {
     setMounted(true);
+
+    // Global interceptor: replace native browser alert() dialogs with Firma Toasts
+    if (typeof window !== "undefined") {
+      const originalAlert = window.alert;
+      window.alert = (msg?: unknown) => {
+        const text = String(msg ?? "");
+        if (/success|saved|created|updated|approved|recorded|exported|awarded/i.test(text)) {
+          toast.success(text);
+        } else if (/error|failed|invalid|not found|already exists/i.test(text)) {
+          toast.error(text);
+        } else if (/please|required|warning|must be|select/i.test(text)) {
+          toast.warning(text);
+        } else {
+          toast.info(text);
+        }
+      };
+
+      return () => {
+        window.alert = originalAlert;
+      };
+    }
   }, []);
 
   if (!mounted || toasts.length === 0) {
@@ -47,7 +68,7 @@ export function Toaster({
       data-firma-toaster
       aria-label="Notifications"
       className={cn(
-        "fixed z-[9999] flex flex-col gap-2.5 pointer-events-none max-w-[420px] w-full p-2 sm:p-0",
+        "fixed z-[999999] flex flex-col gap-2.5 pointer-events-none max-w-[420px] w-full p-3 sm:p-4",
         positionClasses[position],
         className
       )}

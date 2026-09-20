@@ -41,17 +41,20 @@ import {
   getAssignedJobs,
 } from "@/lib/roleAccess";
 import { db } from "@/lib/db";
+import { getJobScheduleState, formatDisplayDate } from "@/lib/dateValidation";
 
-interface SiteManagerDashboardProps {
-  companyName?: string;
+interface SiteDashboardProps {
+  companyName: string;
 }
 
-export default function SiteManagerDashboard({ companyName }: SiteManagerDashboardProps) {
+export default function SiteManagerDashboard({ companyName }: SiteDashboardProps) {
   const currentUser = useAuthStore((state) => state.currentUser);
   const rawJobs = useTenderFlowStore((state) => state.jobs) || [];
   const rawSites = useSiteStore((state) => state.sites) || [];
   const rawScheduledJobs = useSchedulingStore((state) => state.scheduledJobs) || [];
   const allProjects = useLeadFlowStore((state) => state.projects) || [];
+
+  const [scheduleTab, setScheduleTab] = useState<"TODAY" | "UPCOMING">("TODAY");
 
   const assignedProjects = useMemo(() => {
     return getAssignedProjects(allProjects, rawSites, currentUser);
@@ -78,6 +81,21 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
       return siteMatch || jobMatch;
     });
   }, [rawScheduledJobs, sites, jobs]);
+
+  // Separate Today's jobs from Upcoming & Tomorrow's jobs
+  const todayScheduledJobs = useMemo(() => {
+    return scheduledJobs.filter((sj) => {
+      const sched = getJobScheduleState(sj.startDate || sj.date);
+      return sched.category === "TODAY" || sched.category === "OVERDUE" || sj.status === "In Progress" || sj.status === "Completed";
+    });
+  }, [scheduledJobs]);
+
+  const upcomingScheduledJobs = useMemo(() => {
+    return scheduledJobs.filter((sj) => {
+      const sched = getJobScheduleState(sj.startDate || sj.date);
+      return sched.category === "TOMORROW" || sched.category === "FUTURE";
+    });
+  }, [scheduledJobs]);
 
   const [teamCount, setTeamCount] = useState<number>(0);
 
@@ -328,17 +346,43 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
         <div className="lg:col-span-2 space-y-6">
           {/* Today's Schedule Card */}
           <div className="rounded-[16px] bg-white border border-pebble/80 shadow-2xs overflow-hidden">
-            <div className="px-6 py-4 border-b border-pebble/60 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-pebble/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-onyx flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-forest" />
-                  <span>Today's Schedule</span>
-                </h2>
-                <p className="text-xs text-ash mt-0.5">Assigned teams, workers, and planned execution slots.</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setScheduleTab("TODAY")}
+                    className={`px-3 py-1 rounded-[8px] text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                      scheduleTab === "TODAY"
+                        ? "bg-forest text-white shadow-xs"
+                        : "bg-stone text-ash hover:text-onyx"
+                    }`}
+                  >
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>Today&apos;s Schedule ({todayScheduledJobs.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScheduleTab("UPCOMING")}
+                    className={`px-3 py-1 rounded-[8px] text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                      scheduleTab === "UPCOMING"
+                        ? "bg-forest text-white shadow-xs"
+                        : "bg-stone text-ash hover:text-onyx"
+                    }`}
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>Upcoming ({upcomingScheduledJobs.length})</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-ash mt-1.5">
+                  {scheduleTab === "TODAY"
+                    ? "Execution slots scheduled for today and active shifts."
+                    : "Jobs and contractor packages planned for tomorrow or future dates."}
+                </p>
               </div>
               <Link
                 href="/scheduling"
-                className="text-xs font-bold text-forest hover:underline flex items-center gap-1"
+                className="text-xs font-bold text-forest hover:underline flex items-center gap-1 self-end sm:self-auto"
               >
                 <span>Full Timeline</span>
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -346,68 +390,91 @@ export default function SiteManagerDashboard({ companyName }: SiteManagerDashboa
             </div>
 
             <div className="p-6">
-              {scheduledJobs.length === 0 ? (
-                <div className="p-8 text-center bg-stone/20 rounded-[12px] border border-dashed border-pebble/80">
-                  <Calendar className="h-8 w-8 text-ash mx-auto mb-2 opacity-50" />
-                  <p className="text-sm font-semibold text-onyx">No jobs scheduled for today</p>
-                  <p className="text-xs text-ash mt-1 max-w-sm mx-auto">
-                    Assign workers to upcoming jobs and plan shifts on the scheduling timeline.
-                  </p>
-                  <Link
-                    href="/scheduling"
-                    className="inline-flex items-center gap-1.5 mt-3 px-3.5 py-1.5 rounded-[8px] bg-forest text-white text-xs font-semibold hover:bg-forest-hover transition cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Go to Scheduling</span>
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {scheduledJobs.slice(0, 5).map((item) => (
-                    <div
-                      key={item.id}
-                      className="p-3.5 rounded-[12px] bg-stone/40 border border-pebble/60 hover:bg-stone/80 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    >
-                      <div className="flex items-start sm:items-center gap-3">
-                        <div className="h-10 w-16 rounded-[8px] bg-white border border-pebble/80 flex items-center justify-center font-black text-xs text-onyx shrink-0 shadow-2xs">
-                          {item.timeSlot || "Slot"}
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-onyx">{item.title}</h4>
-                          <p className="text-xs text-ash mt-0.5 flex items-center gap-2">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3 text-ash" /> {item.site || "General Site"}
-                            </span>
-                            <span className="text-pebble">•</span>
-                            <span>{item.worker || "Unassigned"}</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-start sm:self-center">
-                        <span
-                          className={`px-2.5 py-1 rounded-[6px] text-xs font-bold ${
-                            item.status === "Completed"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : item.status === "In Progress"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-stone text-onyx border border-pebble"
-                          }`}
-                        >
-                          {item.status}
-                        </span>
-                        <Link
-                          href="/jobs"
-                          className="p-1.5 rounded-[6px] hover:bg-white text-ash hover:text-onyx transition"
-                          title="View Job"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </Link>
-                      </div>
+              {(() => {
+                const activeList = scheduleTab === "TODAY" ? todayScheduledJobs : upcomingScheduledJobs;
+                if (activeList.length === 0) {
+                  return (
+                    <div className="p-8 text-center bg-stone/20 rounded-[12px] border border-dashed border-pebble/80">
+                      <Calendar className="h-8 w-8 text-ash mx-auto mb-2 opacity-50" />
+                      <p className="text-sm font-semibold text-onyx">
+                        {scheduleTab === "TODAY"
+                          ? "No jobs scheduled for today"
+                          : "No upcoming jobs found"}
+                      </p>
+                      <p className="text-xs text-ash mt-1 max-w-sm mx-auto">
+                        {scheduleTab === "TODAY"
+                          ? "Check the Upcoming tab to view tomorrow's or future scheduled work."
+                          : "Assign field workers to upcoming project milestones on the scheduling timeline."}
+                      </p>
+                      <Link
+                        href="/scheduling"
+                        className="inline-flex items-center gap-1.5 mt-3 px-3.5 py-1.5 rounded-[8px] bg-forest text-white text-xs font-semibold hover:bg-forest-hover transition cursor-pointer"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Go to Scheduling</span>
+                      </Link>
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {activeList.slice(0, 6).map((item) => {
+                      const schedState = getJobScheduleState(item.startDate || item.date);
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-3.5 rounded-[12px] bg-stone/40 border border-pebble/60 hover:bg-stone/80 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div className="flex items-start sm:items-center gap-3">
+                            <div className="h-10 w-16 rounded-[8px] bg-white border border-pebble/80 flex items-center justify-center font-black text-xs text-onyx shrink-0 shadow-2xs">
+                              {item.timeSlot || "Slot"}
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-onyx">{item.title}</h4>
+                              <p className="text-xs text-ash mt-0.5 flex items-center gap-2">
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3 text-ash" /> {item.site || "General Site"}
+                                </span>
+                                <span className="text-pebble">•</span>
+                                <span>{item.worker || "Unassigned"}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 self-start sm:self-center">
+                            {/* Schedule Badge */}
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap ${schedState.badgeColor}`}
+                            >
+                              {schedState.badgeText}
+                            </span>
+
+                            <span
+                              className={`px-2.5 py-1 rounded-[6px] text-xs font-bold ${
+                                item.status === "Completed"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : item.status === "In Progress"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-stone text-onyx border border-pebble"
+                              }`}
+                            >
+                              {item.status}
+                            </span>
+                            <Link
+                              href="/jobs"
+                              className="p-1.5 rounded-[6px] hover:bg-white text-ash hover:text-onyx transition"
+                              title="View Job"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Link>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

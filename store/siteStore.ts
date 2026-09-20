@@ -30,7 +30,53 @@ interface SiteState {
   resetToDefaults: () => void;
 }
 
-export const defaultSitesList: ConstructionSite[] = [];
+export const defaultSitesList: ConstructionSite[] = [
+  {
+    id: "SITE-BHP",
+    name: "Bhopal Site",
+    projectName: "ABC Commercial Building",
+    address: "Hoshangabad Road, Zone II",
+    city: "Bhopal",
+    state: "Madhya Pradesh",
+    pincode: "462011",
+    siteManagerName: "Site Manager",
+    status: "Active",
+    startDate: "01 Aug 2026",
+    expectedCompletion: "30 Nov 2026",
+    totalAreaSqFt: "45,000 sq.ft",
+    createdAt: "2026-08-01",
+  },
+  {
+    id: "SITE-SKY",
+    name: "Skyline Apartments Main Yard",
+    projectName: "Skyline Apartments • Phase 1",
+    address: "Plot 42, Sector 62, Golf Course Ext Road",
+    city: "Gurugram",
+    state: "Haryana",
+    pincode: "122011",
+    siteManagerName: "Site Manager",
+    status: "Active",
+    startDate: "15 Jul 2026",
+    expectedCompletion: "15 Jan 2027",
+    totalAreaSqFt: "85,000 sq.ft",
+    createdAt: "2026-07-15",
+  },
+  {
+    id: "SITE-APX",
+    name: "Apex Tech Park Site Yard",
+    projectName: "Apex Tech Park & Corporate Towers",
+    address: "Plot 14, Sector 63, Electronic City",
+    city: "Noida",
+    state: "Uttar Pradesh",
+    pincode: "201301",
+    siteManagerName: "Site Manager",
+    status: "Active",
+    startDate: "01 Sep 2026",
+    expectedCompletion: "28 Feb 2027",
+    totalAreaSqFt: "1,20,000 sq.ft",
+    createdAt: "2026-09-01",
+  },
+];
 
 export const useSiteStore = create<SiteState>()(
   persist(
@@ -102,6 +148,24 @@ export const useSiteStore = create<SiteState>()(
             sessionStorage.removeItem(name);
           } catch (e) {}
         },
+      },
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        if (!state.sites || state.sites.length === 0) {
+          state.sites = [...defaultSitesList];
+        } else if (state.sites.length < 3) {
+          defaultSitesList.forEach((ds) => {
+            if (
+              !state.sites.some(
+                (s) =>
+                  s.id === ds.id ||
+                  s.name.toLowerCase() === ds.name.toLowerCase()
+              )
+            ) {
+              state.sites.push(ds);
+            }
+          });
+        }
       },
     }
   )

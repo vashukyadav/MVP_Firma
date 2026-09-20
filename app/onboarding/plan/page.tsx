@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { db, type PlanType } from "@/lib/db";
 import { useAuthStore } from "@/store/authStore";
+import { toast } from "@/components/ui/toast";
 import { OnboardingHeader } from "@/components/onboarding/OnboardingHeader";
 import { OnboardingStepper } from "@/components/onboarding/OnboardingStepper";
 import { Check, ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
@@ -62,7 +63,7 @@ export default function PlanPage() {
   // ── ALL ORIGINAL LOGIC PRESERVED ──────────────────────────────────────
   const handleContinue = async () => {
     if (!currentUser?.id) {
-      alert("User not found. Please login again.");
+      toast.error("User not found. Please login again.");
       return;
     }
 

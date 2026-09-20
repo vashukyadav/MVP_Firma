@@ -9,8 +9,15 @@ export interface ScheduledJob {
   site: string; // e.g. "Main Site"
   worker: string; // e.g. "Amit Verma"
   workerRole?: string; // e.g. "Field Worker"
+  contractorName?: string; // e.g. "apex solutions"
+  siteManagerName?: string; // e.g. "SM"
+  siteManagerId?: string;
   date: string; // ISO date "2026-09-15" or formatted "15 Sep 2026"
   dateFormatted?: string; // "15 Sep 2026"
+  startDate?: string;
+  endDate?: string;
+  deadline?: string;
+  durationDisplay?: string;
   startTime: string; // "08:30 AM" or "09:00 AM"
   endTime: string; // "10:00 AM" or "05:00 PM"
   timeSlot: string; // "09:00 AM - 05:00 PM" or "8:30 AM - 10:00 AM"
@@ -34,6 +41,12 @@ export interface UnscheduledJob {
   priority: "High" | "Medium" | "Low";
   estimatedHours: string;
   description: string;
+  startDate?: string;
+  endDate?: string;
+  deadline?: string;
+  contractorName?: string;
+  siteManagerName?: string;
+  siteManagerId?: string;
 }
 
 export interface FieldWorker {
@@ -65,7 +78,13 @@ interface SchedulingState {
     site: string;
     worker: string;
     workerRole?: string;
+    contractorName?: string;
+    siteManagerName?: string;
+    siteManagerId?: string;
     date: string;
+    startDate?: string;
+    endDate?: string;
+    deadline?: string;
     timeRange: string;
     notes?: string;
     colorScheme?: "emerald" | "indigo" | "rose" | "teal" | "amber";
@@ -149,6 +168,9 @@ export const useSchedulingStore = create<SchedulingState>()(
             ? data.timeRange.split("-").map((s) => s.trim())
             : [data.timeRange, "05:00 PM"];
 
+        const startDate = data.startDate || data.date;
+        const endDate = data.endDate || data.deadline || data.date;
+
         const newScheduledJob: ScheduledJob = {
           id: data.jobId,
           title: data.title,
@@ -156,8 +178,14 @@ export const useSchedulingStore = create<SchedulingState>()(
           site: data.site,
           worker: data.worker,
           workerRole: data.workerRole || "Field Worker",
+          contractorName: data.contractorName,
+          siteManagerName: data.siteManagerName,
+          siteManagerId: data.siteManagerId,
           date: data.date,
           dateFormatted,
+          startDate,
+          endDate,
+          deadline: data.deadline || endDate,
           startTime,
           endTime,
           timeSlot: data.timeRange,

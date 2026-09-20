@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { db } from "@/lib/db";
 import { useAuthStore } from "@/store/authStore";
+import { toast } from "@/components/ui/toast";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Building2, Eye, EyeOff, ArrowRight, Shield } from "lucide-react";
@@ -41,7 +42,7 @@ export default function LoginPage() {
             .first();
 
         if (!user || user.password !== data.password) {
-            alert("Invalid email or password");
+            toast.error("Invalid email or password");
             setIsLoading(false);
             return;
         }
@@ -130,7 +131,7 @@ export default function LoginPage() {
                     </div>
 
                     {/* Bottom footer text */}
-                    <p className="text-[11px] text-stone/40">&copy; 2025 FIRMA. All rights reserved.</p>
+                    <p className="text-[11px] text-stone/40">&copy; {new Date().getFullYear()} FIRMA. All rights reserved.</p>
                 </div>
             </div>
 

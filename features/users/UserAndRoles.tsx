@@ -12,6 +12,7 @@ import { db, type User as DbUser, type CrewRole } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast";
 import {
   User as UserIcon,
   Mail,
@@ -95,6 +96,7 @@ export default function UsersAndRoles() {
     }
 
     await loadUsers();
+    toast.success("Team member deleted successfully!");
   };
 
   const handleEdit = (user: DbUser) => {
@@ -146,7 +148,7 @@ export default function UsersAndRoles() {
         } catch (e) {}
       }
 
-      alert("User updated successfully!");
+      toast.success("User updated successfully!");
 
       setEditingUser(null);
       setShowForm(false);
@@ -158,7 +160,7 @@ export default function UsersAndRoles() {
 
     // CREATE
     if (!data.password || data.password.length < 6) {
-      alert("Password must be at least 6 characters for a new user.");
+      toast.warning("Password must be at least 6 characters for a new user.");
       return;
     }
 
@@ -169,7 +171,7 @@ export default function UsersAndRoles() {
       .first();
 
     if (existingUser) {
-      alert("User with this email already exists");
+      toast.error("User with this email already exists");
       return;
     }
 
@@ -217,7 +219,7 @@ export default function UsersAndRoles() {
       }
     }
 
-    alert("User created successfully!");
+    toast.success("User created successfully!");
 
     reset();
     setShowForm(false);

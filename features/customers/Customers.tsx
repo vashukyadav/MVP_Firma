@@ -13,6 +13,7 @@ import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/components/ui/toast";
 import { Plus, X, Building, User, Mail, Phone, MapPin, Briefcase } from "lucide-react";
 
 /* =========================================================
@@ -104,7 +105,7 @@ export default function Customers() {
 
     await db.customer.delete(id);
 
-    alert("Customer deleted successfully!");
+    toast.success("Customer deleted successfully!");
 
     await loadCustomers();
   };
@@ -149,7 +150,7 @@ export default function Customers() {
         notes: data.notes ?? "",
       });
 
-      alert("Customer updated successfully!");
+      toast.success("Customer updated successfully!");
 
       setEditingCustomer(null);
 
@@ -175,7 +176,7 @@ export default function Customers() {
       .first();
 
     if (existingCustomer) {
-      alert("A customer with this email already exists in your company");
+      toast.error("A customer with this email already exists in your company");
       return;
     }
 
@@ -194,7 +195,7 @@ export default function Customers() {
       notes: data.notes ?? "",
     });
 
-    alert("Customer created successfully!");
+    toast.success("Customer created successfully!");
 
     reset();
 

@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { db, generateCompanyId } from "@/lib/db";
+import { toast } from "@/components/ui/toast";
 import {
     Building2,
     Eye,
@@ -63,7 +64,7 @@ export default function SignupPage() {
                 .first();
 
             if (existingUser) {
-                alert("A user with this email already exists. Please log in.");
+                toast.error("A user with this email already exists. Please log in.");
                 setIsLoading(false);
                 return;
             }
@@ -96,7 +97,7 @@ export default function SignupPage() {
             router.push("/login");
         } catch (err) {
             console.error("Signup failed:", err);
-            alert("Signup failed. Please try again.");
+            toast.error("Signup failed. Please try again.");
             setIsLoading(false);
         }
     };
@@ -175,7 +176,7 @@ export default function SignupPage() {
                         </div>
                     </div>
 
-                    <p className="text-[11px] text-stone/40">&copy; 2025 FIRMA. All rights reserved.</p>
+                    <p className="text-[11px] text-stone/40">&copy; {new Date().getFullYear()} FIRMA. All rights reserved.</p>
                 </div>
             </div>
 

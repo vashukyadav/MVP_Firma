@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { db, type Company } from "@/lib/db";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import { toast } from "@/components/ui/toast";
 import {
   Building,
   MapPin,
@@ -84,7 +85,7 @@ export default function CompanyPage() {
     if (!company) return;
     await db.company.put(company);
     setEditing(false);
-    alert("Company information updated successfully!");
+    toast.success("Company information updated successfully!");
   };
 
   if (loading) {

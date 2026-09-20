@@ -45,7 +45,7 @@ export default function TimesheetsPage() {
   }, [jobs, isWorker, currentUser]);
 
   const [entries, setEntries] = useState<TimesheetEntry[]>(initialEntries);
-  const [currentWeekRange, setCurrentWeekRange] = useState("13 Oct 2025 - 19 Oct 2025");
+  const [currentWeekRange, setCurrentWeekRange] = useState("13 Oct 2026 - 19 Oct 2026");
   const [weekOffset, setWeekOffset] = useState(0);
 
   // Modal State
@@ -54,7 +54,7 @@ export default function TimesheetsPage() {
   const [viewingEntry, setViewingEntry] = useState<TimesheetEntry | null>(null);
 
   // Form State
-  const [formDate, setFormDate] = useState("16 Sep 2025");
+  const [formDate, setFormDate] = useState("16 Sep 2026");
   const [formJob, setFormJob] = useState("");
   const [formHours, setFormHours] = useState("4");
   const [formNotes, setFormNotes] = useState("");
@@ -70,12 +70,12 @@ export default function TimesheetsPage() {
 
   const handlePrevWeek = () => {
     setWeekOffset(weekOffset - 1);
-    setCurrentWeekRange("06 Oct 2025 - 12 Oct 2025");
+    setCurrentWeekRange("06 Oct 2026 - 12 Oct 2026");
   };
 
   const handleNextWeek = () => {
     setWeekOffset(weekOffset + 1);
-    setCurrentWeekRange("20 Oct 2025 - 26 Oct 2025");
+    setCurrentWeekRange("20 Oct 2026 - 26 Oct 2026");
   };
 
   const handleOpenAdd = () => {

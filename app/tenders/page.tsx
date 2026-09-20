@@ -12,6 +12,8 @@ import { db, type Customer } from "@/lib/db";
 import { useAuthStore } from "@/store/authStore";
 import { useLeadFlowStore } from "@/store/leadFlowStore";
 import { useCrewStore, type CrewMember } from "@/store/crewStore";
+import { toast } from "@/components/ui/toast";
+import { validateTimelineWithinProject } from "@/lib/dateValidation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +25,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Calendar,
+  AlertCircle,
   Building,
   Mail,
   Check,
@@ -176,11 +179,13 @@ export default function TenderPage() {
   const [step2Tab, setStep2Tab] = useState<"Overview" | "Details" | "Documents" | "Activity">("Overview");
 
   // Step 3 Create Tender Form State
-  const [tenderTitle, setTenderTitle] = useState<string>("");
+  const allProjects = useLeadFlowStore((state) => state.projects || []);
+  const [tenderTitle, setTenderTitle] = useState<string>("Electrical Work - Main Package");
   const [tenderCategory, setTenderCategory] = useState<string>("Electrical");
   const [tenderDesc, setTenderDesc] = useState<string>("");
-  const [tenderEstimatedValue, setTenderEstimatedValue] = useState<string>("");
-  const [tenderDeadline, setTenderDeadline] = useState<string>("");
+  const [tenderEstimatedValue, setTenderEstimatedValue] = useState<string>("250000");
+  const [tenderDeadline, setTenderDeadline] = useState<string>("02 Feb 2027");
+  const [tenderDateError, setTenderDateError] = useState<string | null>(null);
 
   // Step 4/6/8 Tabs
   const [tenderTab, setTenderTab] = useState<
@@ -331,6 +336,30 @@ export default function TenderPage() {
     e.preventDefault();
     if (!tenderTitle.trim() || !activeOpp) return;
 
+    // Validate Tender Deadline against Project Timeline decided by Sales
+    const matchedProj = allProjects.find(
+      (p) => p.name.toLowerCase() === (activeOpp?.projectName || "").toLowerCase()
+    );
+    const pStart = matchedProj?.startDate || activeOpp?.expectedStart;
+    const pEnd = matchedProj?.endDate || matchedProj?.due;
+
+    const deadlineToUse =
+      tenderDeadline.trim() ||
+      pEnd ||
+      new Date(Date.now() + 30 * 86400000).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+
+    const valResult = validateTimelineWithinProject(deadlineToUse, undefined, pStart, pEnd);
+    if (!valResult.isValid) {
+      setTenderDateError(valResult.error || "Tender deadline is beyond project duration.");
+      toast.error(valResult.error || "Tender deadline cannot exceed project end date!");
+      return;
+    }
+    setTenderDateError(null);
+
     const numVal = parseInt(tenderEstimatedValue.replace(/[^0-9]/g, ""), 10) || 250000;
     const newTenderId = createTender({
       opportunityId: activeOpp.id,
@@ -339,15 +368,10 @@ export default function TenderPage() {
       category: tenderCategory,
       description: tenderDesc.trim(),
       estimatedValue: numVal,
-      submissionDeadline:
-        tenderDeadline.trim() ||
-        new Date(Date.now() + 30 * 86400000).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
+      submissionDeadline: deadlineToUse,
     });
 
+    toast.success(`Tender package "${tenderTitle.trim()}" created successfully!`);
     setActiveTender(newTenderId);
     goToStep(4);
   };
@@ -1078,6 +1102,39 @@ export default function TenderPage() {
                   />
                 </div>
 
+                {/* Project Timeline Window Indicator */}
+                {(() => {
+                  const matchedP = allProjects.find(
+                    (p) => p.name.toLowerCase() === (activeOpp?.projectName || "").toLowerCase()
+                  );
+                  const pStart = matchedP?.startDate || activeOpp?.expectedStart || "20 Sep 2026";
+                  const pEnd = matchedP?.endDate || matchedP?.due || "02 Feb 2027";
+                  return (
+                    <div className="p-3 rounded-[10px] bg-stone/70 border border-pebble/80 text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-bold text-onyx">
+                          <Calendar className="h-4 w-4 text-forest shrink-0" />
+                          <span>Sales Project Window:</span>
+                          <span className="text-forest underline font-black">{pStart} – {pEnd}</span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-ash bg-white px-2 py-0.5 rounded border border-pebble">
+                          Decided by Sales Manager
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-ash">
+                        Tender bidding and submission deadline must conclude on or before project deadline ({pEnd}).
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {tenderDateError && (
+                  <div className="p-2.5 rounded-[8px] bg-hazard-bg border border-red-200 text-hazard-text text-xs flex items-center gap-2 animate-in fade-in">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                    <span className="font-semibold">{tenderDateError}</span>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-onyx">
@@ -1092,12 +1149,16 @@ export default function TenderPage() {
 
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-onyx">
-                      Submission Deadline
+                      Submission Deadline <span className="text-hazard">*</span>
                     </Label>
                     <Input
                       value={tenderDeadline}
-                      onChange={(e) => setTenderDeadline(e.target.value)}
-                      placeholder="e.g. 30 Sep 2025"
+                      onChange={(e) => {
+                        setTenderDeadline(e.target.value);
+                        setTenderDateError(null);
+                      }}
+                      placeholder="e.g. 02 Feb 2027"
+                      required
                     />
                   </div>
                 </div>

@@ -11,6 +11,7 @@ import {
 } from "@/store/siteStore";
 import { useCrewStore } from "@/store/crewStore";
 import { useSchedulingStore } from "@/store/schedulingStore";
+import { useTenderFlowStore } from "@/store/tenderFlowStore";
 import { useLeadFlowStore } from "@/store/leadFlowStore";
 import { useAuthStore } from "@/store/authStore";
 import { getAssignedSites, getAssignedProjects, isSiteManager, isFieldWorker } from "@/lib/roleAccess";
@@ -18,6 +19,7 @@ import {
   MapPin,
   Building2,
   HardHat,
+  Wrench,
   UserCheck,
   Plus,
   Search,
@@ -46,6 +48,7 @@ export default function SitesPage() {
   const { sites, addSite, updateSite, deleteSite } = useSiteStore();
   const { members: crewMembers = [] } = useCrewStore();
   const { scheduledJobs = [] } = useSchedulingStore();
+  const { jobs: tenderJobs = [], contractors = [] } = useTenderFlowStore();
   const { projects = [] } = useLeadFlowStore();
 
   // Search & Filter State
@@ -101,13 +104,7 @@ export default function SitesPage() {
       try {
         const users = await db.users.toArray();
         const siteMgrs = users
-          .filter(
-            (u) =>
-              u.role === "SITE_MANAGER" ||
-              u.role === "PROJECT_MANAGER" ||
-              u.role === "OWNER" ||
-              u.role === "ACCOUNT_ADMIN"
-          )
+          .filter((u) => u.role === "SITE_MANAGER")
           .map((u) => ({
             id: `user-${u.id}`,
             name: u.name,
@@ -130,10 +127,18 @@ export default function SitesPage() {
         list.push({
           id: m.id,
           name: m.name,
-          role: m.role,
+          role: "Site Manager",
           contact: m.contact,
         });
       }
+    }
+    if (list.length === 0) {
+      list.push({
+        id: "user-default-sm",
+        name: "Site Manager",
+        role: "Site Manager",
+        contact: "+91 98000 00000",
+      });
     }
     return list;
   }, [dbManagers, crewMembers]);
@@ -294,20 +299,114 @@ export default function SitesPage() {
     setEditingSite(null);
   };
 
-  // Helper to count active jobs on this site from schedulingStore
-  const getSiteLiveJobs = (site: ConstructionSite) => {
-    const sName = site.name.toLowerCase();
-    const pName = site.projectName.toLowerCase();
-    return scheduledJobs.filter((j) => {
-      const jSite = (j.site || "").toLowerCase();
-      const jProj = (j.project || "").toLowerCase();
+  // Helper to gather all jobs (tender work packages + scheduling jobs) executing on this site
+  const getSiteWorkPackages = (site: ConstructionSite) => {
+    const sName = (site.name || "").toLowerCase().trim();
+    const pName = (site.projectName || "").toLowerCase().trim();
+    const sId = (site.id || "").toLowerCase().trim();
+
+    // 1. Match tenderFlowStore jobs (awarded contractor packages like JOB-405, plus field tasks)
+    const matchedTenderJobs = tenderJobs.filter((j) => {
+      const jLoc = (j.location || "").toLowerCase().trim();
+      const jProj = (j.projectName || "").toLowerCase().trim();
+      const jSite = ((j as any).siteName || (j as any).site || "").toLowerCase().trim();
+      const jSiteId = ((j as any).siteId || "").toLowerCase().trim();
+
+      const matchesSiteId = Boolean(jSiteId && (jSiteId === sId || sId.includes(jSiteId)));
+      const matchesLoc = Boolean(jLoc && (jLoc.includes(sName) || sName.includes(jLoc)));
+      const matchesSiteName = Boolean(jSite && (jSite.includes(sName) || sName.includes(jSite)));
+      const matchesProj = Boolean(
+        pName &&
+          jProj &&
+          (jProj === pName || jProj.includes(pName) || pName.includes(jProj))
+      );
+
+      return matchesSiteId || matchesLoc || matchesSiteName || matchesProj;
+    });
+
+    // 2. Match schedulingStore scheduledJobs (if any not already in tenderJobs)
+    const matchedSchedJobs = scheduledJobs.filter((sj) => {
+      if (matchedTenderJobs.some((tj) => tj.id === sj.id)) return false;
+      const sjLoc = (sj.site || "").toLowerCase().trim();
+      const sjProj = (sj.project || "").toLowerCase().trim();
       return (
-        jSite.includes(sName) ||
-        sName.includes(jSite) ||
-        jProj.includes(pName) ||
-        pName.includes(jProj)
+        (sjLoc && (sjLoc.includes(sName) || sName.includes(sjLoc))) ||
+        (sjProj && pName && (sjProj === pName || sjProj.includes(pName) || pName.includes(sjProj)))
       );
     });
+
+    // Unified package list
+    const allJobs = [
+      ...matchedTenderJobs.map((tj) => ({
+        id: tj.id,
+        title: tj.title,
+        projectName: tj.projectName,
+        contractorName: tj.contractorName || (tj.isContractorJob ? tj.assignee : undefined),
+        isContractorJob: Boolean(tj.isContractorJob || tj.contractorName),
+        trade: tj.trade || (tj.isContractorJob ? "Specialty Trade" : undefined),
+        status: tj.status || "Scheduled",
+        startDate: tj.startDate || "15 Sep 2026",
+        endDate: tj.endDate || tj.due || "30 Nov 2026",
+        assignee: tj.assignee,
+      })),
+      ...matchedSchedJobs.map((sj) => ({
+        id: sj.id,
+        title: sj.title,
+        projectName: sj.project,
+        contractorName: sj.contractorName,
+        isContractorJob: Boolean(sj.contractorName),
+        trade: sj.contractorName ? "Trade Contractor" : undefined,
+        status: sj.status || "Scheduled",
+        startDate: sj.startDate || sj.date || "15 Sep 2026",
+        endDate: sj.endDate || sj.deadline || "30 Nov 2026",
+        assignee: sj.contractorName || sj.worker,
+      })),
+    ];
+
+    const contractorPackages = allJobs.filter((j) => j.isContractorJob);
+    const internalTasks = allJobs.filter((j) => !j.isContractorJob);
+
+    // Unique active contractors on this site
+    const activeContractors: Array<{ name: string; trade: string; jobId?: string }> = [];
+    contractorPackages.forEach((cp) => {
+      const cName = cp.contractorName || cp.assignee;
+      if (
+        cName &&
+        !activeContractors.some((ac) => ac.name.toLowerCase() === cName.toLowerCase())
+      ) {
+        activeContractors.push({
+          name: cName,
+          trade: cp.trade || "Specialty Trade",
+          jobId: cp.id,
+        });
+      }
+    });
+
+    // Also look up any awarded contractors in contractors array matching this project
+    contractors.forEach((con) => {
+      const cProj = (con.projectName || "").toLowerCase().trim();
+      if (
+        (cProj === pName || cProj.includes(pName) || pName.includes(cProj)) &&
+        !activeContractors.some((ac) => ac.name.toLowerCase() === con.name.toLowerCase())
+      ) {
+        activeContractors.push({
+          name: con.name,
+          trade: con.trade || "Specialty Trade",
+        });
+      }
+    });
+
+    return {
+      allJobs,
+      contractorPackages,
+      internalTasks,
+      activeContractors,
+    };
+  };
+
+  // Helper to count active jobs on this site
+  const getSiteLiveJobs = (site: ConstructionSite) => {
+    return getSiteWorkPackages(site).allJobs;
   };
 
   // Status Badge Helper
@@ -573,7 +672,8 @@ export default function SitesPage() {
             /* 1. GRID CARDS VIEW */
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
               {filteredSites.map((site) => {
-                const liveJobs = getSiteLiveJobs(site);
+                const sitePkg = getSiteWorkPackages(site);
+                const liveJobs = sitePkg.allJobs;
                 const statusBadge = getStatusBadge(site.status);
 
                 return (
@@ -657,6 +757,40 @@ export default function SitesPage() {
                         )}
                       </div>
 
+                      {/* ON-SITE TRADE CONTRACTORS & WORK PACKAGES */}
+                      <div className="mt-3 p-2.5 rounded-[10px] bg-forest/5 border border-forest/20">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-forest uppercase tracking-wider flex items-center gap-1.5">
+                            <HardHat className="h-3.5 w-3.5" />
+                            <span>Trade Contractors on Site ({sitePkg.activeContractors.length})</span>
+                          </span>
+                          {sitePkg.contractorPackages.length > 0 && (
+                            <span className="text-[10px] font-bold text-onyx bg-white px-2 py-0.5 rounded border border-pebble/80 shadow-2xs">
+                              {sitePkg.contractorPackages.length} Work Package{sitePkg.contractorPackages.length > 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </div>
+
+                        {sitePkg.activeContractors.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {sitePkg.activeContractors.map((ac) => (
+                              <span
+                                key={ac.name}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[6px] bg-white border border-forest/30 text-xs font-bold text-onyx shadow-2xs"
+                              >
+                                <Wrench className="h-3 w-3 text-forest" />
+                                <span>{ac.name}</span>
+                                <span className="text-ash font-medium text-[10px]">({ac.trade})</span>
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-ash mt-1 flex items-center gap-1">
+                            <span>Direct execution by internal site crew</span>
+                          </p>
+                        )}
+                      </div>
+
                       {/* Live Execution Stats & Dates */}
                       <div className="mt-3 pt-3 border-t border-pebble/40 grid grid-cols-2 gap-2 text-xs">
                         <div className="flex items-center gap-1.5 text-ash">
@@ -665,6 +799,11 @@ export default function SitesPage() {
                           <span className="font-bold text-onyx">
                             {liveJobs.length}
                           </span>
+                          {sitePkg.contractorPackages.length > 0 && (
+                            <span className="text-[10px] font-bold text-forest bg-forest/10 px-1.5 py-0.2 rounded border border-forest/20">
+                              {sitePkg.contractorPackages.length} trade
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1.5 text-ash">
                           <Calendar className="h-3.5 w-3.5 text-forest shrink-0" />
@@ -745,7 +884,8 @@ export default function SitesPage() {
                 </thead>
                 <tbody className="divide-y divide-pebble/40">
                   {filteredSites.map((site) => {
-                    const liveJobs = getSiteLiveJobs(site);
+                    const sitePkg = getSiteWorkPackages(site);
+                    const liveJobs = sitePkg.allJobs;
                     const statusBadge = getStatusBadge(site.status);
 
                     return (
@@ -821,44 +961,60 @@ export default function SitesPage() {
                         </td>
 
                         {/* Live Tasks */}
-                        <td className="py-3 px-3 font-semibold text-onyx">
-                          <span className="bg-stone px-2 py-0.5 rounded text-xs">
-                            {liveJobs.length} tasks
-                          </span>
+                        <td className="py-3 px-3">
+                          <div className="flex flex-col gap-1">
+                            <span className="bg-stone px-2 py-0.5 rounded text-xs font-semibold text-onyx w-fit">
+                              {liveJobs.length} tasks
+                            </span>
+                            {sitePkg.activeContractors.length > 0 && (
+                              <span className="text-[10px] text-forest font-bold flex items-center gap-1">
+                                <HardHat className="h-3 w-3" />
+                                <span>{sitePkg.activeContractors.length} Contractor{sitePkg.activeContractors.length > 1 ? "s" : ""}</span>
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Actions */}
                         <td className="py-3 px-3 text-right">
-                          {!isFW ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEdit(site)}
-                                className="p-1.5 rounded-[6px] text-ash hover:text-onyx hover:bg-stone transition cursor-pointer"
-                                title="Edit Site"
-                              >
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (
-                                    confirm(
-                                      `Are you sure you want to delete ${site.name}?`
-                                    )
-                                  ) {
-                                    deleteSite(site.id);
-                                  }
-                                }}
-                                className="p-1.5 rounded-[6px] text-ash hover:text-danger-text hover:bg-hazard-bg transition cursor-pointer"
-                                title="Delete Site"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-ash font-medium">Read-only</span>
-                          )}
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setViewingSite(site)}
+                              className="px-2.5 py-1 rounded-[6px] text-xs font-semibold text-forest hover:bg-forest/10 border border-forest/30 transition cursor-pointer"
+                              title="View Scope & Contractors"
+                            >
+                              View Scope
+                            </button>
+                            {!isFW && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEdit(site)}
+                                  className="p-1.5 rounded-[6px] text-ash hover:text-onyx hover:bg-stone transition cursor-pointer"
+                                  title="Edit Site"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (
+                                      confirm(
+                                        `Are you sure you want to delete ${site.name}?`
+                                      )
+                                    ) {
+                                      deleteSite(site.id);
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-[6px] text-ash hover:text-danger-text hover:bg-hazard-bg transition cursor-pointer"
+                                  title="Delete Site"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1333,7 +1489,7 @@ export default function SitesPage() {
       {/* ========================================================================= */}
       {viewingSite && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-lg rounded-[16px] bg-white border border-pebble p-6 shadow-xl relative animate-in zoom-in-95 duration-150">
+          <div className="w-full max-w-2xl rounded-[16px] bg-white border border-pebble p-6 shadow-xl relative animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between pb-3.5 border-b border-pebble/60">
               <div>
                 <span className="font-extrabold text-xs text-forest bg-clear-bg px-2.5 py-0.5 rounded-md">
@@ -1438,27 +1594,151 @@ export default function SitesPage() {
                   </p>
                 </div>
               )}
+
+              {/* ================================================================= */}
+              {/* TRADE CONTRACTORS & WORK PACKAGES ACTIVE ON THIS SITE             */}
+              {/* ================================================================= */}
+              {(() => {
+                const sitePkg = viewingSite ? getSiteWorkPackages(viewingSite) : null;
+                const contractorPackages = sitePkg?.contractorPackages || [];
+
+                return (
+                  <div className="pt-3 border-t border-pebble/60 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <HardHat className="h-4 w-4 text-forest" />
+                        <h4 className="text-xs font-bold text-onyx uppercase tracking-wider">
+                          Trade Contractors &amp; Work Packages Active on this Site
+                        </h4>
+                      </div>
+                      <span className="text-[11px] font-bold text-forest bg-forest/10 px-2.5 py-0.5 rounded-full border border-forest/20">
+                        {contractorPackages.length} Trade Package{contractorPackages.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+
+                    {contractorPackages.length === 0 ? (
+                      <div className="p-4 rounded-[10px] bg-stone/40 border border-pebble text-center text-ash text-xs">
+                        <HardHat className="h-6 w-6 mx-auto mb-1 text-ash/40" />
+                        <p className="font-semibold text-onyx">No Trade Contractors Awarded for this Site Yet</p>
+                        <p className="text-[11px] text-ash mt-0.5">
+                          Contractors awarded tenders for {viewingSite.projectName} will appear here with their execution packages.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setViewingSite(null);
+                            router.push("/contractors");
+                          }}
+                          className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-bold text-forest hover:underline cursor-pointer"
+                        >
+                          <span>Go to Contractors Directory</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {contractorPackages.map((pkg) => (
+                          <div
+                            key={pkg.id}
+                            className="p-3 rounded-[10px] bg-stone/30 border border-pebble/80 hover:border-forest/50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] font-extrabold text-forest bg-clear-bg px-2 py-0.5 rounded border border-forest/20">
+                                  {pkg.id}
+                                </span>
+                                <span className="text-[10px] font-bold text-onyx bg-white px-2 py-0.5 rounded border border-pebble">
+                                  {pkg.trade || "Specialty Trade"}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                    pkg.status === "Completed"
+                                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                      : pkg.status === "In Progress"
+                                      ? "bg-amber-50 text-amber-800 border-amber-200"
+                                      : "bg-sky-50 text-sky-800 border-sky-200"
+                                  }`}
+                                >
+                                  {pkg.status}
+                                </span>
+                              </div>
+
+                              <p className="font-bold text-onyx text-xs mt-1 truncate">
+                                {pkg.title}
+                              </p>
+
+                              <div className="flex flex-wrap items-center gap-2 text-[11px] text-ash mt-1">
+                                <span className="font-bold text-onyx flex items-center gap-1">
+                                  <HardHat className="h-3 w-3 text-forest" />
+                                  <span>Contractor: {pkg.contractorName || pkg.assignee}</span>
+                                </span>
+                                <span>•</span>
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3 text-ash" />
+                                  <span>{pkg.startDate} &ndash; {pkg.endDate}</span>
+                                </span>
+                                <span>•</span>
+                                <span className="text-forest font-semibold">
+                                  Supervised by: {viewingSite.siteManagerName}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setViewingSite(null);
+                                  router.push(`/jobs?jobId=${pkg.id}`);
+                                }}
+                                className="px-2.5 py-1.5 rounded-[7px] bg-forest text-white hover:bg-forest-hover text-xs font-semibold flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                              >
+                                <span>Inspect Job</span>
+                                <ExternalLink className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-4 border-t border-pebble/60 mt-4">
-              <button
-                type="button"
-                onClick={() => setViewingSite(null)}
-                className="rounded-[8px] border border-pebble bg-white px-4 py-2 text-xs font-semibold text-onyx hover:bg-stone transition cursor-pointer"
-              >
-                Close
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-pebble/60 mt-4">
               <button
                 type="button"
                 onClick={() => {
                   setViewingSite(null);
-                  router.push("/scheduling");
+                  router.push(`/jobs?site=${encodeURIComponent(viewingSite.name)}`);
                 }}
-                className="rounded-[8px] bg-forest hover:bg-forest-hover text-white px-4 py-2 text-xs font-semibold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                className="rounded-[8px] border border-forest/30 bg-forest/5 hover:bg-forest/10 text-forest px-3.5 py-2 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
               >
-                <span>View in Scheduling</span>
-                <ExternalLink className="h-3.5 w-3.5" />
+                <Briefcase className="h-3.5 w-3.5" />
+                <span>View All Site Jobs</span>
               </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingSite(null)}
+                  className="rounded-[8px] border border-pebble bg-white px-4 py-2 text-xs font-semibold text-onyx hover:bg-stone transition cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewingSite(null);
+                    router.push("/scheduling");
+                  }}
+                  className="rounded-[8px] bg-forest hover:bg-forest-hover text-white px-4 py-2 text-xs font-semibold transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>View in Scheduling</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

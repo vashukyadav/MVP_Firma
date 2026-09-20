@@ -10,6 +10,9 @@ import {
 } from "@/store/tenderFlowStore";
 import { useCrewStore } from "@/store/crewStore";
 import { useAuthStore } from "@/store/authStore";
+import { useLeadFlowStore } from "@/store/leadFlowStore";
+import { validateTimelineWithinProject } from "@/lib/dateValidation";
+import { toast } from "@/components/ui/toast";
 import {
   HardHat,
   Search,
@@ -65,11 +68,13 @@ export default function ContractorsPage() {
   const [jobTitle, setJobTitle] = useState("");
   const [jobProject, setJobProject] = useState("");
   const [jobLocation, setJobLocation] = useState("");
-  const [jobPriority, setJobPriority] = useState<"High" | "Medium" | "Low">(
-    "High"
-  );
-  const [jobDue, setJobDue] = useState("Next Week");
+  const [jobPriority, setJobPriority] = useState<"High" | "Medium" | "Low">("High");
+  const [jobDue, setJobDue] = useState("02 Feb 2027");
   const [jobDescription, setJobDescription] = useState("");
+  const allProjects = useLeadFlowStore((state) => state.projects || []);
+  const [jobStartDate, setJobStartDate] = useState("20 Sep 2026");
+  const [jobEndDate, setJobEndDate] = useState("02 Feb 2027");
+  const [dateValidationError, setDateValidationError] = useState<string | null>(null);
 
   // Details Modal State
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -294,7 +299,17 @@ export default function ContractorsPage() {
     setJobProject(c.projectName || "Project Site");
     setJobLocation(`${c.projectName}, Main Site Area`);
     setJobPriority("High");
-    setJobDue("Next Week");
+
+    const matchedProj = allProjects.find(
+      (p) => p.name.toLowerCase() === (c.projectName || "").toLowerCase()
+    );
+    const pStart = matchedProj?.startDate || "20 Sep 2026";
+    const pEnd = matchedProj?.endDate || matchedProj?.due || "02 Feb 2027";
+    setJobStartDate(pStart);
+    setJobEndDate(pEnd);
+    setJobDue(pEnd);
+    setDateValidationError(null);
+
     setJobDescription(
       `Deliver ${c.trade} installation according to awarded tender #${c.tenderId} specifications.`
     );
@@ -306,21 +321,39 @@ export default function ContractorsPage() {
     e.preventDefault();
     if (!selectedContractor || !jobTitle) return;
 
+    const targetProjName = jobProject || selectedContractor.projectName;
+    const matchedProj = allProjects.find(
+      (p) => p.name.toLowerCase() === targetProjName.toLowerCase()
+    );
+    const pStart = matchedProj?.startDate;
+    const pEnd = matchedProj?.endDate || matchedProj?.due;
+
+    const valResult = validateTimelineWithinProject(jobStartDate, jobEndDate, pStart, pEnd);
+    if (!valResult.isValid) {
+      setDateValidationError(valResult.error || "Date is outside project timeline.");
+      toast.error(valResult.error || "Selected dates fall outside project timeline!");
+      return;
+    }
+    setDateValidationError(null);
+
     assignJobToContractor({
       title: jobTitle,
-      projectName: jobProject || selectedContractor.projectName,
+      projectName: targetProjName,
       location: jobLocation || `${selectedContractor.projectName} Site`,
       contractorId: selectedContractor.id,
       contractorName: selectedContractor.name,
       trade: selectedContractor.trade,
       priority: jobPriority,
-      due: jobDue,
+      startDate: jobStartDate,
+      endDate: jobEndDate,
+      deadline: jobEndDate,
+      due: jobEndDate || jobDue,
       description: jobDescription,
       tenderId: selectedContractor.tenderId,
     });
 
     setShowAssignModal(false);
-    alert(
+    toast.success(
       `Job successfully assigned to ${selectedContractor.name}! You can now view and manage it in Jobs.`
     );
   };
@@ -351,7 +384,7 @@ export default function ContractorsPage() {
   const handleAwardBidderDirectly = (bidder: typeof allBidders[0]) => {
     if (bidder.tenderId && bidder.supplierId) {
       awardTenderToSupplier(bidder.tenderId, bidder.supplierId);
-      alert(`${bidder.name} has been awarded the contract! They are now active in Awarded Contractors.`);
+      toast.success(`${bidder.name} has been awarded the contract! They are now active in Awarded Contractors.`);
       setActiveTab("AWARDED");
     } else {
       addContractor({
@@ -362,7 +395,7 @@ export default function ContractorsPage() {
         email: bidder.email,
         phone: bidder.phone,
       });
-      alert(`${bidder.name} is now added as an Awarded Contractor!`);
+      toast.success(`${bidder.name} is now added as an Awarded Contractor!`);
       setActiveTab("AWARDED");
     }
   };
@@ -427,7 +460,7 @@ export default function ContractorsPage() {
                 type="button"
                 onClick={() => {
                   seedSampleProjectBidders();
-                  alert("Project bidders loaded! Check the 'All Project Bidders & Suppliers' tab.");
+                  toast.info("Project bidders loaded! Check the 'All Project Bidders & Suppliers' tab.");
                 }}
                 className="flex items-center gap-1.5 rounded-[10px] bg-breath text-forest border border-forest/30 hover:bg-forest hover:text-white px-3 py-2 text-xs font-semibold shadow-2xs transition cursor-pointer"
               >
@@ -874,7 +907,7 @@ export default function ContractorsPage() {
                     type="button"
                     onClick={() => {
                       seedSampleProjectBidders();
-                      alert("Project bidders loaded successfully!");
+                      toast.success("Project bidders loaded successfully!");
                     }}
                     className="inline-flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-5 py-2.5 text-xs font-bold shadow-xs transition cursor-pointer"
                   >
@@ -1147,7 +1180,40 @@ export default function ContractorsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* Project Timeline Window Indicator */}
+                {(() => {
+                  const targetP = allProjects.find(
+                    (p) => p.name.toLowerCase() === (jobProject || selectedContractor?.projectName || "").toLowerCase()
+                  );
+                  const pStart = targetP?.startDate || "20 Sep 2026";
+                  const pEnd = targetP?.endDate || targetP?.due || "02 Feb 2027";
+                  return (
+                    <div className="p-2.5 rounded-[10px] bg-stone/70 border border-pebble/80 text-[11px] space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-bold text-onyx">
+                          <Calendar className="h-3.5 w-3.5 text-forest shrink-0" />
+                          <span>Sales Project Window:</span>
+                          <span className="text-forest underline font-black">{pStart} – {pEnd}</span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-ash bg-white px-2 py-0.5 rounded border border-pebble">
+                          Decided by Sales
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-ash">
+                        Subcontractor job execution dates must fall within this window.
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {dateValidationError && (
+                  <div className="p-2.5 rounded-[8px] bg-hazard-bg border border-red-200 text-hazard-text text-xs flex items-center gap-2 animate-in fade-in">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                    <span className="font-semibold">{dateValidationError}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-onyx mb-1">
                       Priority
@@ -1169,13 +1235,35 @@ export default function ContractorsPage() {
 
                   <div>
                     <label className="block text-xs font-semibold text-onyx mb-1">
-                      Target Due Date
+                      Start Date <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={jobDue}
-                      onChange={(e) => setJobDue(e.target.value)}
-                      placeholder="e.g. Next Friday"
+                      required
+                      value={jobStartDate}
+                      onChange={(e) => {
+                        setJobStartDate(e.target.value);
+                        setDateValidationError(null);
+                      }}
+                      placeholder="e.g. 20 Sep 2026"
+                      className="w-full h-9 px-3 text-xs bg-stone rounded-[8px] border border-pebble outline-none focus:border-forest"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-onyx mb-1">
+                      Deadline / Due <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={jobEndDate}
+                      onChange={(e) => {
+                        setJobEndDate(e.target.value);
+                        setJobDue(e.target.value);
+                        setDateValidationError(null);
+                      }}
+                      placeholder="e.g. 02 Feb 2027"
                       className="w-full h-9 px-3 text-xs bg-stone rounded-[8px] border border-pebble outline-none focus:border-forest"
                     />
                   </div>

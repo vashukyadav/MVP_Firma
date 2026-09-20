@@ -277,9 +277,11 @@ export function ToastItem({ toast: t }: { toast: ToastData }) {
   switch (variant) {
     case "success":
       containerStyles =
-        "bg-[#e1efde] text-[#072d20] border-[#b2d8ad] shadow-[0_8px_20px_rgba(7,45,32,0.12)]";
+        "bg-[#f2f8f1] text-[#072d20] border-[#a9d9a4] shadow-[0_16px_36px_-6px_rgba(7,45,32,0.18),0_4px_12px_rgba(7,45,32,0.06)]";
       iconNode = iconNode || (
-        <CheckCircle2 className="size-5 shrink-0 text-[#009300]" />
+        <div className="size-7 rounded-full bg-[#009300]/15 flex items-center justify-center shrink-0">
+          <CheckCircle2 className="size-4.5 text-[#009300] stroke-[2.2]" />
+        </div>
       );
       progressBarColor = "bg-[#009300]";
       closeBtnColor =
@@ -290,9 +292,11 @@ export function ToastItem({ toast: t }: { toast: ToastData }) {
 
     case "warning":
       containerStyles =
-        "bg-[#faf0df] text-[#412311] border-[#edd3a9] shadow-[0_8px_20px_rgba(65,35,17,0.12)]";
+        "bg-[#fff9ef] text-[#412311] border-[#f0cf99] shadow-[0_16px_36px_-6px_rgba(65,35,17,0.18),0_4px_12px_rgba(65,35,17,0.06)]";
       iconNode = iconNode || (
-        <AlertTriangle className="size-5 shrink-0 text-[#f59e0b]" />
+        <div className="size-7 rounded-full bg-[#f59e0b]/15 flex items-center justify-center shrink-0">
+          <AlertTriangle className="size-4.5 text-[#f59e0b] stroke-[2.2]" />
+        </div>
       );
       progressBarColor = "bg-[#f59e0b]";
       closeBtnColor =
@@ -304,9 +308,11 @@ export function ToastItem({ toast: t }: { toast: ToastData }) {
     case "danger":
     case "error":
       containerStyles =
-        "bg-[#f9e7e5] text-[#4a1212] border-[#f5b5b0] shadow-[0_8px_20px_rgba(74,18,18,0.12)]";
+        "bg-[#fff4f3] text-[#4a1212] border-[#f8b4af] shadow-[0_16px_36px_-6px_rgba(74,18,18,0.18),0_4px_12px_rgba(74,18,18,0.06)]";
       iconNode = iconNode || (
-        <AlertCircle className="size-5 shrink-0 text-[#ef4444]" />
+        <div className="size-7 rounded-full bg-[#ef4444]/15 flex items-center justify-center shrink-0">
+          <AlertCircle className="size-4.5 text-[#ef4444] stroke-[2.2]" />
+        </div>
       );
       progressBarColor = "bg-[#ef4444]";
       closeBtnColor =
@@ -317,9 +323,11 @@ export function ToastItem({ toast: t }: { toast: ToastData }) {
 
     case "loading":
       containerStyles =
-        "bg-white text-[#181b19] border-[#cdcdcd] shadow-[0_8px_20px_rgba(24,27,25,0.1)]";
+        "bg-white text-[#181b19] border-[#cdcdcd] shadow-[0_16px_36px_-6px_rgba(24,27,25,0.15),0_4px_12px_rgba(24,27,25,0.06)]";
       iconNode = (
-        <Loader2 className="size-5 shrink-0 animate-spin text-[#0e382b]" />
+        <div className="size-7 rounded-full bg-[#0e382b]/10 flex items-center justify-center shrink-0">
+          <Loader2 className="size-4.5 animate-spin text-[#0e382b] stroke-[2.2]" />
+        </div>
       );
       progressBarColor = "bg-[#0e382b]";
       closeBtnColor =
@@ -331,9 +339,11 @@ export function ToastItem({ toast: t }: { toast: ToastData }) {
     case "info":
     case "neutral":
       containerStyles =
-        "bg-[#faf9f7] text-[#181b19] border-[#cdcdcd] shadow-[0_8px_20px_rgba(24,27,25,0.1)]";
+        "bg-[#faf9f7] text-[#181b19] border-[#cdcdcd] shadow-[0_16px_36px_-6px_rgba(24,27,25,0.15),0_4px_12px_rgba(24,27,25,0.06)]";
       iconNode = iconNode || (
-        <Info className="size-5 shrink-0 text-[#0e382b]" />
+        <div className="size-7 rounded-full bg-[#0e382b]/10 flex items-center justify-center shrink-0">
+          <Info className="size-4.5 text-[#0e382b] stroke-[2.2]" />
+        </div>
       );
       progressBarColor = "bg-[#0e382b]";
       closeBtnColor =
@@ -344,9 +354,11 @@ export function ToastItem({ toast: t }: { toast: ToastData }) {
 
     default:
       containerStyles =
-        "bg-white text-[#181b19] border-[#cdcdcd] shadow-[0_8px_20px_rgba(24,27,25,0.1)]";
+        "bg-white text-[#181b19] border-[#cdcdcd] shadow-[0_16px_36px_-6px_rgba(24,27,25,0.15),0_4px_12px_rgba(24,27,25,0.06)]";
       iconNode = iconNode || (
-        <Info className="size-5 shrink-0 text-[#0e382b]" />
+        <div className="size-7 rounded-full bg-[#0e382b]/10 flex items-center justify-center shrink-0">
+          <Info className="size-4.5 text-[#0e382b] stroke-[2.2]" />
+        </div>
       );
       progressBarColor = "bg-[#0e382b]";
       closeBtnColor =
@@ -363,13 +375,13 @@ export function ToastItem({ toast: t }: { toast: ToastData }) {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       className={cn(
-        "group relative flex w-full max-w-[390px] items-start gap-3 rounded-[10px] border p-3.5 px-4 overflow-hidden select-none transition-all duration-200 pointer-events-auto",
+        "group relative flex w-full max-w-[400px] items-center gap-3.5 rounded-[14px] border p-3.5 px-4 select-none transition-all duration-200 pointer-events-auto backdrop-blur-sm",
         containerStyles,
         isExiting ? "animate-toast-out" : "animate-toast-in"
       )}
     >
-      {/* Icon */}
-      <div className="mt-0.5 shrink-0">{iconNode}</div>
+      {/* Icon Badge */}
+      <div className="shrink-0">{iconNode}</div>
 
       {/* Content */}
       <div className="flex-1 min-w-0 pr-1">
@@ -406,7 +418,7 @@ export function ToastItem({ toast: t }: { toast: ToastData }) {
         aria-label="Close notification"
         onClick={handleDismiss}
         className={cn(
-          "shrink-0 p-1 rounded-full transition-colors cursor-pointer -mr-1 -mt-0.5",
+          "shrink-0 p-1.5 rounded-full transition-colors cursor-pointer -mr-1",
           closeBtnColor
         )}
       >
@@ -415,7 +427,7 @@ export function ToastItem({ toast: t }: { toast: ToastData }) {
 
       {/* Subtle Progress Bar */}
       {!isPermanent && (
-        <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-black/5 overflow-hidden">
+        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-black/5 overflow-hidden rounded-b-[14px]">
           <div
             className={cn(
               "h-full transition-[width] duration-75 ease-linear",

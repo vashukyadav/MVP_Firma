@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import FirmaLayout from "@/components/layout/FirmaLayout";
 import { useLeadFlowStore } from "@/store/leadFlowStore";
 import { useTenderFlowStore } from "@/store/tenderFlowStore";
+import { toast } from "@/components/ui/toast";
 import {
   BarChart3,
   TrendingUp,
@@ -65,7 +66,7 @@ export default function ReportsPage() {
 
         <button
           type="button"
-          onClick={() => alert("Report exported successfully.")}
+          onClick={() => toast.success("Report exported successfully.")}
           className="flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4.5 py-2.5 text-sm font-medium shadow-xs transition cursor-pointer self-start sm:self-auto"
         >
           <Download className="h-4 w-4" />

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { db } from "@/lib/db";
 import { useAuthStore } from "@/store/authStore";
+import { toast } from "@/components/ui/toast";
 import { OnboardingHeader } from "@/components/onboarding/OnboardingHeader";
 import { OnboardingStepper } from "@/components/onboarding/OnboardingStepper";
 import { ArrowLeft, ArrowRight, ChevronDown, Building2 } from "lucide-react";
@@ -74,7 +75,7 @@ export default function CompanyPage() {
   // ── ALL ORIGINAL LOGIC PRESERVED ──────────────────────────────────────
   const onSubmit = async (data: CompanyFormData) => {
     if (!currentUser?.id) {
-      alert("User not found. Please login again.");
+      toast.error("User not found. Please login again.");
       return;
     }
 

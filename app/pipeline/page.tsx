@@ -79,17 +79,11 @@ function PipelineContent() {
       try {
         const users = await db.users.toArray();
         const siteMgrs = users
-          .filter(
-            (u) =>
-              u.role === "SITE_MANAGER" ||
-              u.role === "PROJECT_MANAGER" ||
-              u.role === "OWNER" ||
-              u.role === "ACCOUNT_ADMIN"
-          )
+          .filter((u) => u.role === "SITE_MANAGER")
           .map((u) => ({
             id: `user-${u.id}`,
             name: u.name,
-            role: u.role === "SITE_MANAGER" ? "Site Manager" : u.role.replace("_", " "),
+            role: "Site Manager",
             contact: "+91 98000 00000",
           }));
         setDbManagers(siteMgrs);
@@ -106,12 +100,13 @@ function PipelineContent() {
         list.push({
           id: m.id,
           name: m.name,
-          role: m.role,
+          role: "Site Manager",
           contact: m.contact,
         });
       }
     }
-    if (!list.some((x) => x.name.toLowerCase() === "site manager")) {
+    // Only provide fallback default Site Manager if no site managers exist yet
+    if (list.length === 0) {
       list.push({
         id: "user-default-sm",
         name: "Site Manager",

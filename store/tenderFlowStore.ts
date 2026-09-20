@@ -126,23 +126,69 @@ export interface CrewMemberAssignment {
 
 export interface JobRFI {
   id: string;
-  rfiNumber: string;
-  title: string;
-  raisedBy: string;
-  date: string;
-  priority: "High" | "Medium" | "Low";
-  status: "Open" | "In Review" | "Resolved";
+  rfiNumber: string; // e.g. "RFI-001"
+  organizationId?: string;
+  projectId: string;
+  projectName: string;
+  siteId: string;
+  siteName: string;
+  jobId: string;
+  jobTitle: string;
+  createdBy: string; // e.g. "Salim"
+  createdById?: string;
+  creatorRole?: string; // e.g. "Field Worker"
+  createdAt: string; // e.g. "18 Sep 2026"
+  date?: string; // backwards compatibility
+  title?: string;
+  subject?: string; // backwards compatibility
+  question: string; // "I need clarification about the electrical drawing."
+  description?: string; // backwards compatibility
+  priority?: "High" | "Medium" | "Low";
+  status: "Open" | "In Review" | "Closed" | "Resolved" | "Answered" | "In Progress";
+  attachments?: { id: string; name: string; url?: string; size?: string }[];
   response?: string;
+  reviewResponse?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
 }
 
 export interface JobVariation {
   id: string;
-  variationNumber: string;
-  title: string;
-  amount: number;
-  date: string;
-  status: "Approved" | "Pending PM Approval" | "Draft";
-  impact: string;
+  variationNumber: string; // e.g. "V-0012"
+  organizationId?: string;
+  projectId: string;
+  projectName: string;
+  siteId: string;
+  siteName: string;
+  jobId: string;
+  jobTitle: string;
+  createdBy: string; // e.g. "Salim"
+  createdById?: string;
+  creatorRole?: string; // e.g. "Field Worker"
+  createdAt: string; // e.g. "18 Sep 2026"
+  date?: string; // backwards compatibility
+  title?: string;
+  description: string;
+  details?: string; // backwards compatibility
+  additionalMaterials?: string;
+  costImpact: number; // e.g. 15000
+  amount?: number; // backwards compatibility
+  scheduleImpact?: string;
+  impact?: string; // backwards compatibility
+  status:
+    | "Awaiting PM Approval"
+    | "Approved"
+    | "Rejected"
+    | "Pending PM Approval"
+    | "Pending"
+    | "Draft";
+  attachments?: { id: string; name: string; url?: string; size?: string }[];
+  pmReviewNotes?: string;
+  reviewRemarks?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
 }
 
 export interface JobDocument {
@@ -225,6 +271,10 @@ export interface JobItem {
   progressPercent?: number;
   tasksCompletedCount?: number;
   tasksTotalCount?: number;
+  projectId?: string;
+  siteId?: string;
+  siteName?: string;
+  organizationId?: string;
   hoursLogged?: number;
 }
 
@@ -240,6 +290,8 @@ interface TenderFlowState {
   bids: BidItem[];
   contractors: AwardedContractor[];
   jobs: JobItem[];
+  rfis: JobRFI[];
+  variations: JobVariation[];
 
   // Navigation actions
   setStep: (step: TenderFlowStep) => void;
@@ -272,6 +324,10 @@ interface TenderFlowState {
     trade?: string;
     priority: "High" | "Medium" | "Low";
     due: string;
+    startDate?: string;
+    endDate?: string;
+    deadline?: string;
+    client?: string;
     description?: string;
     tenderId?: string;
     photos?: JobPhoto[];
@@ -289,6 +345,20 @@ interface TenderFlowState {
   addCrewToJob: (jobId: string, crew: CrewMemberAssignment) => void;
   updateCrewStatus: (jobId: string, crewId: string, status: CrewMemberAssignment["status"]) => void;
   removeCrewFromJob: (jobId: string, crewId: string) => void;
+  addRfi: (rfi: Omit<JobRFI, "id" | "rfiNumber"> & { id?: string; rfiNumber?: string }) => JobRFI;
+  updateRfiStatus: (
+    rfiId: string,
+    status: JobRFI["status"],
+    responseOrData?: string | { reviewResponse?: string; response?: string; reviewedBy?: string; reviewedAt?: string },
+    reviewerName?: string
+  ) => void;
+  addVariation: (variation: Omit<JobVariation, "id" | "variationNumber"> & { id?: string; variationNumber?: string }) => JobVariation;
+  updateVariationStatus: (
+    variationId: string,
+    status: JobVariation["status"],
+    reviewNotesOrData?: string | { approvedBy?: string; approvedAt?: string; reviewRemarks?: string; pmReviewNotes?: string; reviewedBy?: string; reviewedAt?: string },
+    reviewerName?: string
+  ) => void;
   addRfiToJob: (jobId: string, rfi: Omit<JobRFI, "id">) => void;
   addVariationToJob: (jobId: string, variation: Omit<JobVariation, "id">) => void;
   addDocumentToJob: (jobId: string, doc: Omit<JobDocument, "id">) => void;
@@ -327,7 +397,128 @@ const defaultTenders: TenderItem[] = [];
 const defaultBids: BidItem[] = [];
 const defaultContractors: AwardedContractor[] = [];
 
-export const defaultJobs: JobItem[] = [];
+export const defaultJobs: JobItem[] = [
+  {
+    id: "J-1025",
+    title: "Electrical Drawing & Conduit Installation",
+    projectName: "ABC Commercial Building",
+    projectId: "PRJ-ABC",
+    location: "Bhopal Site",
+    siteId: "SITE-BHP",
+    siteName: "Bhopal Site",
+    organizationId: "ORG-DEFAULT",
+    assignee: "Salim",
+    isContractorJob: false,
+    priority: "High",
+    priorityColor: "bg-hazard-bg text-hazard-text border-pebble",
+    startDate: "20 Sep 2026",
+    endDate: "02 Feb 2027",
+    due: "20 Sep 2026",
+    completed: false,
+    status: "Scheduled",
+    description: "Execute 1st floor power distribution conduits per engineering drawings.",
+    assignedDate: "20 Sep 2026",
+    siteManagerName: "Site Manager",
+    photos: [],
+    materials: [
+      { id: "mat-1", name: "25mm PVC Conduit Pipe", quantity: "150 meters" },
+      { id: "mat-2", name: "Heavy Duty Junction Boxes", quantity: "24 pcs" },
+    ],
+    notes: [],
+    rfis: [],
+    variations: [],
+  },
+  {
+    id: "J-1026",
+    title: "Main DB Cable Pulling & Earthing Pit Testing",
+    projectName: "ABC Commercial Building",
+    projectId: "PRJ-ABC",
+    location: "Bhopal Site, Substation Yard",
+    siteId: "SITE-BHP",
+    siteName: "Bhopal Site",
+    organizationId: "ORG-DEFAULT",
+    assignee: "Salim",
+    isContractorJob: false,
+    priority: "Medium",
+    priorityColor: "bg-caution-bg text-caution-text border-pebble",
+    startDate: "21 Sep 2026",
+    endDate: "02 Feb 2027",
+    due: "21 Sep 2026",
+    completed: false,
+    status: "Scheduled",
+    description: "Scheduled for tomorrow: Pull main feed armored cables and verify copper plate earthing pits.",
+    assignedDate: "20 Sep 2026",
+    siteManagerName: "Site Manager",
+    photos: [],
+    materials: [
+      { id: "mat-3", name: "4-Core 50sqmm Armored Cable", quantity: "120 meters" },
+      { id: "mat-4", name: "Copper Earth Plates & Compound", quantity: "4 sets" },
+    ],
+    notes: [],
+    rfis: [],
+    variations: [],
+  },
+  {
+    id: "J-1027",
+    title: "Foundation Steel Reinforcement & Shuttering",
+    projectName: "Skyline Apartments • Phase 1",
+    projectId: "PRJ-SKY",
+    location: "Skyline Apartments Main Yard",
+    siteId: "SITE-SKY",
+    siteName: "Skyline Apartments Main Yard",
+    organizationId: "ORG-DEFAULT",
+    assignee: "Vikas",
+    isContractorJob: false,
+    priority: "High",
+    priorityColor: "bg-hazard-bg text-hazard-text border-pebble",
+    startDate: "22 Sep 2026",
+    endDate: "15 Jan 2027",
+    due: "25 Sep 2026",
+    completed: false,
+    status: "Scheduled",
+    description: "Inspect rebars and timber shuttering before concrete casting in Tower A footing.",
+    assignedDate: "15 Sep 2026",
+    siteManagerName: "Site Manager",
+    photos: [],
+    materials: [
+      { id: "mat-5", name: "Fe-500D TMT Rebars 16mm", quantity: "4.5 tonnes" },
+      { id: "mat-6", name: "Plywood Shuttering Sheets", quantity: "60 sheets" },
+    ],
+    notes: [],
+    rfis: [],
+    variations: [],
+  },
+  {
+    id: "J-1028",
+    title: "HVAC Chiller Piping & Fire Safety Mains",
+    projectName: "Apex Tech Park & Corporate Towers",
+    projectId: "PRJ-CORP",
+    location: "Apex Tech Park Site Yard",
+    siteId: "SITE-APX",
+    siteName: "Apex Tech Park Site Yard",
+    organizationId: "ORG-DEFAULT",
+    assignee: "Rajesh",
+    isContractorJob: false,
+    priority: "Medium",
+    priorityColor: "bg-caution-bg text-caution-text border-pebble",
+    startDate: "25 Sep 2026",
+    endDate: "28 Feb 2027",
+    due: "30 Sep 2026",
+    completed: false,
+    status: "In Progress",
+    description: "Install central air-conditioning chilled water risers and sprinkler lines in basement.",
+    assignedDate: "16 Sep 2026",
+    siteManagerName: "Site Manager",
+    photos: [],
+    materials: [
+      { id: "mat-7", name: "Seamless MS Pipes 100mm", quantity: "80 meters" },
+      { id: "mat-8", name: "Pendant Fire Sprinklers", quantity: "40 pcs" },
+    ],
+    notes: [],
+    rfis: [],
+    variations: [],
+  },
+];
 
 export const useTenderFlowStore = create<TenderFlowState>()(
   persist(
@@ -342,6 +533,8 @@ export const useTenderFlowStore = create<TenderFlowState>()(
       bids: defaultBids,
       contractors: defaultContractors,
       jobs: defaultJobs,
+      rfis: [],
+      variations: [],
 
       setStep: (step) => set({ currentStep: step }),
 
@@ -554,6 +747,9 @@ export const useTenderFlowStore = create<TenderFlowState>()(
           priority: data.priority,
           priorityColor: priorityColors[data.priority] || priorityColors.Medium,
           due: data.due || "Next Week",
+          startDate: data.startDate,
+          endDate: data.endDate || data.deadline,
+          client: data.client,
           completed: false,
           status: "Scheduled",
           description: data.description,
@@ -763,24 +959,291 @@ export const useTenderFlowStore = create<TenderFlowState>()(
         }));
       },
 
-      addRfiToJob: (jobId, rfi) => {
-        const newRfi: JobRFI = { id: `rfi-${Date.now()}`, ...rfi };
-        set((state) => ({
-          jobs: (state.jobs || []).map((j) =>
-            j.id === jobId ? { ...j, rfis: [...(j.rfis || []), newRfi] } : j
-          ),
-        }));
-      },
+      addRfi: (rfiData) => {
+        const nextNum = (get().rfis || []).length + 1;
+        const rfiNumber =
+          rfiData.rfiNumber || `RFI-${String(nextNum).padStart(3, "0")}`;
+        const newRfi: JobRFI = {
+          ...rfiData,
+          id: `rfi-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          rfiNumber,
+          date:
+            rfiData.createdAt ||
+            rfiData.date ||
+            new Date().toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+          createdAt:
+            rfiData.createdAt ||
+            new Date().toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+          status: rfiData.status || "Open",
+          priority: rfiData.priority || "High",
+          attachments: rfiData.attachments || [],
+        };
 
-      addVariationToJob: (jobId, variation) => {
-        const newVar: JobVariation = { id: `var-${Date.now()}`, ...variation };
         set((state) => ({
+          rfis: [newRfi, ...(state.rfis || []).filter((r) => r.id !== newRfi.id)],
           jobs: (state.jobs || []).map((j) =>
-            j.id === jobId
-              ? { ...j, variations: [...(j.variations || []), newVar] }
+            j.id === newRfi.jobId
+              ? {
+                  ...j,
+                  rfis: [
+                    newRfi,
+                    ...(j.rfis || []).filter(
+                      (r) => r.id !== newRfi.id && r.rfiNumber !== newRfi.rfiNumber
+                    ),
+                  ],
+                }
               : j
           ),
         }));
+
+        return newRfi;
+      },
+
+      updateRfiStatus: (rfiId, status, responseOrData, reviewerName) => {
+        const now = new Date().toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+
+        const respText: string | undefined =
+          typeof responseOrData === "string"
+            ? responseOrData
+            : responseOrData && typeof responseOrData === "object"
+            ? responseOrData.reviewResponse || responseOrData.response
+            : undefined;
+
+        const revBy: string | undefined =
+          typeof responseOrData === "object" && responseOrData !== null
+            ? responseOrData.reviewedBy || reviewerName
+            : reviewerName;
+
+        const revAt: string =
+          typeof responseOrData === "object" && responseOrData !== null
+            ? responseOrData.reviewedAt || now
+            : now;
+
+        set((state): Partial<TenderFlowState> => ({
+          rfis: (state.rfis || []).map((r) =>
+            r.id === rfiId || r.rfiNumber === rfiId
+              ? {
+                  ...r,
+                  status,
+                  ...(respText !== undefined ? { response: respText, reviewResponse: respText } : {}),
+                  ...(revBy ? { reviewedBy: revBy, reviewedAt: revAt } : {}),
+                }
+              : r
+          ),
+          jobs: (state.jobs || []).map((j) => ({
+            ...j,
+            rfis: (j.rfis || []).map((r) =>
+              r.id === rfiId || r.rfiNumber === rfiId
+                ? {
+                    ...r,
+                    status,
+                    ...(respText !== undefined ? { response: respText, reviewResponse: respText } : {}),
+                    ...(revBy ? { reviewedBy: revBy, reviewedAt: revAt } : {}),
+                  }
+                : r
+            ),
+          })),
+        }));
+      },
+
+      addVariation: (varData) => {
+        const nextNum = (get().variations || []).length + 12;
+        const variationNumber =
+          varData.variationNumber || `V-${String(nextNum).padStart(4, "0")}`;
+        const newVar: JobVariation = {
+          ...varData,
+          id: `var-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          variationNumber,
+          date:
+            varData.createdAt ||
+            varData.date ||
+            new Date().toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+          createdAt:
+            varData.createdAt ||
+            new Date().toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+          status: varData.status || "Awaiting PM Approval",
+          costImpact: varData.costImpact ?? varData.amount ?? 0,
+          amount: varData.amount ?? varData.costImpact ?? 0,
+          attachments: varData.attachments || [],
+        };
+
+        set((state) => ({
+          variations: [
+            newVar,
+            ...(state.variations || []).filter((v) => v.id !== newVar.id),
+          ],
+          jobs: (state.jobs || []).map((j) =>
+            j.id === newVar.jobId
+              ? {
+                  ...j,
+                  variations: [
+                    newVar,
+                    ...(j.variations || []).filter(
+                      (v) =>
+                        v.id !== newVar.id &&
+                        v.variationNumber !== newVar.variationNumber
+                    ),
+                  ],
+                }
+              : j
+          ),
+        }));
+
+        return newVar;
+      },
+
+      updateVariationStatus: (varId, status, reviewNotesOrData, reviewerName) => {
+        const now = new Date().toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+
+        const notesText: string | undefined =
+          typeof reviewNotesOrData === "string"
+            ? reviewNotesOrData
+            : reviewNotesOrData && typeof reviewNotesOrData === "object"
+            ? reviewNotesOrData.reviewRemarks || reviewNotesOrData.pmReviewNotes
+            : undefined;
+
+        const appBy: string | undefined =
+          typeof reviewNotesOrData === "object" && reviewNotesOrData !== null
+            ? reviewNotesOrData.approvedBy || reviewNotesOrData.reviewedBy || reviewerName
+            : reviewerName;
+
+        const appAt: string =
+          typeof reviewNotesOrData === "object" && reviewNotesOrData !== null
+            ? reviewNotesOrData.approvedAt || reviewNotesOrData.reviewedAt || now
+            : now;
+
+        set((state): Partial<TenderFlowState> => ({
+          variations: (state.variations || []).map((v) =>
+            v.id === varId || v.variationNumber === varId
+              ? {
+                  ...v,
+                  status,
+                  ...(notesText !== undefined ? { pmReviewNotes: notesText, reviewRemarks: notesText } : {}),
+                  ...(appBy ? { approvedBy: appBy, reviewedBy: appBy, approvedAt: appAt, reviewedAt: appAt } : {}),
+                }
+              : v
+          ),
+          jobs: (state.jobs || []).map((j) => ({
+            ...j,
+            variations: (j.variations || []).map((v) =>
+              v.id === varId || v.variationNumber === varId
+                ? {
+                    ...v,
+                    status,
+                    ...(notesText !== undefined ? { pmReviewNotes: notesText, reviewRemarks: notesText } : {}),
+                    ...(appBy ? { approvedBy: appBy, reviewedBy: appBy, approvedAt: appAt, reviewedAt: appAt } : {}),
+                  }
+                : v
+            ),
+          })),
+        }));
+      },
+
+      addRfiToJob: (jobId, rfi) => {
+        const job = get().jobs.find((j) => j.id === jobId);
+        const rfiNumber =
+          rfi.rfiNumber ||
+          `RFI-${String((get().rfis || []).length + 1).padStart(3, "0")}`;
+        const fullRfi: Omit<JobRFI, "id"> = {
+          rfiNumber,
+          organizationId: rfi.organizationId || job?.organizationId || "ORG-DEFAULT",
+          projectId: rfi.projectId || job?.projectId || "PRJ-ABC",
+          projectName:
+            rfi.projectName || job?.projectName || "ABC Commercial Building",
+          siteId: rfi.siteId || job?.siteId || "SITE-BHP",
+          siteName:
+            rfi.siteName || job?.siteName || job?.location || "Bhopal Site",
+          jobId,
+          jobTitle: job?.title || "Site Work Order",
+          createdBy: rfi.createdBy || "Salim",
+          createdById: rfi.createdById || "user-salim",
+          creatorRole: rfi.creatorRole || "Field Worker",
+          createdAt:
+            rfi.createdAt ||
+            rfi.date ||
+            new Date().toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+          title: rfi.title,
+          question: rfi.question || rfi.description || rfi.title,
+          description: rfi.description || rfi.question || rfi.title,
+          priority: rfi.priority || "High",
+          status: rfi.status || "Open",
+          attachments: rfi.attachments || [],
+          response: rfi.response || "",
+        };
+        get().addRfi(fullRfi);
+      },
+
+      addVariationToJob: (jobId, variation) => {
+        const job = get().jobs.find((j) => j.id === jobId);
+        const variationNumber =
+          variation.variationNumber ||
+          `V-${String((get().variations || []).length + 12).padStart(4, "0")}`;
+        const fullVar: Omit<JobVariation, "id"> = {
+          variationNumber,
+          organizationId:
+            variation.organizationId || job?.organizationId || "ORG-DEFAULT",
+          projectId: variation.projectId || job?.projectId || "PRJ-ABC",
+          projectName:
+            variation.projectName || job?.projectName || "ABC Commercial Building",
+          siteId: variation.siteId || job?.siteId || "SITE-BHP",
+          siteName:
+            variation.siteName ||
+            job?.siteName ||
+            job?.location ||
+            "Bhopal Site",
+          jobId,
+          jobTitle: job?.title || "Site Work Order",
+          createdBy: variation.createdBy || "Salim",
+          createdById: variation.createdById || "user-salim",
+          creatorRole: variation.creatorRole || "Field Worker",
+          createdAt:
+            variation.createdAt ||
+            variation.date ||
+            new Date().toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+          title: variation.title,
+          description:
+            variation.description || variation.details || variation.title,
+          additionalMaterials: variation.additionalMaterials || "",
+          costImpact: variation.costImpact ?? variation.amount ?? 0,
+          amount: variation.amount ?? variation.costImpact ?? 0,
+          scheduleImpact: variation.scheduleImpact || variation.impact || "—",
+          impact: variation.impact || variation.scheduleImpact || "—",
+          status: (variation.status as any) || "Awaiting PM Approval",
+          attachments: variation.attachments || [],
+        };
+        get().addVariation(fullVar);
       },
 
       addDocumentToJob: (jobId, doc) => {
@@ -1157,7 +1620,7 @@ export const useTenderFlowStore = create<TenderFlowState>()(
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         if (!state.jobs) {
-          state.jobs = [];
+          state.jobs = [...defaultJobs];
         } else {
           state.jobs = state.jobs
             .filter((j) => j && j.id && j.id !== "dummy-test-seed" && j.id !== "JOB-403")
@@ -1167,8 +1630,45 @@ export const useTenderFlowStore = create<TenderFlowState>()(
                 photos: j.photos || [],
                 materials: j.materials || [],
                 notes: j.notes || [],
+                rfis: j.rfis || [],
+                variations: j.variations || [],
               };
             });
+          for (const dj of defaultJobs) {
+            if (!state.jobs.some((j) => j.id === dj.id)) {
+              state.jobs.push(dj);
+            }
+          }
+        }
+
+        if (!state.rfis) state.rfis = [];
+        if (!state.variations) state.variations = [];
+
+        // Synchronize any RFIs and Variations from jobs into state.rfis and state.variations
+        for (const job of state.jobs) {
+          if (job.rfis && job.rfis.length > 0) {
+            for (const r of job.rfis) {
+              if (
+                !state.rfis.some(
+                  (sr) => sr.id === r.id || sr.rfiNumber === r.rfiNumber
+                )
+              ) {
+                state.rfis.push(r);
+              }
+            }
+          }
+          if (job.variations && job.variations.length > 0) {
+            for (const v of job.variations) {
+              if (
+                !state.variations.some(
+                  (sv) =>
+                    sv.id === v.id || sv.variationNumber === v.variationNumber
+                )
+              ) {
+                state.variations.push(v);
+              }
+            }
+          }
         }
         if (state.tenders && state.tenders.length > 0) {
           const awardedTenders = state.tenders.filter(

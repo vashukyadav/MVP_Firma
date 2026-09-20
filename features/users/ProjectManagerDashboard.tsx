@@ -20,6 +20,7 @@ import {
   MapPin,
   CheckCircle2,
   AlertTriangle,
+  Layers,
 } from "lucide-react";
 
 interface ProjectDashboardProps {
@@ -29,7 +30,7 @@ interface ProjectDashboardProps {
 export default function ProjectManagerDashboard({ companyName }: ProjectDashboardProps) {
   const router = useRouter();
   const { currentUser } = useAuthStore();
-  const { projects = [] } = useLeadFlowStore();
+  const { projects = [], quotes = [] } = useLeadFlowStore();
   const { jobs = [], contractors = [], toggleJob } = useTenderFlowStore();
 
   const firstName = currentUser?.name?.split(" ")[0] || "Project Manager";
@@ -286,30 +287,51 @@ export default function ProjectManagerDashboard({ companyName }: ProjectDashboar
                 </button>
               </div>
             ) : (
-              <div className="space-y-4">
-                {projects.slice(0, 4).map((p) => (
-                  <div key={p.id} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-onyx">{p.name}</span>
-                        <span className="text-[10px] text-ash flex items-center gap-1">
-                          <MapPin className="h-3 w-3" /> {p.location || "On Site"}
-                        </span>
+              <div className="space-y-3">
+                {projects.slice(0, 4).map((p) => {
+                  const linkedQuote = quotes.find(
+                    (q) =>
+                      (p.quoteId && (q.id === p.quoteId || q.quoteNo === p.quoteId)) ||
+                      (p.sourceOpportunityId && q.opportunityId === p.sourceOpportunityId) ||
+                      (q.opportunityTitle && p.name && q.opportunityTitle.trim().toLowerCase() === p.name.trim().toLowerCase())
+                  );
+                  const materialsCount = p.lineItems?.length || linkedQuote?.lineItems?.length || 0;
+
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => router.push(`/projects?id=${p.id}`)}
+                      className="space-y-1.5 p-3 rounded-[12px] hover:bg-stone/50 transition cursor-pointer border border-pebble/40 hover:border-forest/40 group bg-stone/20"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-onyx group-hover:text-forest transition">{p.name}</span>
+                          <span className="text-[10px] text-ash flex items-center gap-1">
+                            <MapPin className="h-3 w-3" /> {p.location || "On Site"}
+                          </span>
+                        </div>
+                        <span className="text-ash font-bold">{p.progress}%</span>
                       </div>
-                      <span className="text-ash font-bold">{p.progress}%</span>
+                      <div className="h-2 w-full bg-mist rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-forest rounded-full transition-all"
+                          style={{ width: `${p.progress}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-ash pt-0.5">
+                        <span>Client: <strong className="text-onyx font-medium">{p.client || "Direct Contractor"}</strong></span>
+                        <div className="flex items-center gap-2">
+                          {materialsCount > 0 && (
+                            <span className="text-forest text-[10px] font-bold flex items-center gap-1 bg-forest/10 px-2 py-0.5 rounded-full border border-forest/20">
+                              <Layers className="h-2.5 w-2.5" /> {materialsCount} Materials
+                            </span>
+                          )}
+                          <span>Budget: <strong className="text-onyx font-semibold">{p.budget || "₹2.4 Cr"}</strong></span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="h-2.5 w-full bg-stone rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-forest rounded-full transition-all"
-                        style={{ width: `${p.progress}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] text-ash">
-                      <span>Client: {p.client || "Direct Contractor"}</span>
-                      <span>Budget: {p.budget || "₹2.4 Cr"}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

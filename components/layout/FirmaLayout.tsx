@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/store/authStore";
 import { db } from "@/lib/db";
+import { toast } from "@/components/ui/toast";
 import {
   Building2,
   LayoutDashboard,
@@ -159,18 +160,18 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
     if (e) e.preventDefault();
 
     if (user.role !== "OWNER") {
-      alert("Only the Owner can create an Account Admin");
+      toast.error("Only the Owner can create an Account Admin");
       setAdminOpen(false);
       return;
     }
 
     if (!adminName || !adminEmail || !adminPassword || !confirmPassword) {
-      alert("Please fill all fields");
+      toast.warning("Please fill all fields");
       return;
     }
 
     if (adminPassword !== confirmPassword) {
-      alert("Passwords do not match");
+      toast.error("Passwords do not match");
       return;
     }
 
@@ -181,7 +182,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
       .first();
 
     if (existingAdmin) {
-      alert("Account Admin already exists for your company");
+      toast.error("Account Admin already exists for your company");
       setHasAdmin(true);
       setAdminOpen(false);
       return;
@@ -193,7 +194,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
       .first();
 
     if (existingUser) {
-      alert("User with this email already exists");
+      toast.error("User with this email already exists");
       return;
     }
 
@@ -208,7 +209,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
 
     setHasAdmin(true);
     window.dispatchEvent(new CustomEvent("admin-created"));
-    alert("Account Admin created successfully!");
+    toast.success("Account Admin created successfully!");
 
     setAdminName("");
     setAdminEmail("");
@@ -378,15 +379,15 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
 
   const financeManagerNavItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Invoices", href: "/finance", icon: FileText },
-    { name: "Purchase Orders", href: "/finance", icon: ClipboardList },
-    { name: "Bills & Supplier Invoices", href: "/finance", icon: FileCheck2 },
-    { name: "Payments", href: "/finance", icon: CreditCard },
-    { name: "Job Costs", href: "/jobs", icon: Briefcase },
-    { name: "Budgets", href: "/finance", icon: BarChart3 },
-    { name: "Financial Reports", href: "/reports", icon: BarChart3 },
-    { name: "People & Suppliers", href: "/contractors", icon: Users },
-    { name: "Settings", href: "/setting", icon: Settings },
+    { name: "Invoices", href: "/finance?tab=invoices", icon: FileText },
+    { name: "Purchase Orders", href: "/finance?tab=purchase-orders", icon: ClipboardList },
+    { name: "Bills & Supplier Invoices", href: "/finance?tab=bills", icon: FileCheck2 },
+    { name: "Payments", href: "/finance?tab=payments", icon: CreditCard },
+    { name: "Job Costs", href: "/finance?tab=job-costs", icon: Briefcase },
+    { name: "Budgets", href: "/finance?tab=budgets", icon: BarChart3 },
+    { name: "Financial Reports", href: "/finance?tab=reports", icon: BarChart3 },
+    { name: "People & Suppliers", href: "/finance?tab=people-suppliers", icon: Users },
+    { name: "Settings", href: "/finance?tab=settings", icon: Settings },
   ];
 
   const isProjectManager =
@@ -623,36 +624,6 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
 
           {/* Right: Notifications & User Profile Pill */}
           <div className="flex items-center gap-3 sm:gap-4">
-            {/* Site Manager Top Header Pill (Matching Design Screenshot) */}
-            {(user.role === "SITE_MANAGER" || isSiteManagerRoute) && (
-              <div className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-[12px] bg-white border border-pebble/80 shadow-2xs text-left">
-                <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-forest text-white">
-                  <HardHat className="h-4 w-4 text-white" />
-                </div>
-                <div className="leading-tight">
-                  <span className="text-xs font-bold text-onyx block">Role: Site Manager</span>
-                  <span className="text-[10px] text-ash block leading-tight truncate max-w-[280px]">
-                    On-site execution, daily reporting, crew coordination and site management
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Finance Manager Top Header Pill (Matching Design Screenshot) */}
-            {user.role === "FINANCE_MANAGER" && (
-              <div className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-[12px] bg-white border border-pebble/80 shadow-2xs text-left">
-                <div className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-forest text-white">
-                  <CreditCard className="h-4 w-4 text-white" />
-                </div>
-                <div className="leading-tight">
-                  <span className="text-xs font-bold text-onyx block">Role: Finance Manager</span>
-                  <span className="text-[10px] text-ash block leading-tight truncate max-w-[280px]">
-                    Invoicing, cash flow, payment reconciliations, bills &amp; approvals
-                  </span>
-                </div>
-              </div>
-            )}
-
             {/* Notification Bell */}
             <button
               type="button"
@@ -670,14 +641,14 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                 className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2 hover:bg-mist/70 transition cursor-pointer"
               >
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-onyx text-xs font-bold text-white shadow-xs">
-                  {user.role === "SITE_MANAGER" ? "SM" : user.role === "FINANCE_MANAGER" ? "FM" : userInitial}
+                  {user.role === "SITE_MANAGER" ? "SM" : user.role === "FINANCE_MANAGER" ? "FM" : user.role === "FIELD_WORKER" ? "FW" : userInitial}
                 </div>
                 <div className="text-left hidden sm:block">
                   <p className="text-xs font-bold text-onyx leading-tight">
                     {user.name || currentUser?.name || "User"}
                   </p>
                   <p className="text-[10px] font-medium text-ash leading-none capitalize">
-                    {user.role === "SITE_MANAGER" ? "Site Manager" : user.role === "FINANCE_MANAGER" ? "Finance Manager" : user.role?.toLowerCase() || "Owner"}
+                    {user.role === "SITE_MANAGER" ? "Site Manager" : user.role === "FINANCE_MANAGER" ? "Finance Manager" : user.role === "FIELD_WORKER" ? "Field Worker" : user.role?.toLowerCase() || "Owner"}
                   </p>
                 </div>
                 <ChevronDown className="h-3.5 w-3.5 text-ash" />
@@ -692,141 +663,6 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                     <p className="text-[10px] text-ash capitalize">
                       {user.role === "SITE_MANAGER" ? "Site Manager" : user.role?.toLowerCase().replace("_", " ") || "owner"}
                     </p>
-                  </div>
-
-                  {/* Role Switcher for UI Navigation & Testing */}
-                  <div className="px-3 py-2 border-b border-pebble/60 bg-stone/50">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-ash mb-1.5">
-                      Switch Role (UI Demo)
-                    </p>
-                    <div className="grid grid-cols-2 gap-1 text-[10px]">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUser({
-                            id: currentUser?.id || 99,
-                            companyId: currentUser?.companyId || "ORG-DEFAULT",
-                            name: currentUser?.name || "Site Manager",
-                            email: currentUser?.email || "sitemanager@firma.com",
-                            role: "SITE_MANAGER",
-                            size: currentUser?.size || 10,
-                          });
-                          setUserDropdownOpen(false);
-                          router.push("/dashboard");
-                        }}
-                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "SITE_MANAGER"
-                            ? "bg-forest text-white font-semibold shadow-2xs"
-                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
-                          }`}
-                      >
-                        Site Mgr
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUser({
-                            id: currentUser?.id || 1,
-                            companyId: currentUser?.companyId || "ORG-DEFAULT",
-                            name: currentUser?.name || "Project Manager",
-                            email: currentUser?.email || "pm@firma.com",
-                            role: "PROJECT_MANAGER",
-                            size: currentUser?.size || 10,
-                          });
-                          setUserDropdownOpen(false);
-                          router.push("/dashboard");
-                        }}
-                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "PROJECT_MANAGER"
-                            ? "bg-forest text-white font-semibold shadow-2xs"
-                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
-                          }`}
-                      >
-                        Project Mgr
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUser({
-                            id: currentUser?.id || 1,
-                            companyId: currentUser?.companyId || "ORG-DEFAULT",
-                            name: currentUser?.name || "vashukyadav",
-                            email: currentUser?.email || "vashu@firma.com",
-                            role: "OWNER",
-                            size: 10,
-                          });
-                          setUserDropdownOpen(false);
-                          router.push("/dashboard");
-                        }}
-                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "OWNER"
-                            ? "bg-forest text-white font-semibold shadow-2xs"
-                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
-                          }`}
-                      >
-                        Owner
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUser({
-                            id: currentUser?.id || 1,
-                            companyId: currentUser?.companyId || "ORG-DEFAULT",
-                            name: currentUser?.name || "Sales User",
-                            email: currentUser?.email || "sales@firma.com",
-                            role: "SALES_MANAGER",
-                            size: 10,
-                          });
-                          setUserDropdownOpen(false);
-                          router.push("/dashboard");
-                        }}
-                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "SALES_MANAGER"
-                            ? "bg-forest text-white font-semibold shadow-2xs"
-                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
-                          }`}
-                      >
-                        Sales Mgr
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUser({
-                            id: currentUser?.id || 1,
-                            companyId: currentUser?.companyId || "ORG-DEFAULT",
-                            name: currentUser?.name || "Admin User",
-                            email: currentUser?.email || "admin@firma.com",
-                            role: "ACCOUNT_ADMIN",
-                            size: 10,
-                          });
-                          setUserDropdownOpen(false);
-                          router.push("/dashboard");
-                        }}
-                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "ACCOUNT_ADMIN"
-                            ? "bg-forest text-white font-semibold shadow-2xs"
-                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
-                          }`}
-                      >
-                        Admin
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUser({
-                            id: currentUser?.id || 105,
-                            companyId: currentUser?.companyId || "ORG-DEFAULT",
-                            name: currentUser?.name || "Finance Manager",
-                            email: currentUser?.email || "finance@firma.com",
-                            role: "FINANCE_MANAGER",
-                            size: 10,
-                          });
-                          setUserDropdownOpen(false);
-                          router.push("/dashboard");
-                        }}
-                        className={`px-2 py-1 rounded-[5px] font-medium text-center transition cursor-pointer ${user.role === "FINANCE_MANAGER"
-                            ? "bg-forest text-white font-semibold shadow-2xs"
-                            : "bg-white text-onyx border border-pebble/80 hover:bg-mist"
-                          }`}
-                      >
-                        Finance Mgr
-                      </button>
-                    </div>
                   </div>
 
                   {/* Only show 'Add Admin' if current logged in user is OWNER and no admin has been created yet */}
@@ -869,7 +705,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                 FIRMA
               </span>
               <span className="text-[11px]">
-                &copy; 2025 FIRMA, All rights reserved.
+                &copy; {new Date().getFullYear()} FIRMA, All rights reserved.
               </span>
             </div>
 

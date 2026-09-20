@@ -21,7 +21,11 @@ import {
   isFieldWorker,
 } from "@/lib/roleAccess";
 import { db, type User as DbUser } from "@/lib/db";
+import { toast } from "@/components/ui/toast";
+import { validateTimelineWithinProject, formatDisplayDate } from "@/lib/dateValidation";
 import {
+  UserCheck,
+  Building2,
   Briefcase,
   Plus,
   Search,
@@ -55,6 +59,7 @@ function JobsContent() {
   const initialContractorId = searchParams.get("contractorId");
   const autoOpenAssign = searchParams.get("openAssign") === "true";
   const initialJobId = searchParams.get("jobId");
+  const initialSite = searchParams.get("site");
 
   const [selectedJobId, setSelectedJobId] = useState<string | null>(
     initialJobId || null
@@ -131,12 +136,14 @@ function JobsContent() {
           title: sj.title,
           projectName: sj.project,
           location: sj.site || `${sj.project} Site`,
-          assignee: sj.worker,
-          contractorName: sj.worker,
-          isContractorJob: false,
+          assignee: sj.contractorName || sj.worker,
+          contractorName: sj.contractorName,
+          isContractorJob: Boolean(sj.contractorName),
           priority: "High",
           priorityColor: "bg-caution-bg text-caution-text border-pebble",
-          due: sj.dateFormatted || sj.date || "Next Week",
+          due: sj.endDate || sj.dateFormatted || sj.date || "Next Week",
+          startDate: sj.startDate || sj.date,
+          endDate: sj.endDate || sj.deadline,
           completed: sj.status === "Completed",
           status:
             sj.status === "Completed"
@@ -145,9 +152,9 @@ function JobsContent() {
               ? "In Progress"
               : "Scheduled",
           description: sj.notes || `Scheduled for ${sj.worker}`,
-          assignedDate: sj.dateFormatted || "15 Sep 2026",
-          siteManagerName: isSM ? currentUser?.name : undefined,
-          siteManagerId: isSM ? String(currentUser?.id) : undefined,
+          assignedDate: sj.startDate || sj.dateFormatted || "15 Sep 2026",
+          siteManagerName: sj.siteManagerName || (isSM ? currentUser?.name : undefined),
+          siteManagerId: sj.siteManagerId || (isSM ? String(currentUser?.id) : undefined),
           photos: sj.photos || [],
           materials: sj.materials || [],
           notes: sj.notesList || [],
@@ -177,6 +184,26 @@ function JobsContent() {
 
   const [filter, setFilter] = useState("ALL");
   const [search, setSearch] = useState("");
+  const [siteFilter, setSiteFilter] = useState<string>(initialSite || "ALL");
+  const [groupBySite, setGroupBySite] = useState<boolean>(false);
+
+  useEffect(() => {
+    const s = searchParams.get("site");
+    if (s) {
+      setSiteFilter(s);
+    }
+  }, [searchParams]);
+
+  const availableSiteOptions = useMemo(() => {
+    const names = new Set<string>();
+    allSites.forEach((s) => {
+      if (s.name) names.add(s.name);
+    });
+    combinedJobs.forEach((j) => {
+      if (j.location) names.add(j.location);
+    });
+    return Array.from(names).filter(Boolean);
+  }, [allSites, combinedJobs]);
 
   // Modal State
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -191,7 +218,13 @@ function JobsContent() {
   const [jobLocation, setJobLocation] = useState("");
   const [jobPriority, setJobPriority] = useState<"High" | "Medium" | "Low">("High");
   const [jobDue, setJobDue] = useState("Today");
+  const [jobStartDate, setJobStartDate] = useState("15 Sep 2026");
+  const [jobEndDate, setJobEndDate] = useState("30 Nov 2026");
+  const [jobSiteManagerId, setJobSiteManagerId] = useState("");
+  const [jobSiteManagerName, setJobSiteManagerName] = useState("");
+  const [availableSiteManagers, setAvailableSiteManagers] = useState<{ id: string; name: string; role: string }[]>([]);
   const [jobDescription, setJobDescription] = useState("");
+  const [dateValidationError, setDateValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     db.users.toArray().then((users) => {
@@ -199,7 +232,22 @@ function JobsContent() {
       if (users.length > 0) {
         setInternalAssignee(users[0].name);
       }
-    }).catch(() => {});
+      const smUsers = users
+        .filter((u) => u.role === "SITE_MANAGER")
+        .map((u) => ({ id: `user-${u.id}`, name: u.name, role: "Site Manager" }));
+      if (!smUsers.some((u) => u.name.toLowerCase() === "sm")) {
+        smUsers.unshift({ id: "user-sm-default", name: "SM", role: "Site Manager" });
+      }
+      setAvailableSiteManagers(smUsers);
+      if (smUsers.length > 0) {
+        setJobSiteManagerName((prev) => prev || smUsers[0].name);
+        setJobSiteManagerId((prev) => prev || smUsers[0].id);
+      }
+    }).catch(() => {
+      setAvailableSiteManagers([{ id: "user-sm-default", name: "SM", role: "Site Manager" }]);
+      setJobSiteManagerName("SM");
+      setJobSiteManagerId("user-sm-default");
+    });
   }, []);
 
   // Reassign Modal State
@@ -237,11 +285,24 @@ function JobsContent() {
   // Handle Contractor Selection Change in Modal
   const handleContractorSelect = (contractorId: string) => {
     setSelectedContractorId(contractorId);
+    setDateValidationError(null);
     const contractor = contractors.find((c) => c.id === contractorId);
     if (contractor) {
       setJobTitle(`Execute ${contractor.trade} Works – ${contractor.projectName}`);
       setJobProject(contractor.projectName);
       setJobLocation(`${contractor.projectName}, Main Site Area`);
+      const matchedProj = allProjects.find((p) => p.name.toLowerCase() === contractor.projectName.toLowerCase());
+      if (matchedProj) {
+        if (matchedProj.startDate) setJobStartDate(matchedProj.startDate);
+        if (matchedProj.endDate || matchedProj.due) {
+          setJobEndDate(matchedProj.endDate || matchedProj.due);
+          setJobDue(matchedProj.endDate || matchedProj.due);
+        }
+        if (matchedProj.siteManagerName) {
+          setJobSiteManagerName(matchedProj.siteManagerName);
+          setJobSiteManagerId(matchedProj.siteManagerId || "");
+        }
+      }
       setJobDescription(
         `Execute trade work scope per awarded tender #${contractor.tenderId}. Ensure quality sign-off.`
       );
@@ -250,6 +311,7 @@ function JobsContent() {
 
   // Open Dispatch Modal
   const handleOpenDispatchModal = () => {
+    setDateValidationError(null);
     const defaultProject =
       (isSM && assignedProjects.length > 0 ? assignedProjects[0] : null) ||
       allProjects[0] ||
@@ -268,8 +330,15 @@ function JobsContent() {
       setJobProject(defaultProject?.name || "");
       setJobLocation(defaultProject?.location || "Project Site");
     }
+    const matchedProj = allProjects.find((p) => p.name === (roleContractors[0]?.projectName || defaultProject?.name));
+    setJobStartDate(matchedProj?.startDate || "20 Sep 2026");
+    setJobEndDate(matchedProj?.endDate || matchedProj?.due || "02 Feb 2027");
+    setJobDue(matchedProj?.endDate || matchedProj?.due || "02 Feb 2027");
+    if (matchedProj?.siteManagerName) {
+      setJobSiteManagerName(matchedProj.siteManagerName);
+      setJobSiteManagerId(matchedProj.siteManagerId || "");
+    }
     setJobPriority("High");
-    setJobDue("Tomorrow");
     setJobDescription("");
     setShowAssignModal(true);
   };
@@ -290,17 +359,28 @@ function JobsContent() {
         s.name.toLowerCase() === targetProjName.toLowerCase()
     );
 
+    // Validate Job Start & End Dates against Project Timeline decided by Sales/Contract
+    const projStart = matchedProj?.startDate;
+    const projEnd = matchedProj?.endDate || matchedProj?.due;
+    const valResult = validateTimelineWithinProject(jobStartDate, jobEndDate, projStart, projEnd);
+    if (!valResult.isValid) {
+      setDateValidationError(valResult.error || "Date outside project timeline.");
+      toast.error(valResult.error || "Selected dates fall outside project timeline!");
+      return;
+    }
+    setDateValidationError(null);
+
     const smId = isSM
       ? (String(currentUser?.id) || "user-sm")
-      : (matchedProj?.siteManagerId || matchedSite?.siteManagerId);
+      : (jobSiteManagerId || matchedProj?.siteManagerId || matchedSite?.siteManagerId || "user-sm-default");
     const smName = isSM
       ? (currentUser?.name || "Site Manager")
-      : (matchedProj?.siteManagerName || matchedSite?.siteManagerName);
+      : (jobSiteManagerName || matchedProj?.siteManagerName || matchedSite?.siteManagerName || "SM");
 
     if (assigneeType === "CONTRACTOR") {
       const contractor = contractors.find((c) => c.id === selectedContractorId);
       if (!contractor) {
-        alert("Please select an awarded contractor.");
+        toast.warning("Please select an awarded contractor.");
         return;
       }
 
@@ -312,14 +392,18 @@ function JobsContent() {
         contractorName: contractor.name,
         trade: contractor.trade,
         priority: jobPriority,
-        due: jobDue,
+        due: jobEndDate || jobDue,
+        startDate: jobStartDate,
+        endDate: jobEndDate,
+        deadline: jobEndDate,
+        client: matchedProj?.client || "SSS",
         description: jobDescription,
         tenderId: contractor.tenderId,
         siteManagerId: smId,
         siteManagerName: smName,
       });
 
-      alert(`Job assigned successfully to ${contractor.name}!`);
+      toast.success(`Job assigned successfully to ${contractor.name} under Site Manager ${smName}!`);
     } else {
       // Internal staff job
       assignJobToContractor({
@@ -329,12 +413,16 @@ function JobsContent() {
         contractorId: "",
         contractorName: internalAssignee || "Site Team",
         priority: jobPriority,
-        due: jobDue,
+        due: jobEndDate || jobDue,
+        startDate: jobStartDate,
+        endDate: jobEndDate,
+        deadline: jobEndDate,
+        client: matchedProj?.client || "SSS",
         description: jobDescription,
         siteManagerId: smId,
         siteManagerName: smName,
       });
-      alert(`Job assigned to ${internalAssignee || "Site Team"}!`);
+      toast.success(`Job assigned to ${internalAssignee || "Site Team"} under Site Manager ${smName}!`);
     }
 
     setShowAssignModal(false);
@@ -367,16 +455,17 @@ function JobsContent() {
     });
 
     setShowReassignModal(false);
-    alert(`Work order successfully reassigned to ${contractor.name}!`);
+    toast.success(`Work order successfully reassigned to ${contractor.name}!`);
   };
 
-  // Filter Jobs based on role and active tab/search
+  // Filter Jobs based on role, site, and active tab/search
   const filtered = useMemo(() => {
     return (roleJobs || []).filter((j) => {
       const matchSearch =
         j.title.toLowerCase().includes(search.toLowerCase()) ||
         j.assignee.toLowerCase().includes(search.toLowerCase()) ||
         j.location.toLowerCase().includes(search.toLowerCase()) ||
+        (j.contractorName && j.contractorName.toLowerCase().includes(search.toLowerCase())) ||
         (j.projectName && j.projectName.toLowerCase().includes(search.toLowerCase()));
 
       let matchTab = true;
@@ -392,9 +481,62 @@ function JobsContent() {
         matchTab = j.completed || j.status === "Completed";
       }
 
-      return matchSearch && matchTab;
+      let matchSite = true;
+      if (siteFilter !== "ALL") {
+        const target = siteFilter.toLowerCase().trim();
+        const jLoc = (j.location || "").toLowerCase().trim();
+        const jProj = (j.projectName || "").toLowerCase().trim();
+        matchSite =
+          jLoc.includes(target) ||
+          target.includes(jLoc) ||
+          jProj.includes(target) ||
+          target.includes(jProj);
+      }
+
+      return matchSearch && matchTab && matchSite;
     });
-  }, [roleJobs, search, filter, scheduledJobs]);
+  }, [roleJobs, search, filter, siteFilter, scheduledJobs]);
+
+  // Group work packages by Construction Site for organized hierarchy
+  const siteGroupedJobs = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        siteName: string;
+        projectName?: string;
+        siteManagerName?: string;
+        jobs: typeof filtered;
+        contractorPackagesCount: number;
+        crewJobsCount: number;
+      }
+    >();
+
+    for (const j of filtered) {
+      const siteKey = j.location || j.projectName || "Active Construction Site";
+      if (!map.has(siteKey)) {
+        map.set(siteKey, {
+          siteName: siteKey,
+          projectName: j.projectName,
+          siteManagerName: j.siteManagerName || "SM",
+          jobs: [],
+          contractorPackagesCount: 0,
+          crewJobsCount: 0,
+        });
+      }
+      const group = map.get(siteKey)!;
+      group.jobs.push(j);
+      if (j.isContractorJob) {
+        group.contractorPackagesCount += 1;
+      } else {
+        group.crewJobsCount += 1;
+      }
+      if (j.siteManagerName && (!group.siteManagerName || group.siteManagerName === "SM")) {
+        group.siteManagerName = j.siteManagerName;
+      }
+    }
+
+    return Array.from(map.values());
+  }, [filtered]);
 
   const completedCount = roleJobs.filter((j) => j.completed).length;
   const activeCount = roleJobs.filter((j) => !j.completed).length;
@@ -663,358 +805,485 @@ function JobsContent() {
         {/* ========================================================================= */}
         {/* FILTER TABS & SEARCH BAR                                                  */}
         {/* ========================================================================= */}
-        <div className="rounded-[12px] bg-white p-3 border border-pebble flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
-            {[
-              { key: "ALL", label: `All Jobs (${totalJobsCount})` },
-              { key: "CONTRACTOR_JOBS", label: `Contractor Jobs (${contractorJobsCount})` },
-              { key: "WITH_PHOTOS", label: `📸 Field Photos (${withPhotosCount})` },
-              { key: "SCHEDULED", label: "Scheduled" },
-              { key: "IN_PROGRESS", label: "In Progress" },
-              { key: "COMPLETED", label: "Completed" },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setFilter(tab.key)}
-                className={`px-3.5 py-1.5 rounded-[8px] text-xs font-semibold transition cursor-pointer shrink-0 ${
-                  filter === tab.key
-                    ? "bg-forest text-white shadow-xs"
-                    : "bg-stone text-ash hover:bg-mist hover:text-onyx"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+        {/* ========================================================================= */}
+        {/* FILTER TABS, SITE SELECTOR & SEARCH BAR                                   */}
+        {/* ========================================================================= */}
+        <div className="rounded-[12px] bg-white p-3.5 border border-pebble space-y-3 shadow-2xs">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full lg:w-auto pb-1 lg:pb-0">
+              {[
+                { key: "ALL", label: `All Site Work Orders (${totalJobsCount})` },
+                { key: "CONTRACTOR_JOBS", label: `Trade Packages (${contractorJobsCount})` },
+                { key: "WITH_PHOTOS", label: `📸 Field Photos (${withPhotosCount})` },
+                { key: "SCHEDULED", label: "Scheduled" },
+                { key: "IN_PROGRESS", label: "In Progress" },
+                { key: "COMPLETED", label: "Completed" },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setFilter(tab.key)}
+                  className={`px-3 py-1.5 rounded-[8px] text-xs font-semibold transition cursor-pointer shrink-0 ${
+                    filter === tab.key
+                      ? "bg-forest text-white shadow-xs"
+                      : "bg-stone text-ash hover:bg-mist hover:text-onyx"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search Input */}
+            <div className="relative w-full lg:w-64 shrink-0">
+              <Search className="h-3.5 w-3.5 text-ash absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search job, contractor, or site..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-xs text-onyx placeholder:text-ash bg-stone rounded-[8px] border border-pebble outline-none focus:border-forest transition"
+              />
+            </div>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="h-3.5 w-3.5 text-ash absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search job, contractor, or project..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs text-onyx placeholder:text-ash bg-stone rounded-[8px] border border-pebble outline-none focus:border-forest transition"
-            />
+          {/* Construction Site Filter & Grouping Control Bar */}
+          <div className="pt-2.5 border-t border-pebble/60 flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-bold text-onyx flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5 text-forest" />
+                <span>Construction Site:</span>
+              </span>
+
+              <select
+                value={siteFilter}
+                onChange={(e) => setSiteFilter(e.target.value)}
+                className="h-8 px-2.5 text-xs bg-stone text-onyx font-semibold rounded-[8px] border border-pebble outline-none focus:border-forest cursor-pointer"
+              >
+                <option value="ALL">All Construction Sites ({availableSiteOptions.length})</option>
+                {availableSiteOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+
+              {siteFilter !== "ALL" && (
+                <button
+                  type="button"
+                  onClick={() => setSiteFilter("ALL")}
+                  className="text-xs text-forest hover:underline font-semibold flex items-center gap-1 cursor-pointer bg-forest/10 px-2 py-1 rounded-md"
+                >
+                  <span>Clear Site Filter</span>
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setGroupBySite(!groupBySite)}
+              className={`px-3 py-1.5 rounded-[8px] text-xs font-semibold border transition cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                groupBySite
+                  ? "bg-forest text-white border-forest"
+                  : "bg-stone hover:bg-mist text-onyx border-pebble"
+              }`}
+              title="Group work orders under their respective Construction Site"
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              <span>{groupBySite ? "Grouped by Construction Site ✓" : "Group by Construction Site"}</span>
+            </button>
           </div>
         </div>
 
         {/* ========================================================================= */}
         {/* JOBS LIST                                                                 */}
         {/* ========================================================================= */}
-        <div className="rounded-[14px] bg-white p-5 border border-pebble space-y-3 shadow-2xs">
-          {filtered.length === 0 ? (
-            <div className="py-12 px-6 text-center text-ash space-y-2">
-              <Briefcase className="h-9 w-9 mx-auto text-ash/40" />
-              <p className="text-sm font-bold text-onyx">
-                {isSM ? "No Work Orders Assigned to Your Sites" : "No work orders found"}
-              </p>
-              <p className="text-xs text-ash max-w-md mx-auto">
-                {isSM
-                  ? `There are currently no active work orders or trade jobs assigned to your projects or sites (${currentUser?.name || "Site Manager"}). Work orders dispatched by the Project Manager will appear here.`
-                  : "Try a different filter or click \"Dispatch / Assign Job\" to assign a new work order."}
-              </p>
-            </div>
-          ) : (
-            filtered.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => {
-                  setSelectedJobId(item.id);
-                  router.push(`/jobs?jobId=${item.id}`);
-                }}
-                className={`flex flex-col gap-3.5 p-4.5 rounded-[12px] border transition cursor-pointer hover:border-forest hover:shadow-xs ${
-                  item.completed
-                    ? "bg-stone/50 border-pebble/70 opacity-60"
-                    : item.isContractorJob
-                    ? "bg-white border-forest/30 shadow-2xs hover:border-forest"
-                    : "bg-white border-pebble hover:border-onyx"
-                }`}
-              >
-                {/* Top Row: Job Info (Left) and Assignee / Actions (Right) */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  {/* Left Side: Checkbox & Info */}
-                  <div className="flex items-start gap-3.5 min-w-0">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleJob(item.id);
-                      }}
-                      className="text-ash hover:text-onyx shrink-0 cursor-pointer mt-0.5"
-                    >
-                      {item.completed ? (
-                        <CheckSquare className="h-5 w-5 text-forest stroke-[2.5]" />
-                      ) : (
-                        <Square className="h-5 w-5 text-ash" />
-                      )}
-                    </button>
+        {(() => {
+          const renderJobCard = (item: (typeof filtered)[0]) => (
+            <div
+              key={item.id}
+              onClick={() => {
+                setSelectedJobId(item.id);
+                router.push(`/jobs?jobId=${item.id}`);
+              }}
+              className={`flex flex-col gap-3.5 p-4.5 rounded-[12px] border transition cursor-pointer hover:border-forest hover:shadow-xs ${
+                item.completed
+                  ? "bg-stone/50 border-pebble/70 opacity-60"
+                  : item.isContractorJob
+                  ? "bg-white border-forest/30 shadow-2xs hover:border-forest"
+                  : "bg-white border-pebble hover:border-onyx"
+              }`}
+            >
+              {/* Top Row: Job Info (Left) and Assignee / Actions (Right) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                {/* Left Side: Checkbox & Info */}
+                <div className="flex items-start gap-3.5 min-w-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleJob(item.id);
+                    }}
+                    className="text-ash hover:text-onyx shrink-0 cursor-pointer mt-0.5"
+                  >
+                    {item.completed ? (
+                      <CheckSquare className="h-5 w-5 text-forest stroke-[2.5]" />
+                    ) : (
+                      <Square className="h-5 w-5 text-ash" />
+                    )}
+                  </button>
 
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-eyebrow font-bold text-ash uppercase">
-                          {item.id}
-                        </span>
-                        <span
-                          className={`text-eyebrow font-semibold px-2 py-0.5 rounded-full border ${item.priorityColor}`}
-                        >
-                          {item.priority}
-                        </span>
-
-                        {item.isContractorJob && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-breath text-forest border border-forest/20">
-                            <HardHat className="h-3 w-3" />
-                            <span>Awarded Contractor</span>
-                          </span>
-                        )}
-
-                        {item.trade && (
-                          <span className="text-[10px] font-semibold text-ash bg-stone px-2 py-0.5 rounded-md border border-pebble">
-                            {item.trade}
-                          </span>
-                        )}
-                      </div>
-
-                      <h3
-                        className={`text-sm mt-1 truncate ${
-                          item.completed
-                            ? "line-through text-ash"
-                            : "font-bold text-onyx"
-                        }`}
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-eyebrow font-bold text-ash uppercase">
+                        {item.id}
+                      </span>
+                      <span
+                        className={`text-eyebrow font-semibold px-2 py-0.5 rounded-full border ${item.priorityColor}`}
                       >
-                        {item.title}
-                      </h3>
+                        {item.priority}
+                      </span>
 
-                      <p className="text-xs text-ash flex items-center gap-1.5 mt-0.5">
-                        <MapPin className="h-3 w-3 shrink-0 text-forest" />
-                        <span>{item.location}</span>
-                        {item.projectName && (
-                          <>
-                            <span className="text-pebble">•</span>
-                            <span className="font-semibold text-onyx">
-                              {item.projectName}
-                            </span>
-                          </>
-                        )}
-                      </p>
+                      {item.isContractorJob && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-breath text-forest border border-forest/20">
+                          <HardHat className="h-3 w-3" />
+                          <span>Awarded Contractor</span>
+                        </span>
+                      )}
 
-                      {item.description && (
-                        <p className="text-[11px] text-ash/90 mt-1 max-w-xl italic">
-                          &quot;{item.description}&quot;
-                        </p>
+                      {item.trade && (
+                        <span className="text-[10px] font-semibold text-ash bg-stone px-2 py-0.5 rounded-md border border-pebble">
+                          {item.trade}
+                        </span>
                       )}
                     </div>
+
+                    <h3
+                      className={`text-sm mt-1 truncate ${
+                        item.completed
+                          ? "line-through text-ash"
+                          : "font-bold text-onyx"
+                      }`}
+                    >
+                      {item.title}
+                    </h3>
+
+                    {/* Dedicated Construction Site & Supervising Site Manager Anchor Box */}
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2 p-2 rounded-[8px] bg-stone/40 border border-pebble/70 text-xs">
+                      <div className="flex items-center gap-1.5 font-bold text-onyx">
+                        <MapPin className="h-3.5 w-3.5 text-forest shrink-0" />
+                        <span className="text-ash font-medium">Site:</span>
+                        <span className="text-forest">{item.location || item.projectName}</span>
+                      </div>
+
+                      {item.projectName && (
+                        <>
+                          <span className="text-pebble">•</span>
+                          <span className="text-ash font-medium">
+                            Project: <strong className="text-onyx">{item.projectName}</strong>
+                          </span>
+                        </>
+                      )}
+
+                      <span className="text-pebble">•</span>
+                      <div className="flex items-center gap-1 text-ash">
+                        <UserCheck className="h-3.5 w-3.5 text-forest shrink-0" />
+                        <span>Site Manager:</span>
+                        <strong className="text-onyx">{item.siteManagerName || "SM"}</strong>
+                      </div>
+
+                      {item.isContractorJob && item.contractorName && (
+                        <>
+                          <span className="text-pebble">•</span>
+                          <div className="flex items-center gap-1 text-ash">
+                            <HardHat className="h-3.5 w-3.5 text-forest shrink-0" />
+                            <span>Trade Contractor:</span>
+                            <strong className="text-onyx">{item.contractorName}</strong>
+                            {item.trade && (
+                              <span className="text-forest font-semibold">({item.trade})</span>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {item.description && (
+                      <p className="text-[11px] text-ash/90 mt-1.5 max-w-xl italic">
+                        &quot;{item.description}&quot;
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Side: Assignee, Schedule, Due Date, Photo Quick Button, and Reassign */}
+                <div className="flex items-center justify-between sm:justify-end gap-3.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-pebble/50">
+                  <div className="text-left sm:text-right">
+                    <span className="text-[10px] font-semibold text-ash block uppercase">
+                      {item.isContractorJob ? "On-Site Trade Contractor" : "Assigned Crew"}
+                    </span>
+                    <span className="text-xs font-bold text-onyx flex items-center sm:justify-end gap-1 mt-0.5">
+                      {item.isContractorJob && (
+                        <HardHat className="h-3.5 w-3.5 text-forest" />
+                      )}
+                      <span>{item.assignee}</span>
+                    </span>
                   </div>
 
-                  {/* Right Side: Assignee, Schedule, Due Date, Photo Quick Button, and Reassign */}
-                  <div className="flex items-center justify-between sm:justify-end gap-3.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-pebble/50">
-                    <div className="text-left sm:text-right">
-                      <span className="text-[10px] font-semibold text-ash block uppercase">
-                        {item.isContractorJob ? "Contractor Partner" : "Assigned To"}
-                      </span>
-                      <span className="text-xs font-bold text-onyx flex items-center sm:justify-end gap-1 mt-0.5">
-                        {item.isContractorJob && (
-                          <HardHat className="h-3.5 w-3.5 text-forest" />
-                        )}
-                        <span>{item.assignee}</span>
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {/* Schedule Button */}
-                      {(() => {
-                        const isScheduled =
-                          item.status === "Scheduled" ||
-                          scheduledJobs.some((sj) => sj.id === item.id);
-                        return (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(
-                                `/scheduling?jobId=${item.id}&openSchedule=true`
-                              );
-                            }}
-                            className={`px-2.5 py-1 rounded-[6px] text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 shadow-2xs ${
-                              isScheduled
-                                ? "border-success/30 bg-clear-bg text-success-text hover:bg-clear-bg/80"
-                                : "border-forest/40 bg-breath text-forest hover:bg-forest hover:text-white"
-                            }`}
-                            title={
-                              isScheduled
-                                ? "Job is scheduled on calendar (click to view/edit)"
-                                : "Click to schedule worker & date on calendar"
-                            }
-                          >
-                            {isScheduled ? (
-                              <CheckCircle2 className="h-3 w-3 text-success" />
-                            ) : (
-                              <Calendar className="h-3 w-3" />
-                            )}
-                            <span>{isScheduled ? "Scheduled" : "Schedule"}</span>
-                          </button>
-                        );
-                      })()}
-
-                      {/* Due Badge */}
-                      <div className="bg-stone border border-pebble px-2.5 py-1 rounded-[6px] text-xs font-medium text-onyx">
-                        {item.due}
-                      </div>
-
-                      {/* Quick Photo Inspection Button */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPhotoTargetJob(item);
-                          setShowPhotoModal(true);
-                        }}
-                        className={`px-2.5 py-1 rounded-[6px] text-xs font-bold border transition cursor-pointer flex items-center gap-1 shadow-2xs ${
-                          item.photos && item.photos.length > 0
-                            ? "border-forest/30 bg-breath text-forest hover:bg-forest hover:text-white"
-                            : "border-pebble bg-stone text-ash hover:text-onyx"
-                        }`}
-                        title={
-                          item.photos && item.photos.length > 0
-                            ? `Inspect ${item.photos.length} field photos`
-                            : "No field photos attached"
-                        }
-                      >
-                        <Camera className="h-3 w-3" />
-                        <span>{item.photos?.length || 0}</span>
-                      </button>
-
-                      {/* Reassign / Change Assignee Button */}
-                      {contractors.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    {/* Schedule Button */}
+                    {(() => {
+                      const isScheduled =
+                        item.status === "Scheduled" ||
+                        scheduledJobs.some((sj) => sj.id === item.id);
+                      return (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setReassignTargetJob(item);
-                            setReassignContractorId(
-                              item.contractorId || contractors[0].id
+                            router.push(
+                              `/scheduling?jobId=${item.id}&openSchedule=true`
                             );
-                            setShowReassignModal(true);
                           }}
-                          className="p-1 text-ash hover:text-forest hover:bg-stone rounded-md transition cursor-pointer text-xs"
-                          title="Reassign to Contractor"
+                          className={`px-2.5 py-1 rounded-[6px] text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                            isScheduled
+                              ? "border-success/30 bg-clear-bg text-success-text hover:bg-clear-bg/80"
+                              : "border-forest/40 bg-breath text-forest hover:bg-forest hover:text-white"
+                          }`}
+                          title={
+                            isScheduled
+                              ? "Job is scheduled on calendar (click to view/edit)"
+                              : "Click to schedule worker & date on calendar"
+                          }
                         >
-                          <User className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom Row: Field Worker Photo Evidence Strip */}
-                {item.photos && item.photos.length > 0 ? (
-                  <div className="pt-3 border-t border-pebble/60 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-stone/30 rounded-[10px] p-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Photo Thumbnails */}
-                      <div className="flex items-center -space-x-2 shrink-0">
-                        {item.photos.slice(0, 4).map((photo, pIdx) => (
-                          <div
-                            key={photo.id || pIdx}
-                            onClick={() => {
-                              setPhotoTargetJob(item);
-                              setShowPhotoModal(true);
-                            }}
-                            className="h-11 w-14 rounded-[7px] overflow-hidden border-2 border-white shadow-xs bg-stone cursor-pointer hover:scale-110 hover:z-10 transition duration-150 relative group"
-                            title={photo.caption || "Click to inspect photo"}
-                          >
-                            <img
-                              src={photo.url}
-                              alt="Site Evidence"
-                              className="h-full w-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                              <Eye className="h-3 w-3 text-white" />
-                            </div>
-                          </div>
-                        ))}
-                        {item.photos.length > 4 && (
-                          <div
-                            onClick={() => {
-                              setPhotoTargetJob(item);
-                              setShowPhotoModal(true);
-                            }}
-                            className="h-11 w-11 rounded-[7px] bg-onyx text-white text-[10px] font-bold flex items-center justify-center border-2 border-white shadow-xs cursor-pointer"
-                          >
-                            +{item.photos.length - 4}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Info & Attribution */}
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-bold text-onyx flex items-center gap-1.5">
-                            <Camera className="h-3.5 w-3.5 text-forest" />
-                            <span>Field Evidence ({item.photos.length} Photos Received)</span>
-                          </span>
-
-                          {item.photos.some((p) => p.verified) ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-success-text bg-clear-bg px-2 py-0.5 rounded-full border border-success/30">
-                              <CheckCircle2 className="h-2.5 w-2.5 text-success" />
-                              <span>Quality Verified ✓</span>
-                            </span>
+                          {isScheduled ? (
+                            <CheckCircle2 className="h-3 w-3 text-success" />
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-caution-text bg-caution-bg px-2 py-0.5 rounded-full border border-pebble">
-                              <Clock className="h-2.5 w-2.5" />
-                              <span>Awaiting PM Review</span>
-                            </span>
+                            <Calendar className="h-3 w-3" />
                           )}
+                          <span>{isScheduled ? "Scheduled" : "Schedule"}</span>
+                        </button>
+                      );
+                    })()}
 
-                          <span className="text-[10px] text-ash bg-white px-2 py-0.5 rounded border border-pebble">
-                            Sent by {item.photos[0]?.uploadedBy || item.assignee}
-                          </span>
-                        </div>
-
-                        <p className="text-[11px] text-ash truncate mt-0.5">
-                          Latest note: &quot;{item.photos[0]?.caption || "Site progress photo submitted"}&quot; • {item.photos[0]?.timestamp}
-                        </p>
-                      </div>
+                    {/* Due Badge */}
+                    <div className="bg-stone border border-pebble px-2.5 py-1 rounded-[6px] text-xs font-medium text-onyx">
+                      {item.due}
                     </div>
 
-                    {/* Inspect Photos Action Button */}
-                    <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
+                    {/* Quick Photo Inspection Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPhotoTargetJob(item);
+                        setShowPhotoModal(true);
+                      }}
+                      className={`px-2.5 py-1 rounded-[6px] text-xs font-bold border transition cursor-pointer flex items-center gap-1 shadow-2xs ${
+                        item.photos && item.photos.length > 0
+                          ? "border-forest/30 bg-breath text-forest hover:bg-forest hover:text-white"
+                          : "border-pebble bg-stone text-ash hover:text-onyx"
+                      }`}
+                      title={
+                        item.photos && item.photos.length > 0
+                          ? `Inspect ${item.photos.length} field photos`
+                          : "No field photos attached"
+                      }
+                    >
+                      <Camera className="h-3 w-3" />
+                      <span>{item.photos?.length || 0}</span>
+                    </button>
+
+                    {/* Reassign / Change Assignee Button */}
+                    {contractors.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setPhotoTargetJob(item);
-                          setShowPhotoModal(true);
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReassignTargetJob(item);
+                          setReassignContractorId(
+                            item.contractorId || contractors[0].id
+                          );
+                          setShowReassignModal(true);
                         }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-forest hover:bg-forest-hover text-white text-xs font-bold transition shadow-2xs cursor-pointer"
+                        className="p-1 text-ash hover:text-forest hover:bg-stone rounded-md transition cursor-pointer text-xs"
+                        title="Reassign to Contractor"
                       >
-                        <Eye className="h-3.5 w-3.5" />
-                        <span>Inspect &amp; Verify Photos ({item.photos.length})</span>
+                        <User className="h-4 w-4" />
                       </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Row: Field Worker Photo Evidence Strip */}
+              {item.photos && item.photos.length > 0 ? (
+                <div className="pt-3 border-t border-pebble/60 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-stone/30 rounded-[10px] p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Photo Thumbnails */}
+                    <div className="flex items-center -space-x-2 shrink-0">
+                      {item.photos.slice(0, 4).map((photo, pIdx) => (
+                        <div
+                          key={photo.id || pIdx}
+                          onClick={() => {
+                            setPhotoTargetJob(item);
+                            setShowPhotoModal(true);
+                          }}
+                          className="h-11 w-14 rounded-[7px] overflow-hidden border-2 border-white shadow-xs bg-stone cursor-pointer hover:scale-110 hover:z-10 transition duration-150 relative group"
+                          title={photo.caption || "Click to inspect photo"}
+                        >
+                          <img
+                            src={photo.url}
+                            alt="Site Evidence"
+                            className="h-full w-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                            <Eye className="h-3 w-3 text-white" />
+                          </div>
+                        </div>
+                      ))}
+                      {item.photos.length > 4 && (
+                        <div
+                          onClick={() => {
+                            setPhotoTargetJob(item);
+                            setShowPhotoModal(true);
+                          }}
+                          className="h-11 w-11 rounded-[7px] bg-onyx text-white text-[10px] font-bold flex items-center justify-center border-2 border-white shadow-xs cursor-pointer"
+                        >
+                          +{item.photos.length - 4}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info & Attribution */}
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold text-onyx flex items-center gap-1.5">
+                          <Camera className="h-3.5 w-3.5 text-forest" />
+                          <span>Field Evidence ({item.photos.length} Photos Received)</span>
+                        </span>
+
+                        {item.photos.some((p) => p.verified) ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-success-text bg-clear-bg px-2 py-0.5 rounded-full border border-success/30">
+                            <CheckCircle2 className="h-2.5 w-2.5 text-success" />
+                            <span>Quality Verified ✓</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-caution-text bg-caution-bg px-2 py-0.5 rounded-full border border-pebble">
+                            <Clock className="h-2.5 w-2.5" />
+                            <span>Awaiting PM Review</span>
+                          </span>
+                        )}
+
+                        <span className="text-[10px] text-ash bg-white px-2 py-0.5 rounded border border-pebble">
+                          Sent by {item.photos[0]?.uploadedBy || item.assignee}
+                        </span>
+                      </div>
+
+                      <p className="text-[11px] text-ash truncate mt-0.5">
+                        Latest note: &quot;{item.photos[0]?.caption || "Site progress photo submitted"}&quot; • {item.photos[0]?.timestamp}
+                      </p>
                     </div>
                   </div>
-                ) : (
-                  <div className="pt-2.5 border-t border-pebble/40 flex items-center justify-between text-xs text-ash">
-                    <span className="flex items-center gap-1.5 text-[11px]">
-                      <Camera className="h-3 w-3 text-ash/60" />
-                      <span>No field photos submitted yet for this work order</span>
-                    </span>
+
+                  {/* Inspect Photos Action Button */}
+                  <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
                     <button
                       type="button"
                       onClick={() => {
                         setPhotoTargetJob(item);
                         setShowPhotoModal(true);
                       }}
-                      className="text-forest hover:text-forest-hover font-bold text-xs cursor-pointer flex items-center gap-1"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-forest hover:bg-forest-hover text-white text-xs font-bold transition shadow-2xs cursor-pointer"
                     >
-                      <Plus className="h-3 w-3" />
-                      <span>Attach Field Photo</span>
+                      <Eye className="h-3.5 w-3.5" />
+                      <span>Inspect &amp; Verify Photos ({item.photos.length})</span>
                     </button>
                   </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
+                </div>
+              ) : (
+                <div className="pt-2.5 border-t border-pebble/40 flex items-center justify-between text-xs text-ash">
+                  <span className="flex items-center gap-1.5 text-[11px]">
+                    <Camera className="h-3 w-3 text-ash/60" />
+                    <span>No field photos submitted yet for this work order</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhotoTargetJob(item);
+                      setShowPhotoModal(true);
+                    }}
+                    className="text-forest hover:text-forest-hover font-bold text-xs cursor-pointer flex items-center gap-1"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Attach Field Photo</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+
+          return (
+            <div className="rounded-[14px] bg-white p-5 border border-pebble space-y-4 shadow-2xs">
+              {filtered.length === 0 ? (
+                <div className="py-12 px-6 text-center text-ash space-y-2">
+                  <Briefcase className="h-9 w-9 mx-auto text-ash/40" />
+                  <p className="text-sm font-bold text-onyx">
+                    {isSM ? "No Work Orders Assigned to Your Sites" : "No work orders found"}
+                  </p>
+                  <p className="text-xs text-ash max-w-md mx-auto">
+                    {isSM
+                      ? `There are currently no active work orders or trade jobs assigned to your projects or sites (${currentUser?.name || "Site Manager"}). Work orders dispatched by the Project Manager will appear here.`
+                      : "Try a different filter or click \"Dispatch / Assign Job\" to assign a new work order."}
+                  </p>
+                </div>
+              ) : groupBySite ? (
+                siteGroupedJobs.map((group) => (
+                  <div
+                    key={group.siteName}
+                    className="space-y-3 pb-4 border-b border-pebble/70 last:border-0"
+                  >
+                    {/* Site Header Container */}
+                    <div className="p-3 bg-stone/60 rounded-[10px] border border-pebble/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-forest text-white shrink-0 shadow-xs">
+                          <MapPin className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-onyx">
+                              Construction Site: {group.siteName}
+                            </span>
+                            {group.projectName && (
+                              <span className="text-[10px] font-semibold text-ash bg-white px-2 py-0.2 rounded border border-pebble">
+                                Project: {group.projectName}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-ash mt-0.5">
+                            Site Manager in Charge: <strong className="text-forest">{group.siteManagerName || "Site Manager"}</strong>
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="text-[11px] font-bold text-forest bg-forest/10 px-2.5 py-1 rounded-full border border-forest/20 self-start sm:self-auto">
+                        {group.jobs.length} Work Package{group.jobs.length === 1 ? "" : "s"} ({group.contractorPackagesCount} Contractor, {group.crewJobsCount} Crew)
+                      </span>
+                    </div>
+
+                    {/* Nested Jobs in this Site */}
+                    <div className="space-y-3 pl-0 sm:pl-3 border-l-0 sm:border-l-2 sm:border-forest/20">
+                      {group.jobs.map((item) => renderJobCard(item))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                filtered.map((item) => renderJobCard(item))
+              )}
+            </div>
+          );
+        })()}
 
         {/* ========================================================================= */}
         {/* MODAL: DISPATCH / ASSIGN NEW JOB                                          */}
@@ -1204,38 +1473,102 @@ function JobsContent() {
                   </div>
                 </div>
 
-                {/* Priority & Due Date */}
+                {/* Project Timeline Window Indicator (Sales Contract Alignment) */}
+                {(() => {
+                  const targetP = allProjects.find(
+                    (p) => p.name.toLowerCase() === (jobProject || "").toLowerCase()
+                  );
+                  const pStart = targetP?.startDate || "20 Sep 2026";
+                  const pEnd = targetP?.endDate || targetP?.due || "02 Feb 2027";
+                  return (
+                    <div className="p-2.5 rounded-[10px] bg-stone/70 border border-pebble/80 text-[11px] space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-bold text-onyx">
+                          <Calendar className="h-3.5 w-3.5 text-forest shrink-0" />
+                          <span>Sales Project Window:</span>
+                          <span className="text-forest underline font-black">{pStart} – {pEnd}</span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-ash bg-white px-2 py-0.5 rounded border border-pebble">
+                          Decided by Sales Manager
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-ash">
+                        Scheduled jobs must start on/after {pStart} and finish before {pEnd}.
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {dateValidationError && (
+                  <div className="p-2.5 rounded-[8px] bg-hazard-bg border border-red-200 text-hazard-text text-xs flex items-center gap-2 animate-in fade-in">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                    <span className="font-semibold">{dateValidationError}</span>
+                  </div>
+                )}
+
+                {/* Timeline: Start Date & End Date / Deadline */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-onyx mb-1">
-                      Priority
-                    </label>
-                    <select
-                      value={jobPriority}
-                      onChange={(e) =>
-                        setJobPriority(
-                          e.target.value as "High" | "Medium" | "Low"
-                        )
-                      }
-                      className="w-full h-9 px-3 text-xs bg-stone rounded-[8px] border border-pebble outline-none focus:border-forest cursor-pointer"
-                    >
-                      <option value="High">High</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-onyx mb-1">
-                      Target Completion
+                      Start Date <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      value={jobDue}
-                      onChange={(e) => setJobDue(e.target.value)}
-                      placeholder="e.g. Today, Tomorrow, 28 May"
+                      required
+                      value={jobStartDate}
+                      onChange={(e) => {
+                        setJobStartDate(e.target.value);
+                        setDateValidationError(null);
+                      }}
+                      placeholder="e.g. 20 Sep 2026"
                       className="w-full h-9 px-3 text-xs bg-stone rounded-[8px] border border-pebble outline-none focus:border-forest"
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-onyx mb-1">
+                      Deadline / Completion <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={jobEndDate}
+                      onChange={(e) => {
+                        setJobEndDate(e.target.value);
+                        setJobDue(e.target.value);
+                        setDateValidationError(null);
+                      }}
+                      placeholder="e.g. 02 Feb 2027"
+                      className="w-full h-9 px-3 text-xs bg-stone rounded-[8px] border border-pebble outline-none focus:border-forest"
+                    />
+                  </div>
+                </div>
+
+                {/* Supervising Site Manager */}
+                <div>
+                  <label className="block text-xs font-semibold text-onyx mb-1">
+                    Supervising Site Manager (Project Supervisor)
+                  </label>
+                  <select
+                    value={jobSiteManagerName}
+                    onChange={(e) => {
+                      setJobSiteManagerName(e.target.value);
+                      const sm = availableSiteManagers.find((m) => m.name === e.target.value);
+                      if (sm) setJobSiteManagerId(sm.id);
+                    }}
+                    className="w-full h-9 px-3 text-xs bg-stone text-onyx rounded-[8px] border border-pebble outline-none focus:border-forest cursor-pointer"
+                  >
+                    {availableSiteManagers.map((m) => (
+                      <option key={m.id} value={m.name}>
+                        {m.name} ({m.role})
+                      </option>
+                    ))}
+                    {jobSiteManagerName && !availableSiteManagers.some((m) => m.name === jobSiteManagerName) && (
+                      <option value={jobSiteManagerName}>{jobSiteManagerName} (Site Manager)</option>
+                    )}
+                  </select>
+                  <p className="text-[11px] text-ash mt-1">
+                    The appointed Site Manager supervises this contractor package and verifies work on site.
+                  </p>
                 </div>
 
                 {/* Description */}

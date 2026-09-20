@@ -18,8 +18,10 @@ import {
 } from "@/store/tenderFlowStore";
 import { useSchedulingStore } from "@/store/schedulingStore";
 import { useCrewStore } from "@/store/crewStore";
+import { useLeadFlowStore } from "@/store/leadFlowStore";
 import { useAuthStore } from "@/store/authStore";
 import { db } from "@/lib/db";
+import { getJobScheduleState } from "@/lib/dateValidation";
 import {
   Briefcase,
   MapPin,
@@ -48,6 +50,7 @@ import {
   Eye,
   Trash2,
   Phone,
+  UserCheck,
   ShieldCheck,
   ShieldAlert,
   Navigation,
@@ -60,6 +63,7 @@ import {
   FileCheck,
   ListChecks,
   AlertTriangle,
+  AlertCircle,
   Upload,
   Download,
   Search,
@@ -67,6 +71,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/components/ui/toast";
 import JobPhotoModal from "./JobPhotoModal";
+import JobFinanceTab from "./JobFinanceTab";
 
 interface JobDetailViewProps {
   job: JobItem;
@@ -86,7 +91,8 @@ export type TabKey =
   | "VARIATIONS"
   | "DOCUMENTS"
   | "SAFETY"
-  | "PUNCH_LISTS";
+  | "PUNCH_LISTS"
+  | "FINANCE";
 
 export type PhotoCategory = "ALL" | "BEFORE" | "PROGRESS" | "AFTER";
 
@@ -122,6 +128,10 @@ export default function JobDetailView({
     addCrewToJob,
     updateCrewStatus,
     removeCrewFromJob,
+    addRfi,
+    updateRfiStatus,
+    addVariation,
+    updateVariationStatus,
     addRfiToJob,
     addVariationToJob,
     addDocumentToJob,
@@ -129,6 +139,9 @@ export default function JobDetailView({
     addPunchItemToJob,
     addTimesheetToJob,
   } = useTenderFlowStore();
+
+  const allProjects = useLeadFlowStore((state) => state.projects) || [];
+  const contractors = useTenderFlowStore((state) => state.contractors) || [];
 
   // Resolve the live reactive job from the store
   const liveJob = useMemo(() => {
@@ -143,10 +156,76 @@ export default function JobDetailView({
         notes: fromScheduled.notesList || job.notes || [],
         status: (fromScheduled.status as JobItem["status"]) || job.status,
         completed: fromScheduled.status === "Completed" || job.completed,
+        startDate: fromScheduled.startDate || job.startDate,
+        endDate: fromScheduled.endDate || job.endDate,
+        contractorName: fromScheduled.contractorName || job.contractorName,
+        siteManagerName: fromScheduled.siteManagerName || job.siteManagerName,
       };
     }
     return job;
   }, [liveJobs, scheduledJobs, job]);
+
+  // Match project
+  const matchedProject = useMemo(() => {
+    const pName = (liveJob.projectName || "").toLowerCase().trim();
+    return allProjects.find((p) =>
+      (liveJob.projectId && p.id === liveJob.projectId) ||
+      (pName && p.name.toLowerCase().trim() === pName) ||
+      (pName && (p.name.toLowerCase().includes(pName) || pName.includes(p.name.toLowerCase())))
+    );
+  }, [allProjects, liveJob.projectId, liveJob.projectName]);
+
+  // Match contractor
+  const matchedContractor = useMemo(() => {
+    if (liveJob.contractorId) {
+      const found = contractors.find((c) => c.id === liveJob.contractorId);
+      if (found) return found;
+    }
+    if (liveJob.contractorName && !["sm", "site manager", "field worker"].includes(liveJob.contractorName.toLowerCase().trim())) {
+      const found = contractors.find((c) => c.name.toLowerCase().trim() === liveJob.contractorName?.toLowerCase().trim());
+      if (found) return found;
+    }
+    if (liveJob.tenderId) {
+      const found = contractors.find((c) => c.tenderId === liveJob.tenderId);
+      if (found) return found;
+    }
+    if (liveJob.projectName) {
+      const found = contractors.find((c) => c.projectName.toLowerCase().trim() === liveJob.projectName.toLowerCase().trim());
+      if (found) return found;
+    }
+    return contractors[0] || null;
+  }, [contractors, liveJob.contractorId, liveJob.contractorName, liveJob.tenderId, liveJob.projectName]);
+
+  // Resolved display names
+  const displayContractorName = useMemo(() => {
+    if (liveJob.contractorName && !["sm", "site manager", "field worker"].includes(liveJob.contractorName.toLowerCase().trim())) {
+      return liveJob.contractorName;
+    }
+    return matchedContractor?.name || "apex solutions";
+  }, [liveJob.contractorName, matchedContractor]);
+
+  const displaySiteManagerName = useMemo(() => {
+    return (
+      liveJob.siteManagerName ||
+      matchedProject?.siteManagerName ||
+      (liveJob.contractorName?.toLowerCase().trim() === "sm" ? "SM" : null) ||
+      "SM"
+    );
+  }, [liveJob.siteManagerName, matchedProject, liveJob.contractorName]);
+
+  const displayClientName = useMemo(() => {
+    return liveJob.client || matchedProject?.client || "SSS";
+  }, [liveJob.client, matchedProject]);
+
+  const displayDates = useMemo(() => {
+    const start = liveJob.startDate || "15 Sep 2026";
+    const end = liveJob.endDate || matchedProject?.due || "30 Nov 2026";
+    return `${start} – ${end}`;
+  }, [liveJob.startDate, liveJob.endDate, matchedProject?.due]);
+
+  const displayDuration = useMemo(() => {
+    return liveJob.expectedDuration || "76 Days (~2.5 Months)";
+  }, [liveJob.expectedDuration]);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<TabKey>("OVERVIEW");
@@ -166,6 +245,7 @@ export default function JobDetailView({
   const [showUploadDocModal, setShowUploadDocModal] = useState(false);
   const [showReportSafetyModal, setShowReportSafetyModal] = useState(false);
   const [showAddPunchModal, setShowAddPunchModal] = useState(false);
+  const [showEarlyTravelModal, setShowEarlyTravelModal] = useState(false);
 
   // Form states for modals
   const [editDesc, setEditDesc] = useState(liveJob.description || "");
@@ -199,12 +279,20 @@ export default function JobDetailView({
 
   // RFI Form
   const [rfiTitle, setRfiTitle] = useState("");
+  const [rfiQuestion, setRfiQuestion] = useState("");
   const [rfiPriority, setRfiPriority] = useState<"High" | "Medium" | "Low">("High");
+  const [rfiAttachment, setRfiAttachment] = useState("");
+  const [reviewingRfi, setReviewingRfi] = useState<JobRFI | null>(null);
+  const [rfiReviewDirective, setRfiReviewDirective] = useState("");
+  const [rfiReviewStatus, setRfiReviewStatus] = useState<"Open" | "In Review" | "Closed">("Closed");
 
   // Variation Form
   const [varTitle, setVarTitle] = useState("");
+  const [varDescription, setVarDescription] = useState("");
+  const [varMaterials, setVarMaterials] = useState("");
   const [varAmount, setVarAmount] = useState("");
   const [varImpact, setVarImpact] = useState("");
+  const [varAttachment, setVarAttachment] = useState("");
 
   // Document Form
   const [docName, setDocName] = useState("");
@@ -458,6 +546,14 @@ export default function JobDetailView({
 
   // Handlers
   const handleStatusChange = (newStatus: JobItem["status"]) => {
+    if (newStatus === "Travelling") {
+      const sched = getJobScheduleState(liveJob.startDate || liveJob.due);
+      if (!sched.allowDirectTravel) {
+        setShowStatusMenu(false);
+        setShowEarlyTravelModal(true);
+        return;
+      }
+    }
     updateJobStatus(liveJob.id, newStatus);
     setShowStatusMenu(false);
     toast.success(`Job status updated to ${newStatus}`);
@@ -562,47 +658,96 @@ export default function JobDetailView({
 
   const handleRaiseRfi = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rfiTitle.trim()) return;
-    const nextNum = rfisList.length + 1;
-    addRfiToJob(liveJob.id, {
-      rfiNumber: `RFI-${nextNum}`,
-      title: rfiTitle.trim(),
-      raisedBy: currentUser?.name || "Site Manager",
-      date: new Date().toLocaleDateString("en-GB", {
+    if (!rfiQuestion.trim()) return;
+    const nextNum = (useTenderFlowStore.getState().rfis || []).length + 1;
+    const rfiNumber = `RFI-${String(nextNum).padStart(3, "0")}`;
+    addRfi({
+      rfiNumber,
+      organizationId: liveJob.organizationId || "ORG-DEFAULT",
+      projectId: liveJob.projectId || "PRJ-ABC",
+      projectName: liveJob.projectName || "ABC Commercial Building",
+      siteId: liveJob.siteId || "SITE-BHP",
+      siteName: liveJob.siteName || liveJob.location || "Bhopal Site",
+      jobId: liveJob.id,
+      jobTitle: liveJob.title,
+      createdBy: currentUser?.name || "Salim",
+      createdById: String(currentUser?.id || "user-salim"),
+      creatorRole: isWorker ? "Field Worker" : "Site Manager",
+      createdAt: new Date().toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
       }),
+      title: rfiTitle.trim() || `Technical Query - ${liveJob.title}`,
+      question: rfiQuestion.trim(),
       priority: rfiPriority,
       status: "Open",
-      response: "",
+      attachments: rfiAttachment.trim()
+        ? [{ id: `att-${Date.now()}`, name: rfiAttachment.trim(), size: "1.2 MB" }]
+        : [],
     });
     setRfiTitle("");
+    setRfiQuestion("");
+    setRfiAttachment("");
     setShowRaiseRfiModal(false);
     toast.success("RFI raised successfully!");
   };
 
   const handleRequestVariation = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!varTitle.trim()) return;
-    const amountNum = parseFloat(varAmount) || 0;
-    const nextNum = variationsList.length + 1;
-    addVariationToJob(liveJob.id, {
-      variationNumber: `VAR-${nextNum}`,
-      title: varTitle.trim(),
-      amount: amountNum,
-      date: new Date().toLocaleDateString("en-GB", {
+    if (!varDescription.trim() || !varAmount.trim()) return;
+    const amountNum = parseFloat(varAmount.replace(/[^0-9.]/g, "")) || 0;
+    const nextNum = (useTenderFlowStore.getState().variations || []).length + 12;
+    const variationNumber = `V-${String(nextNum).padStart(4, "0")}`;
+    addVariation({
+      variationNumber,
+      organizationId: liveJob.organizationId || "ORG-DEFAULT",
+      projectId: liveJob.projectId || "PRJ-ABC",
+      projectName: liveJob.projectName || "ABC Commercial Building",
+      siteId: liveJob.siteId || "SITE-BHP",
+      siteName: liveJob.siteName || liveJob.location || "Bhopal Site",
+      jobId: liveJob.id,
+      jobTitle: liveJob.title,
+      createdBy: currentUser?.name || "Salim",
+      createdById: String(currentUser?.id || "user-salim"),
+      creatorRole: isWorker ? "Field Worker" : "Site Manager",
+      createdAt: new Date().toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
       }),
-      status: "Pending PM Approval",
-      impact: varImpact.trim() || "—",
+      title: varTitle.trim() || `Scope Variation - ${liveJob.title}`,
+      description: varDescription.trim(),
+      additionalMaterials: varMaterials.trim(),
+      costImpact: amountNum,
+      amount: amountNum,
+      scheduleImpact: varImpact.trim() || "—",
+      status: "Awaiting PM Approval",
+      attachments: varAttachment.trim()
+        ? [{ id: `att-${Date.now()}`, name: varAttachment.trim(), size: "1.5 MB" }]
+        : [],
     });
     setVarTitle("");
+    setVarDescription("");
+    setVarMaterials("");
     setVarAmount("");
+    setVarImpact("");
+    setVarAttachment("");
     setShowRequestVariationModal(false);
     toast.success("Variation request submitted!");
+  };
+
+  const handleSaveRfiReview = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewingRfi) return;
+    updateRfiStatus(
+      reviewingRfi.id,
+      rfiReviewStatus,
+      rfiReviewDirective.trim(),
+      currentUser?.name || "Reviewer"
+    );
+    toast.success(`RFI ${reviewingRfi.rfiNumber} review updated.`);
+    setReviewingRfi(null);
   };
 
   const handleUploadDoc = (e: React.FormEvent) => {
@@ -880,21 +1025,19 @@ export default function JobDetailView({
       {/* 3. TOP 5 INFO METRIC CARDS (Scheduled Date, Client, Location, Contact, Status) */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        {/* Card 1: Scheduled Date */}
+        {/* Card 1: Scheduled Timeline */}
         <div className="rounded-[14px] bg-white border border-pebble/80 p-3.5 shadow-2xs flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-emerald-50 text-emerald-700 shrink-0">
             <Calendar className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <span className="text-[11px] font-semibold text-ash block">Scheduled Date</span>
-            <p className="text-xs font-bold text-onyx truncate">
-              {liveJob.startDate || "Not scheduled"}
+            <span className="text-[11px] font-semibold text-ash block">Scheduled Timeline</span>
+            <p className="text-xs font-bold text-onyx truncate" title={displayDates}>
+              {displayDates}
             </p>
-            {liveJob.timeSlot && (
-              <p className="text-[11px] text-ash truncate">
-                {liveJob.timeSlot}
-              </p>
-            )}
+            <p className="text-[11px] text-ash truncate">
+              {liveJob.timeSlot || "Full Work Order"}
+            </p>
           </div>
         </div>
 
@@ -906,48 +1049,37 @@ export default function JobDetailView({
           <div className="min-w-0">
             <span className="text-[11px] font-semibold text-ash block">Client</span>
             <p className="text-xs font-bold text-onyx truncate">
-              {liveJob.client || "—"}
+              {displayClientName}
             </p>
-            <p className="text-[11px] text-ash truncate">Client</p>
+            <p className="text-[11px] text-ash truncate">Project Client</p>
           </div>
         </div>
 
-        {/* Card 3: Location */}
+        {/* Card 3: Construction Site */}
         <div className="rounded-[14px] bg-white border border-pebble/80 p-3.5 shadow-2xs flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-emerald-50 text-emerald-700 shrink-0">
             <MapPin className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <span className="text-[11px] font-semibold text-ash block">Location</span>
+            <span className="text-[11px] font-semibold text-ash block">Construction Site</span>
             <p className="text-xs font-bold text-onyx truncate">
               {liveJob.location || liveJob.projectName || "—"}
             </p>
-            <p className="text-[11px] text-ash truncate">Site Location</p>
+            <p className="text-[11px] text-forest font-medium truncate">Site Location</p>
           </div>
         </div>
 
-        {/* Card 4: Site Contact */}
+        {/* Card 4: Site Manager */}
         <div className="rounded-[14px] bg-white border border-pebble/80 p-3.5 shadow-2xs flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-emerald-50 text-emerald-700 shrink-0">
-            <Phone className="h-5 w-5" />
+            <UserCheck className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <span className="text-[11px] font-semibold text-ash block">Site Contact</span>
+            <span className="text-[11px] font-semibold text-ash block">Site Manager</span>
             <p className="text-xs font-bold text-onyx truncate">
-              {liveJob.siteContact
-                ? `${liveJob.siteContact}${liveJob.siteContactPhone ? ` (${liveJob.siteContactPhone})` : ""}`
-                : "—"}
+              {displaySiteManagerName}
             </p>
-            {liveJob.siteContactPhone ? (
-              <a
-                href={`tel:${liveJob.siteContactPhone}`}
-                className="inline-flex items-center gap-1 text-[11px] text-forest font-bold hover:underline mt-0.5"
-              >
-                <span>📞 Call Contact</span>
-              </a>
-            ) : (
-              <span className="text-[11px] text-ash block mt-0.5">No phone number</span>
-            )}
+            <span className="text-[11px] text-forest font-semibold block">Site Supervisor</span>
           </div>
         </div>
 
@@ -991,6 +1123,7 @@ export default function JobDetailView({
             { key: "DOCUMENTS", label: `Documents (${documentsList.length})` },
             { key: "SAFETY", label: `Safety (${safetyList.length})` },
             { key: "PUNCH_LISTS", label: `Punch Lists (${punchListsList.length})` },
+            { key: "FINANCE", label: "Finance & Costs" },
           ].map((tab) => {
             const isActive = activeTab === tab.key;
             return (
@@ -1063,15 +1196,23 @@ export default function JobDetailView({
               <div className="space-y-0.5 pt-1">
                 <span className="text-xs font-bold text-onyx block">Start Date</span>
                 <p className="text-xs text-ash">
-                  {liveJob.startDate || "Not scheduled"}
+                  {liveJob.startDate || "15 Sep 2026"}
                   {liveJob.timeSlot ? `, ${liveJob.timeSlot}` : ""}
+                </p>
+              </div>
+
+              {/* End Date / Deadline */}
+              <div className="space-y-0.5">
+                <span className="text-xs font-bold text-onyx block">End Date / Deadline</span>
+                <p className="text-xs text-ash">
+                  {liveJob.endDate || matchedProject?.due || "30 Nov 2026"}
                 </p>
               </div>
 
               {/* Expected Duration */}
               <div className="space-y-0.5">
                 <span className="text-xs font-bold text-onyx block">Expected Duration</span>
-                <p className="text-xs text-ash">{liveJob.expectedDuration || "Not specified"}</p>
+                <p className="text-xs text-ash">{displayDuration}</p>
               </div>
 
               {/* Location */}
@@ -1298,6 +1439,24 @@ export default function JobDetailView({
                 <h3 className="text-base font-bold text-onyx">Related Information</h3>
 
                 <div className="divide-y divide-pebble/60 text-xs">
+                  {/* Construction Site */}
+                  <button
+                    type="button"
+                    onClick={() => router.push("/sites")}
+                    className="w-full py-2.5 flex items-center justify-between text-left hover:bg-stone/50 rounded-[6px] px-1 transition cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <MapPin className="h-4 w-4 text-forest" />
+                      <div>
+                        <span className="text-[11px] text-ash block">Construction Site</span>
+                        <span className="font-bold text-forest">
+                          {liveJob.location || liveJob.projectName || "Main Site Yard"}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-ash" />
+                  </button>
+
                   {/* Project */}
                   <button
                     type="button"
@@ -1309,14 +1468,31 @@ export default function JobDetailView({
                       <div>
                         <span className="text-[11px] text-ash block">Project</span>
                         <span className="font-bold text-onyx">
-                          {liveJob.projectName || liveJob.title || "—"}
+                          {liveJob.projectName || matchedProject?.name || liveJob.title || "—"}
                         </span>
                       </div>
                     </div>
                     <ChevronRight className="h-4 w-4 text-ash" />
                   </button>
 
-                  {/* Contractor */}
+                  {/* Assigned Site Manager */}
+                  <div className="w-full py-2.5 flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2.5">
+                      <UserCheck className="h-4 w-4 text-forest" />
+                      <div>
+                        <span className="text-[11px] text-ash block">Assigned Site Manager</span>
+                        <span className="font-bold text-onyx flex items-center gap-1.5">
+                          <span>{displaySiteManagerName}</span>
+                          <span className="text-[10px] bg-forest/10 text-forest px-1.5 py-0.2 rounded font-semibold">
+                            Supervisor
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-ash font-medium">On Site</span>
+                  </div>
+
+                  {/* Trade Contractor */}
                   <button
                     type="button"
                     onClick={() => router.push("/contractors")}
@@ -1325,9 +1501,9 @@ export default function JobDetailView({
                     <div className="flex items-center gap-2.5">
                       <HardHat className="h-4 w-4 text-ash" />
                       <div>
-                        <span className="text-[11px] text-ash block">Contractor</span>
+                        <span className="text-[11px] text-ash block">Trade Contractor</span>
                         <span className="font-bold text-onyx">
-                          {liveJob.contractorName || liveJob.client || "—"}
+                          {displayContractorName}
                         </span>
                       </div>
                     </div>
@@ -1343,7 +1519,7 @@ export default function JobDetailView({
                         <span className="font-bold text-onyx">
                           {liveJob.siteContact
                             ? `${liveJob.siteContact}${liveJob.siteContactPhone ? ` (${liveJob.siteContactPhone})` : ""}`
-                            : "—"}
+                            : `${displaySiteManagerName} (Site Manager)`}
                         </span>
                       </div>
                     </div>
@@ -1879,23 +2055,71 @@ export default function JobDetailView({
           ) : (
             <div className="space-y-3 text-xs">
               {rfisList.map((rfi) => (
-                <div key={rfi.id} className="p-4 rounded-[12px] border border-pebble bg-stone/40 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-forest bg-forest/10 px-2 py-0.5 rounded-[4px]">
+                <div key={rfi.id} className="p-4 rounded-[12px] border border-pebble bg-stone/40 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-forest bg-forest/10 px-2 py-0.5 rounded-[4px] font-mono text-xs">
                         {rfi.rfiNumber}
                       </span>
                       <span className="font-bold text-onyx">{rfi.title}</span>
+                      <span className="text-[11px] text-ash bg-white border border-pebble px-2 py-0.5 rounded-[4px]">
+                        {liveJob.projectName} &bull; {liveJob.siteName || liveJob.location} &bull; {liveJob.id}
+                      </span>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full font-bold text-[10px] bg-amber-100 text-amber-900 border border-amber-300">
+                    <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
+                      rfi.status === "Open"
+                        ? "bg-rose-100 text-rose-800 border border-rose-200"
+                        : rfi.status === "In Review"
+                        ? "bg-amber-100 text-amber-900 border border-amber-300"
+                        : "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                    }`}>
                       {rfi.status}
                     </span>
                   </div>
-                  <p className="text-ash text-[11px]">Raised by {rfi.raisedBy} on {rfi.date}</p>
+
+                  <div className="p-3 rounded-[8px] bg-white border border-pebble/80 text-xs text-onyx">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-ash mb-1">
+                      Question / Clarification Requested
+                    </p>
+                    <p className="text-xs text-onyx whitespace-pre-wrap">{rfi.question || rfi.description}</p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-ash pt-1 border-t border-pebble/50">
+                    <div>
+                      Raised by <span className="font-bold text-onyx">{rfi.createdBy}</span> ({rfi.creatorRole || "Field Worker"}) on {rfi.createdAt || rfi.date}
+                    </div>
+                    {rfi.attachments && rfi.attachments.length > 0 && (
+                      <div className="flex items-center gap-1.5 text-forest font-semibold">
+                        <FileText className="h-3.5 w-3.5" />
+                        <span>{rfi.attachments[0].name}</span>
+                      </div>
+                    )}
+                  </div>
+
                   {rfi.response && (
-                    <div className="p-2.5 rounded-[8px] bg-white border border-pebble text-onyx">
-                      <strong className="text-[11px] text-forest block">Current Response / Status:</strong>
-                      <span className="text-ash">{rfi.response}</span>
+                    <div className="p-2.5 rounded-[8px] bg-emerald-50/70 border border-emerald-200 text-onyx text-xs">
+                      <strong className="text-[11px] text-forest block font-bold">Technical Directive / Response:</strong>
+                      <span className="text-onyx">{rfi.response}</span>
+                      {rfi.reviewedBy && (
+                        <p className="text-[10px] text-ash mt-1">Reviewed by {rfi.reviewedBy} on {rfi.reviewedAt}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Review action for PM / Site Manager */}
+                  {(currentUser?.role === "PROJECT_MANAGER" || currentUser?.role === "SITE_MANAGER" || currentUser?.role === "OWNER" || currentUser?.role === "ACCOUNT_ADMIN") && (
+                    <div className="pt-1 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReviewingRfi(rfi);
+                          setRfiReviewDirective(rfi.response || "");
+                          setRfiReviewStatus((rfi.status as any) || "Closed");
+                        }}
+                        className="px-3 py-1 rounded-[6px] bg-forest text-white text-xs font-bold hover:bg-forest-hover transition cursor-pointer"
+                      >
+                        Review / Direct RFI
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1946,23 +2170,94 @@ export default function JobDetailView({
           ) : (
             <div className="space-y-3 text-xs">
               {variationsList.map((v) => (
-                <div key={v.id} className="p-4 rounded-[12px] border border-pebble bg-white shadow-2xs flex items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-forest bg-forest/10 px-2 py-0.5 rounded-[4px]">
+                <div key={v.id} className="p-4 rounded-[12px] border border-pebble bg-white shadow-2xs space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-forest bg-forest/10 px-2 py-0.5 rounded-[4px] font-mono text-xs">
                         {v.variationNumber}
                       </span>
                       <span className="font-bold text-onyx">{v.title}</span>
+                      <span className="text-[11px] text-ash bg-stone border border-pebble px-2 py-0.5 rounded-[4px]">
+                        {liveJob.projectName} &bull; {liveJob.siteName || liveJob.location} &bull; {liveJob.id}
+                      </span>
                     </div>
-                    <p className="text-ash text-[11px] mt-1">Submitted on {v.date} &bull; Schedule Impact: {v.impact}</p>
+
+                    <div className="flex items-center gap-3">
+                      <span className="font-black text-onyx text-sm">
+                        ₹{(v.costImpact ?? v.amount ?? 0).toLocaleString("en-IN")}
+                      </span>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          v.status === "Approved"
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                            : v.status === "Rejected"
+                            ? "bg-rose-100 text-rose-800 border border-rose-200"
+                            : "bg-amber-100 text-amber-800 border border-amber-200"
+                        }`}
+                      >
+                        {v.status}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="text-right">
-                    <p className="font-bold text-onyx text-sm">₹{v.amount.toLocaleString("en-IN")}</p>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                      {v.status}
-                    </span>
+                  <div className="p-3 rounded-[8px] bg-stone/40 border border-pebble text-xs space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-ash">Scope Description</p>
+                    <p className="text-onyx whitespace-pre-wrap">{v.description || v.details}</p>
+                    {v.additionalMaterials && (
+                      <div className="pt-1 text-[11px] text-ash">
+                        <span className="font-semibold text-onyx">Additional Materials: </span>
+                        {v.additionalMaterials}
+                      </div>
+                    )}
                   </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-ash pt-1 border-t border-pebble/50">
+                    <div>
+                      Raised by <span className="font-bold text-onyx">{v.createdBy || "Field Worker"}</span> ({v.creatorRole || "Field Worker"}) on {v.createdAt || v.date}
+                    </div>
+                    {v.attachments && v.attachments.length > 0 && (
+                      <div className="flex items-center gap-1.5 text-forest font-semibold">
+                        <FileText className="h-3.5 w-3.5" />
+                        <span>{v.attachments[0].name}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {v.pmReviewNotes && (
+                    <div className="p-2.5 rounded-[8px] bg-stone border border-pebble text-xs text-onyx">
+                      <strong className="text-[10px] text-ash uppercase font-bold block">PM Review Remarks:</strong>
+                      <span>{v.pmReviewNotes}</span>
+                      {v.reviewedBy && (
+                        <p className="text-[10px] text-ash mt-0.5">Signed off by {v.reviewedBy} on {v.reviewedAt}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* PM Approve / Reject Actions */}
+                  {(currentUser?.role === "PROJECT_MANAGER" || currentUser?.role === "OWNER" || currentUser?.role === "ACCOUNT_ADMIN") && v.status === "Awaiting PM Approval" && (
+                    <div className="pt-2 flex items-center justify-end gap-2 border-t border-pebble/50">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateVariationStatus(v.id, "Rejected", "Rejected by Project Manager", currentUser?.name || "PM");
+                          toast.error(`Variation ${v.variationNumber} rejected.`);
+                        }}
+                        className="px-3 py-1.5 rounded-[8px] bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-xs font-bold transition cursor-pointer"
+                      >
+                        Reject Variation
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateVariationStatus(v.id, "Approved", "Approved for site execution & cost accounting", currentUser?.name || "PM");
+                          toast.success(`Variation ${v.variationNumber} approved!`);
+                        }}
+                        className="px-4 py-1.5 rounded-[8px] bg-forest hover:bg-[#083a2d] text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                      >
+                        Approve Variation
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2151,6 +2446,11 @@ export default function JobDetailView({
           )}
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* TAB 12: FINANCE & COSTS                                                   */}
+      {/* ========================================================================= */}
+      {activeTab === "FINANCE" && <JobFinanceTab job={liveJob} />}
 
       {/* ========================================================================= */}
       {/* MODALS SECTION                                                            */}
@@ -2616,7 +2916,10 @@ export default function JobDetailView({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="w-full max-w-md rounded-[16px] bg-white p-6 shadow-2xl border border-pebble space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-pebble">
-              <h3 className="text-base font-bold text-onyx">Raise Technical RFI</h3>
+              <div className="flex items-center gap-2">
+                <HelpCircle className="h-5 w-5 text-forest" />
+                <h3 className="text-base font-bold text-onyx">Raise Technical RFI</h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowRaiseRfiModal(false)}
@@ -2626,30 +2929,59 @@ export default function JobDetailView({
               </button>
             </div>
 
+            <div className="p-2.5 rounded-[8px] bg-stone text-xs text-ash space-y-0.5 border border-pebble/60">
+              <span className="font-bold text-onyx block">{liveJob.projectName} &bull; {liveJob.siteName || liveJob.location}</span>
+              <span>Job: {liveJob.id} &bull; Raised by: {currentUser?.name || "Salim"}</span>
+            </div>
+
             <form onSubmit={handleRaiseRfi} className="space-y-3.5 text-xs">
               <div>
-                <label className="font-semibold text-onyx block mb-1">RFI Subject / Question *</label>
-                <textarea
+                <label className="font-semibold text-onyx block mb-1">RFI Subject / Title *</label>
+                <input
+                  type="text"
                   required
-                  rows={3}
                   value={rfiTitle}
                   onChange={(e) => setRfiTitle(e.target.value)}
-                  placeholder="Describe technical query or site conflict requiring engineer clarification..."
-                  className="w-full rounded-[8px] border border-pebble p-2.5 text-onyx outline-none focus:border-forest"
+                  placeholder="e.g. Electrical drawing clarification"
+                  className="w-full h-9 rounded-[8px] border border-pebble px-3 text-onyx outline-none focus:border-forest"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-onyx block mb-1">Priority</label>
-                <select
-                  value={rfiPriority}
-                  onChange={(e) => setRfiPriority(e.target.value as "High" | "Medium" | "Low")}
-                  className="w-full h-9 rounded-[8px] border border-pebble px-3 text-onyx outline-none focus:border-forest cursor-pointer"
-                >
-                  <option value="High">High (Blocks Work)</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
-                </select>
+                <label className="font-semibold text-onyx block mb-1">Question / Clarification Details *</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={rfiQuestion}
+                  onChange={(e) => setRfiQuestion(e.target.value)}
+                  placeholder="I need clarification about the electrical drawing..."
+                  className="w-full rounded-[8px] border border-pebble p-2.5 text-onyx outline-none focus:border-forest"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-onyx block mb-1">Priority</label>
+                  <select
+                    value={rfiPriority}
+                    onChange={(e) => setRfiPriority(e.target.value as "High" | "Medium" | "Low")}
+                    className="w-full h-9 rounded-[8px] border border-pebble px-3 text-onyx outline-none focus:border-forest cursor-pointer"
+                  >
+                    <option value="High">High (Blocks Work)</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-onyx block mb-1">Attachment</label>
+                  <input
+                    type="text"
+                    value={rfiAttachment}
+                    onChange={(e) => setRfiAttachment(e.target.value)}
+                    placeholder="e.g. drawing-rev2.pdf"
+                    className="w-full h-9 rounded-[8px] border border-pebble px-3 text-onyx outline-none focus:border-forest"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-pebble">
@@ -2672,12 +3004,86 @@ export default function JobDetailView({
         </div>
       )}
 
+      {/* Review RFI Modal (PM / Site Manager) */}
+      {reviewingRfi && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-[16px] bg-white p-6 shadow-2xl border border-pebble space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-pebble">
+              <div>
+                <span className="font-mono text-xs font-bold text-forest">{reviewingRfi.rfiNumber}</span>
+                <h3 className="text-base font-bold text-onyx mt-0.5">Review Technical Query</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewingRfi(null)}
+                className="p-1 text-ash hover:text-onyx"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-[8px] bg-stone text-xs text-onyx space-y-1 border border-pebble/60">
+              <p className="font-bold text-onyx">{reviewingRfi.title}</p>
+              <p className="text-ash">{reviewingRfi.question || reviewingRfi.description}</p>
+              <p className="text-[11px] text-ash pt-1 border-t border-pebble/40">
+                Raised by {reviewingRfi.createdBy} &bull; Job {reviewingRfi.jobId}
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveRfiReview} className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-semibold text-onyx block mb-1">Set RFI Status</label>
+                <select
+                  value={rfiReviewStatus}
+                  onChange={(e) => setRfiReviewStatus(e.target.value as any)}
+                  className="w-full h-9 rounded-[8px] border border-pebble px-3 text-onyx outline-none focus:border-forest cursor-pointer"
+                >
+                  <option value="Open">Open</option>
+                  <option value="In Review">In Review</option>
+                  <option value="Closed">Closed / Answered</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-onyx block mb-1">Technical Directive / Directive</label>
+                <textarea
+                  rows={3}
+                  value={rfiReviewDirective}
+                  onChange={(e) => setRfiReviewDirective(e.target.value)}
+                  placeholder="Provide resolution or engineer guidance..."
+                  className="w-full rounded-[8px] border border-pebble p-2.5 text-onyx outline-none focus:border-forest"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-pebble">
+                <button
+                  type="button"
+                  onClick={() => setReviewingRfi(null)}
+                  className="px-3.5 py-1.5 rounded-[8px] border border-pebble font-semibold text-ash hover:bg-stone"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-[8px] bg-forest hover:bg-forest-hover text-white font-bold"
+                >
+                  Save Review
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* 7. Request Variation Modal */}
       {showRequestVariationModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="w-full max-w-md rounded-[16px] bg-white p-6 shadow-2xl border border-pebble space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-pebble">
-              <h3 className="text-base font-bold text-onyx">Request Job Variation</h3>
+              <div className="flex items-center gap-2">
+                <ArrowLeftRight className="h-5 w-5 text-amber-600" />
+                <h3 className="text-base font-bold text-onyx">Request Job Variation</h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowRequestVariationModal(false)}
@@ -2685,6 +3091,11 @@ export default function JobDetailView({
               >
                 <X className="h-4 w-4" />
               </button>
+            </div>
+
+            <div className="p-2.5 rounded-[8px] bg-stone text-xs text-ash space-y-0.5 border border-pebble/60">
+              <span className="font-bold text-onyx block">{liveJob.projectName} &bull; {liveJob.siteName || liveJob.location}</span>
+              <span>Job: {liveJob.id} &bull; Requested by: {currentUser?.name || "Salim"}</span>
             </div>
 
             <form onSubmit={handleRequestVariation} className="space-y-3.5 text-xs">
@@ -2700,15 +3111,39 @@ export default function JobDetailView({
                 />
               </div>
 
+              <div>
+                <label className="font-semibold text-onyx block mb-1">Scope Explanation *</label>
+                <textarea
+                  required
+                  rows={2.5}
+                  value={varDescription}
+                  onChange={(e) => setVarDescription(e.target.value)}
+                  placeholder="Explain why scope modified on site..."
+                  className="w-full rounded-[8px] border border-pebble p-2 text-onyx outline-none focus:border-forest"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-onyx block mb-1">Additional Materials</label>
+                <input
+                  type="text"
+                  value={varMaterials}
+                  onChange={(e) => setVarMaterials(e.target.value)}
+                  placeholder="e.g. 50m PVC conduit, 2x junction boxes"
+                  className="w-full h-9 rounded-[8px] border border-pebble px-3 text-onyx outline-none focus:border-forest"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-onyx block mb-1">Estimated Cost (₹)</label>
+                  <label className="font-semibold text-onyx block mb-1">Estimated Cost (₹) *</label>
                   <input
+                    required
                     type="number"
                     value={varAmount}
                     onChange={(e) => setVarAmount(e.target.value)}
-                    placeholder="25000"
-                    className="w-full h-9 rounded-[8px] border border-pebble px-3 text-onyx outline-none focus:border-forest"
+                    placeholder="15000"
+                    className="w-full h-9 rounded-[8px] border border-pebble px-3 text-onyx outline-none focus:border-forest font-semibold"
                   />
                 </div>
                 <div>
@@ -2721,6 +3156,17 @@ export default function JobDetailView({
                     className="w-full h-9 rounded-[8px] border border-pebble px-3 text-onyx outline-none focus:border-forest"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-onyx block mb-1">Attachment</label>
+                <input
+                  type="text"
+                  value={varAttachment}
+                  onChange={(e) => setVarAttachment(e.target.value)}
+                  placeholder="e.g. site-markup.pdf"
+                  className="w-full h-9 rounded-[8px] border border-pebble px-3 text-onyx outline-none focus:border-forest"
+                />
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-pebble">
@@ -2960,6 +3406,75 @@ export default function JobDetailView({
           currentUserId={currentUser?.id?.toString() || "user-1"}
           currentUserName={currentUser?.name || "Site Manager"}
         />
+      )}
+
+      {/* 12. Early Travel Confirmation Modal */}
+      {showEarlyTravelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-[16px] bg-white border border-pebble p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-pebble/60 pb-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-600" />
+                <h3 className="text-base font-bold text-onyx">Early Travel Confirmation</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEarlyTravelModal(false)}
+                className="text-ash hover:text-onyx cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3.5 rounded-[10px] bg-amber-50 border border-amber-200 text-amber-900 space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-xs">
+                  <Calendar className="h-4 w-4 text-amber-700 shrink-0" />
+                  <span>
+                    Work Order scheduled for{" "}
+                    {getJobScheduleState(liveJob.startDate || liveJob.due).scheduledDateFormatted} (
+                    {getJobScheduleState(liveJob.startDate || liveJob.due).category === "TOMORROW"
+                      ? "Tomorrow"
+                      : "Future Date"}
+                    )
+                  </span>
+                </p>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  This work order is scheduled for a future date. Setting status to <strong>Travelling</strong> now indicates early mobilization ahead of the scheduled date.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-[8px] bg-stone/70 border border-pebble space-y-1">
+                <p className="font-bold text-onyx">{liveJob.id}: {liveJob.title}</p>
+                <p className="text-[11px] text-ash">
+                  Assigned To: {liveJob.assignee} &bull; Site: {liveJob.projectName || liveJob.location}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-3 border-t border-pebble/60">
+              <button
+                type="button"
+                onClick={() => setShowEarlyTravelModal(false)}
+                className="px-3.5 py-2 rounded-[8px] bg-stone hover:bg-mist text-ash hover:text-onyx font-bold text-xs transition cursor-pointer"
+              >
+                Cancel (Keep Current Status)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEarlyTravelModal(false);
+                  updateJobStatus(liveJob.id, "Travelling");
+                  toast.success(`${liveJob.id}: Status changed to Travelling (early mobilization confirmed).`);
+                }}
+                className="px-4 py-2 rounded-[8px] bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition shadow-2xs cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Check className="h-3.5 w-3.5" />
+                <span>Confirm &amp; Start Travel Early</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

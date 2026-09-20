@@ -179,6 +179,8 @@ function SchedulingContent() {
   const [modalJobId, setModalJobId] = useState<string>("");
   const [modalWorker, setModalWorker] = useState<string>("");
   const [modalDate, setModalDate] = useState<string>("15/09/2026");
+  const [modalStartDate, setModalStartDate] = useState<string>("15/09/2026");
+  const [modalEndDate, setModalEndDate] = useState<string>("30/11/2026");
   const [modalTime, setModalTime] = useState<string>("09:00 AM - 05:00 PM");
   const [modalNotes, setModalNotes] = useState<string>("");
 
@@ -305,28 +307,42 @@ function SchedulingContent() {
 
   // Combined options for Job Select dropdown (Unscheduled first, then already scheduled)
   const availableJobOptions = useMemo(() => {
-    const unscheduledOpts = allUnscheduledJobs.map((j) => ({
-      id: j.id,
-      title: j.title,
-      project: j.project,
-      site: j.site,
-      trade: j.trade,
-      description: j.description,
-      isScheduled: false,
-    }));
+    const unscheduledOpts = allUnscheduledJobs.map((j) => {
+      const tj = tenderJobs.find((t) => t.id === j.id);
+      return {
+        id: j.id,
+        title: j.title,
+        project: j.project,
+        site: j.site,
+        trade: j.trade,
+        description: j.description,
+        isScheduled: false,
+        startDate: tj?.startDate,
+        endDate: tj?.endDate,
+        contractorName: tj?.contractorName,
+        siteManagerName: tj?.siteManagerName,
+      };
+    });
 
-    const scheduledOpts = scheduledJobs.map((j) => ({
-      id: j.id,
-      title: j.title,
-      project: j.project,
-      site: j.site,
-      trade: "General",
-      description: j.notes || "",
-      isScheduled: true,
-    }));
+    const scheduledOpts = scheduledJobs.map((j) => {
+      const tj = tenderJobs.find((t) => t.id === j.id);
+      return {
+        id: j.id,
+        title: j.title,
+        project: j.project,
+        site: j.site,
+        trade: "General",
+        description: j.notes || "",
+        isScheduled: true,
+        startDate: j.startDate || tj?.startDate,
+        endDate: j.endDate || tj?.endDate,
+        contractorName: j.contractorName || tj?.contractorName,
+        siteManagerName: j.siteManagerName || tj?.siteManagerName,
+      };
+    });
 
     return [...unscheduledOpts, ...scheduledOpts];
-  }, [allUnscheduledJobs, scheduledJobs]);
+  }, [allUnscheduledJobs, scheduledJobs, tenderJobs]);
 
   // Helper to suggest worker based on trade
   const suggestWorkerForTrade = (trade?: string) => {
@@ -353,8 +369,6 @@ function SchedulingContent() {
 
     const defaultJobId = targetJob ? targetJob.id : "";
     const defaultJobTitle = targetJob ? targetJob.title : "";
-    const defaultJobProject = targetJob ? targetJob.project : "";
-    const defaultJobSite = targetJob ? targetJob.site : "";
     const defaultJobNotes = targetJob
       ? targetJob.description || `Execute ${defaultJobTitle}.`
       : "";
@@ -371,7 +385,13 @@ function SchedulingContent() {
     }
 
     // Date & Time pre-fill
-    setModalDate(prefilledDate || "15/09/2026");
+    const anyJob = targetJob as { startDate?: string; endDate?: string } | undefined;
+    const startDatePrefill = anyJob?.startDate || prefilledDate || "15/09/2026";
+    const endDatePrefill = anyJob?.endDate || "30/11/2026";
+
+    setModalDate(startDatePrefill);
+    setModalStartDate(startDatePrefill);
+    setModalEndDate(endDatePrefill);
     setModalTime(prefilledTime || "09:00 AM - 05:00 PM");
     setShowScheduleModal(true);
   };
@@ -402,6 +422,13 @@ function SchedulingContent() {
       if (job.description) {
         setModalNotes(job.description);
       }
+      if (job.startDate) {
+        setModalStartDate(job.startDate);
+        setModalDate(job.startDate);
+      }
+      if (job.endDate) {
+        setModalEndDate(job.endDate);
+      }
       const suggested = suggestWorkerForTrade(job.trade);
       setModalWorker(suggested);
     }
@@ -419,6 +446,18 @@ function SchedulingContent() {
     const workerObj = activeWorkers.find((w) => w.name === modalWorker);
     const workerRole = workerObj ? workerObj.role : "Field Worker";
 
+    const isSiteMgr = workerRole === "Site Manager" || modalWorker.toLowerCase() === "sm";
+
+    const existingTenderJob = tenderJobs.find((t) => t.id === modalJobId);
+    const originalContractorName =
+      selectedOption?.contractorName ||
+      existingTenderJob?.contractorName ||
+      (workerRole === "Contractor Partner" ? modalWorker : undefined);
+
+    const assignedSiteManager = isSiteMgr
+      ? modalWorker
+      : (selectedOption?.siteManagerName || existingTenderJob?.siteManagerName);
+
     scheduleJob({
       jobId: modalJobId,
       title,
@@ -426,22 +465,30 @@ function SchedulingContent() {
       site,
       worker: modalWorker,
       workerRole,
-      date: modalDate,
+      contractorName: originalContractorName,
+      siteManagerName: assignedSiteManager,
+      date: modalStartDate || modalDate,
+      startDate: modalStartDate || modalDate,
+      endDate: modalEndDate,
+      deadline: modalEndDate,
       timeRange: modalTime,
       notes: modalNotes,
     });
 
-    // Also sync status and assignee in tenderFlowStore so jobs page shows it as scheduled
+    // Also sync in tenderFlowStore WITHOUT destroying contractorName!
     updateTenderJob(modalJobId, {
       status: "Scheduled",
       assignee: modalWorker,
-      contractorName: modalWorker,
+      ...(originalContractorName ? { contractorName: originalContractorName } : {}),
+      ...(assignedSiteManager ? { siteManagerName: assignedSiteManager } : {}),
+      startDate: modalStartDate || modalDate,
+      endDate: modalEndDate,
     });
 
     setShowScheduleModal(false);
     setActiveTab("CALENDAR");
     toast.success("Job Scheduled", {
-      description: `${title} scheduled for ${modalWorker} on ${modalDate}`,
+      description: `${title} scheduled for ${modalWorker} (${modalStartDate || modalDate} – ${modalEndDate})`,
     });
 
     // Clear query param if it was present
@@ -523,6 +570,29 @@ function SchedulingContent() {
       return `${y}-${m}-${dayNum}`;
     }
     return trimmed;
+  };
+
+  // Helper to determine if a scheduled job is active on a specific calendar day
+  const isJobActiveOnDate = (
+    j: ScheduledJob,
+    d: { fullDateIso: string; fullDateDmy: string; dayDateStr: string; formattedStr: string }
+  ) => {
+    const startIso = normalizeJobDate(j.startDate || j.date);
+    const endIso = normalizeJobDate(j.endDate || j.deadline);
+
+    if (startIso && endIso && startIso.length === 10 && endIso.length === 10) {
+      if (d.fullDateIso >= startIso && d.fullDateIso <= endIso) {
+        return true;
+      }
+    }
+
+    const jobIso = normalizeJobDate(j.date) || normalizeJobDate(j.dateFormatted);
+    return (
+      jobIso === d.fullDateIso ||
+      j.dayDate === d.dayDateStr ||
+      j.date === d.fullDateDmy ||
+      j.dateFormatted === d.formattedStr
+    );
   };
 
   // Helper to extract hour in 24-hr format
@@ -888,17 +958,7 @@ function SchedulingContent() {
 
                     {calendarDays.map((d) => {
                       // Total jobs on this specific day
-                      const dayJobs = filteredScheduledJobs.filter((j) => {
-                        const jobIso =
-                          normalizeJobDate(j.date) ||
-                          normalizeJobDate(j.dateFormatted);
-                        return (
-                          jobIso === d.fullDateIso ||
-                          j.dayDate === d.dayDateStr ||
-                          j.date === d.fullDateDmy ||
-                          j.dateFormatted === d.formattedStr
-                        );
-                      });
+                      const dayJobs = filteredScheduledJobs.filter((j) => isJobActiveOnDate(j, d));
 
                       const totalHours = dayJobs.reduce((acc, curr) => {
                         return acc + getJobDuration(curr.timeSlot).hours;
@@ -942,17 +1002,7 @@ function SchedulingContent() {
                             j.worker?.trim().toLowerCase() ===
                             worker.name.trim().toLowerCase();
                           if (!matchWorker) return false;
-                          return calendarDays.some((d) => {
-                            const jobIso =
-                              normalizeJobDate(j.date) ||
-                              normalizeJobDate(j.dateFormatted);
-                            return (
-                              jobIso === d.fullDateIso ||
-                              j.dayDate === d.dayDateStr ||
-                              j.date === d.fullDateDmy ||
-                              j.dateFormatted === d.formattedStr
-                            );
-                          });
+                          return calendarDays.some((d) => isJobActiveOnDate(j, d));
                         });
 
                         const totalWorkerHours = workerWeekJobs.reduce(
@@ -1007,15 +1057,7 @@ function SchedulingContent() {
                                   j.worker?.trim().toLowerCase() ===
                                   worker.name.trim().toLowerCase();
                                 if (!matchWorker) return false;
-                                const jobIso =
-                                  normalizeJobDate(j.date) ||
-                                  normalizeJobDate(j.dateFormatted);
-                                return (
-                                  jobIso === d.fullDateIso ||
-                                  j.dayDate === d.dayDateStr ||
-                                  j.date === d.fullDateDmy ||
-                                  j.dateFormatted === d.formattedStr
-                                );
+                                return isJobActiveOnDate(j, d);
                               });
 
                               return (
@@ -1713,23 +1755,47 @@ function SchedulingContent() {
                   </div>
                 </div>
 
-                {/* Date Input */}
-                <div>
-                  <label className="block text-xs font-bold text-onyx mb-1">
-                    Date <span className="text-hazard">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ash">
-                      <CalendarIcon className="h-4 w-4" />
+                {/* Timeline: Start Date and End Date / Deadline */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-onyx mb-1">
+                      Start Date <span className="text-hazard">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ash">
+                        <CalendarIcon className="h-4 w-4" />
+                      </div>
+                      <input
+                        type="text"
+                        value={modalStartDate}
+                        onChange={(e) => {
+                          setModalStartDate(e.target.value);
+                          setModalDate(e.target.value);
+                        }}
+                        placeholder="15/09/2026"
+                        required
+                        className="w-full rounded-[10px] border border-pebble/90 bg-white py-3 pl-9 pr-3 text-xs font-medium text-onyx focus:border-forest focus:outline-none focus:ring-1 focus:ring-forest transition"
+                      />
                     </div>
-                    <input
-                      type="text"
-                      value={modalDate}
-                      onChange={(e) => setModalDate(e.target.value)}
-                      placeholder="15/09/2026"
-                      required
-                      className="w-full rounded-[10px] border border-pebble/90 bg-white py-3 pl-9 pr-3 text-xs font-medium text-onyx focus:border-forest focus:outline-none focus:ring-1 focus:ring-forest transition"
-                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-onyx mb-1">
+                      Deadline / End <span className="text-hazard">*</span>
+                    </label>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ash">
+                        <CalendarIcon className="h-4 w-4" />
+                      </div>
+                      <input
+                        type="text"
+                        value={modalEndDate}
+                        onChange={(e) => setModalEndDate(e.target.value)}
+                        placeholder="30/11/2026"
+                        required
+                        className="w-full rounded-[10px] border border-pebble/90 bg-white py-3 pl-9 pr-3 text-xs font-medium text-onyx focus:border-forest focus:outline-none focus:ring-1 focus:ring-forest transition"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1851,11 +1917,12 @@ function SchedulingContent() {
                     </span>
                   </div>
                   <div>
-                    <span className="text-ash block text-[11px]">Date</span>
+                    <span className="text-ash block text-[11px]">Timeline</span>
                     <span className="font-semibold text-onyx flex items-center gap-1.5 mt-0.5">
                       <CalendarIcon className="h-3.5 w-3.5 text-forest" />
-                      {selectedJobDetails.dateFormatted ||
-                        selectedJobDetails.date}
+                      {selectedJobDetails.startDate && selectedJobDetails.endDate && selectedJobDetails.startDate !== selectedJobDetails.endDate
+                        ? `${selectedJobDetails.startDate} – ${selectedJobDetails.endDate}`
+                        : selectedJobDetails.dateFormatted || selectedJobDetails.date}
                     </span>
                   </div>
                   <div>
@@ -1867,6 +1934,15 @@ function SchedulingContent() {
                       {selectedJobDetails.timeSlot}
                     </span>
                   </div>
+                  {selectedJobDetails.contractorName && (
+                    <div className="col-span-2 pt-1 border-t border-pebble/40">
+                      <span className="text-ash block text-[11px]">Assigned Contractor</span>
+                      <span className="font-semibold text-onyx flex items-center gap-1.5 mt-0.5">
+                        <HardHat className="h-3.5 w-3.5 text-forest" />
+                        {selectedJobDetails.contractorName}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {selectedJobDetails.notes && (
