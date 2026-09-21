@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from "react";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
+import { usePermissions } from "@/lib/permissions";
 import { useTenderFlowStore, JobVariation } from "@/store/tenderFlowStore";
 import { useAuthStore } from "@/store/authStore";
 import { isFieldWorker, isJobAssignedToUser, isVariationVisibleToUser, canApproveVariation } from "@/lib/roleAccess";
@@ -27,8 +29,10 @@ import {
 export default function VariationsPage() {
   const { variations, jobs = [], addVariation, updateVariationStatus } = useTenderFlowStore();
   const currentUser = useAuthStore((state) => state.currentUser);
+  const { hasPermission } = usePermissions();
   const isWorker = isFieldWorker(currentUser);
-  const userCanApprove = canApproveVariation(currentUser);
+  const userCanApprove = hasPermission("variations", "approve");
+  const canCreateVariation = hasPermission("variations", "create");
 
   const userJobs = useMemo(() => {
     if (!isWorker) return jobs;
@@ -160,7 +164,8 @@ export default function VariationsPage() {
 
   return (
     <FirmaLayout activeNav="Variations">
-      <div className="space-y-6 mt-2">
+      <PermissionGuard module="variations" action="view">
+        <div className="space-y-6 mt-2">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
           <div>
@@ -177,16 +182,18 @@ export default function VariationsPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              setNewJobId(userJobs[0]?.id || jobs[0]?.id || "J-1025");
-              setShowNewModal(true);
-            }}
-            className="px-4 py-2 rounded-[10px] bg-forest text-white text-xs font-bold hover:bg-forest-hover transition shadow-xs flex items-center gap-2 self-start sm:self-auto cursor-pointer"
-          >
-            <Plus className="h-4 w-4" /> Raise Variation
-          </button>
+          {canCreateVariation && (
+            <button
+              type="button"
+              onClick={() => {
+                setNewJobId(userJobs[0]?.id || jobs[0]?.id || "J-1025");
+                setShowNewModal(true);
+              }}
+              className="px-4 py-2 rounded-[10px] bg-forest text-white text-xs font-bold hover:bg-forest-hover transition shadow-xs flex items-center gap-2 self-start sm:self-auto cursor-pointer"
+            >
+              <Plus className="h-4 w-4" /> Raise Variation
+            </button>
+          )}
         </div>
 
         {/* Filter Pills & Search */}
@@ -666,6 +673,7 @@ export default function VariationsPage() {
           </form>
         </div>
       )}
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

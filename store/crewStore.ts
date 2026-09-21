@@ -1,11 +1,17 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  getActiveCompanyId,
+  createTenantStorage,
+  registerStoreRehydrator,
+} from "@/lib/tenantContext";
 
 export type CrewRole = "Field Worker" | "Site Manager" | "Office";
 export type CrewStatus = "Active" | "On Leave" | "Inactive";
 
 export interface CrewMember {
   id: string;
+  companyId?: string;
   name: string;
   role: CrewRole;
   contact: string;
@@ -40,6 +46,7 @@ export const useCrewStore = create<CrewState>()(
         const newMember: CrewMember = {
           ...memberData,
           id: `crew-${Date.now()}`,
+          companyId: (memberData as any).companyId || getActiveCompanyId(),
           joinedDate:
             memberData.joinedDate ||
             new Date().toLocaleDateString("en-IN", {
@@ -83,6 +90,7 @@ export const useCrewStore = create<CrewState>()(
     }),
     {
       name: "mini-firma-crew-store-v2",
+      storage: createTenantStorage("mini-firma-crew-store-v2"),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         const dummyIds = new Set([
@@ -94,3 +102,14 @@ export const useCrewStore = create<CrewState>()(
     }
   )
 );
+
+// Register store for automatic tenant rehydration
+if (typeof window !== "undefined") {
+  registerStoreRehydrator(() => {
+    const cId = getActiveCompanyId();
+    if (cId !== "ORG-DEFAULT") {
+      useCrewStore.setState({ members: [] });
+    }
+    useCrewStore.persist.rehydrate();
+  });
+}

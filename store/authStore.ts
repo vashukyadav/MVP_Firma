@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { User } from "@/lib/db";
+import { rehydrateAllTenantStores } from "@/lib/tenantContext";
 
 type AuthUser = Omit<User, "password">;
 
@@ -31,10 +32,18 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: (user) => {
         set({ currentUser: user });
+        // Synchronously rehydrate all stores for the user's company
+        setTimeout(() => {
+          rehydrateAllTenantStores();
+        }, 0);
       },
 
       logout: () => {
         set({ currentUser: null });
+        // Clear/rehydrate stores for unauthenticated/default state
+        setTimeout(() => {
+          rehydrateAllTenantStores();
+        }, 0);
       },
     }),
     {

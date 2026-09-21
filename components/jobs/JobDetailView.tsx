@@ -21,6 +21,7 @@ import { useCrewStore } from "@/store/crewStore";
 import { useLeadFlowStore } from "@/store/leadFlowStore";
 import { useAuthStore } from "@/store/authStore";
 import { db } from "@/lib/db";
+import { usePermissions } from "@/lib/permissions";
 import { getJobScheduleState } from "@/lib/dateValidation";
 import {
   Briefcase,
@@ -114,6 +115,11 @@ export default function JobDetailView({
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.currentUser);
   const isWorker = currentUser?.role === "FIELD_WORKER";
+
+  const { hasPermission } = usePermissions();
+  const canEditJob = hasPermission("jobs", "edit");
+  const canManageCrew = hasPermission("crew", "edit") || hasPermission("crew", "create");
+  const canAssignCrew = canEditJob || canManageCrew;
 
   // Live store subscriptions
   const liveJobs = useTenderFlowStore((state) => state.jobs);
@@ -360,9 +366,18 @@ export default function JobDetailView({
   const loadDbFieldWorkers = useCallback(async () => {
     setIsLoadingDbWorkers(true);
     try {
+      const activeCompanyId = currentUser?.companyId || "ORG-DEFAULT";
       const [allDbUsers, allDbCrew] = await Promise.all([
-        db.users.toArray().catch(() => []),
-        db.crew.toArray().catch(() => []),
+        db.users
+          .where("companyId")
+          .equals(activeCompanyId)
+          .toArray()
+          .catch(() => []),
+        db.crew
+          .where("companyId")
+          .equals(activeCompanyId)
+          .toArray()
+          .catch(() => []),
       ]);
 
       const storeCrew = useCrewStore.getState().members || [];
@@ -436,7 +451,7 @@ export default function JobDetailView({
     } finally {
       setIsLoadingDbWorkers(false);
     }
-  }, []);
+  }, [currentUser?.companyId]);
 
   useEffect(() => {
     loadDbFieldWorkers();
@@ -574,6 +589,10 @@ export default function JobDetailView({
 
   const handleAddCrew = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAssignCrew) {
+      toast.error("You do not have permission to assign crew members.");
+      return;
+    }
     if (!selectedWorkerId || !newCrewName.trim()) {
       toast.error("Please select a registered Field Worker from the dropdown");
       return;
@@ -1665,14 +1684,16 @@ export default function JobDetailView({
                 Manage site electricians, trade specialists, and field helpers allocated to this work order.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={openAssignCrewModal}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white text-xs font-bold transition shadow-xs cursor-pointer self-start sm:self-auto"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Assign New Worker</span>
-            </button>
+            {canAssignCrew && (
+              <button
+                type="button"
+                onClick={openAssignCrewModal}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white text-xs font-bold transition shadow-xs cursor-pointer self-start sm:self-auto"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Assign New Worker</span>
+              </button>
+            )}
           </div>
 
           {crewList.length === 0 ? (
@@ -1682,14 +1703,16 @@ export default function JobDetailView({
               <p className="text-xs text-ash max-w-sm mx-auto">
                 Assign electricians, trade specialists, or field helpers to work on this job.
               </p>
-              <button
-                type="button"
-                onClick={openAssignCrewModal}
-                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-forest text-white rounded-[8px] text-xs font-bold hover:bg-forest-hover transition cursor-pointer"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Assign Worker</span>
-              </button>
+              {canAssignCrew && (
+                <button
+                  type="button"
+                  onClick={openAssignCrewModal}
+                  className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-forest text-white rounded-[8px] text-xs font-bold hover:bg-forest-hover transition cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Assign Worker</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-pebble/60 text-xs">
@@ -1708,6 +1731,7 @@ export default function JobDetailView({
                   <div className="flex items-center gap-3">
                     <select
                       value={worker.status}
+                      disabled={!canAssignCrew}
                       onChange={(e) =>
                         updateCrewStatus(liveJob.id, worker.id, e.target.value as CrewMemberAssignment["status"])
                       }
@@ -1717,7 +1741,7 @@ export default function JobDetailView({
                           : worker.status === "Travelling"
                           ? "bg-purple-50 text-purple-800 border-purple-300"
                           : "bg-stone text-ash border-pebble"
-                      }`}
+                      } ${!canAssignCrew ? "opacity-80 cursor-default" : ""}`}
                     >
                       <option value="On Site">On Site</option>
                       <option value="Travelling">Travelling</option>
@@ -1735,17 +1759,19 @@ export default function JobDetailView({
                       </a>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        removeCrewFromJob(liveJob.id, worker.id);
-                        toast.success(`${worker.name} removed from job crew.`);
-                      }}
-                      className="p-2 rounded-[8px] bg-stone hover:bg-rose-50 text-ash hover:text-rose-600 transition cursor-pointer"
-                      title="Remove Worker"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {canAssignCrew && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          removeCrewFromJob(liveJob.id, worker.id);
+                          toast.success(`${worker.name} removed from job crew.`);
+                        }}
+                        className="p-2 rounded-[8px] bg-stone hover:bg-rose-50 text-ash hover:text-rose-600 transition cursor-pointer"
+                        title="Remove Worker"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

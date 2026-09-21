@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import Image from "next/image";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
 import {
   FileText,
   Search,
@@ -54,7 +55,8 @@ export default function DocumentsPage() {
 
   return (
     <FirmaLayout activeNav="Documents">
-      <div className="space-y-6 mt-2 pb-16 font-sans">
+      <PermissionGuard module="documents" action="view">
+        <div className="space-y-6 mt-2 pb-16 font-sans">
         {/* ========================================================================= */}
         {/* 1. HEADER SECTION (Screen 8)                                              */}
         {/* ========================================================================= */}
@@ -240,7 +242,8 @@ export default function DocumentsPage() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

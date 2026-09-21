@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { useAuthStore } from "@/store/authStore";
 import { db } from "@/lib/db";
 import { toast } from "@/components/ui/toast";
+import { usePermissions, type ModuleKey } from "@/lib/permissions";
 import {
   Building2,
   LayoutDashboard,
@@ -98,6 +99,27 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
   };
 
   const userInitial = (currentUser?.name?.charAt(0) || "U").toUpperCase();
+
+  const getFormattedRole = (role?: string) => {
+    switch (role) {
+      case "SITE_MANAGER":
+        return "Site Manager";
+      case "PROJECT_MANAGER":
+        return "Project Manager";
+      case "FIELD_WORKER":
+        return "Field Worker";
+      case "SALES_MANAGER":
+        return "Sales Manager";
+      case "FINANCE_MANAGER":
+        return "Finance Manager";
+      case "ACCOUNT_ADMIN":
+        return "Account Admin";
+      case "OWNER":
+        return "Owner / Director";
+      default:
+        return role ? role.replace("_", " ") : "Member";
+    }
+  };
 
   // Close bottom sidebar menu on click outside or escape
   useEffect(() => {
@@ -292,131 +314,57 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                                                           ? "Help & Support"
                                                           : "");
 
-  const fieldWorkerNavItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "My Jobs", href: "/jobs", icon: ClipboardList },
-    { name: "Schedule", href: "/scheduling", icon: Calendar },
-    { name: "Timesheets", href: "/timesheets", icon: Clock },
-    { name: "Photos", href: "/photos", icon: Camera },
-    { name: "Documents", href: "/documents", icon: FileText },
-    { name: "RFIs", href: "/rfis", icon: HelpCircle },
-    { name: "Variations", href: "/variations", icon: ArrowLeftRight },
-    { name: "Sites", href: "/sites", icon: MapPin },
-  ];
+  const { hasPermission } = usePermissions();
+  const isOwner = user.role === "OWNER";
+  const isAccountAdmin = user.role === "ACCOUNT_ADMIN" || user.isAccountAdmin === true;
 
-  const siteManagerNavItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Projects", href: "/projects", icon: Building2 },
-    { name: "Jobs", href: "/jobs", icon: ClipboardList },
-    { name: "Scheduling", href: "/scheduling", icon: Calendar },
-    { name: "Variations", href: "/variations", icon: ArrowLeftRight },
-    { name: "RFIs", href: "/rfis", icon: HelpCircle },
-    { name: "Sites", href: "/sites", icon: MapPin },
-    { name: "Contractors", href: "/contractors", icon: HardHat },
-    { name: "Crew / People", href: "/crew", icon: Users2 },
-    { name: "Documents", href: "/documents", icon: FileText },
-    { name: "Timesheets", href: "/timesheets", icon: Clock },
-    { name: "Reports", href: "/site-reports", icon: BarChart3 },
-    { name: "Safety & Incidents", href: "/safety", icon: ShieldAlert },
-    { name: "Punch Lists", href: "/punch-lists", icon: ListChecks },
-    { name: "Photos", href: "/photos", icon: Camera },
-  ];
+  // Master catalog of navigation items, strictly filtered by user's final effective permissions
+  const navItems = useMemo(() => {
+    const catalog: {
+      name: string;
+      href: string;
+      icon: any;
+      module?: ModuleKey;
+      ownerOnly?: boolean;
+    }[] = [
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { name: "Company", href: "/company", icon: Building, module: "userManagement", ownerOnly: true },
+      { name: "Subscription", href: "/subscription", icon: CreditCard, module: "userManagement", ownerOnly: true },
+      { name: "Team & Admins", href: "/team", icon: Users, module: "userManagement", ownerOnly: true },
+      { name: "Users & Roles", href: "/users", icon: Users, module: "userManagement" },
+      { name: "Customers", href: "/customers", icon: Layers, module: "customers" },
+      { name: "Leads", href: "/leads", icon: Target, module: "leads" },
+      { name: "Pipeline", href: "/pipeline", icon: Briefcase, module: "leads" },
+      { name: "Quotations", href: "/quotations", icon: FileCheck2, module: "quotes" },
+      { name: "Tenders", href: "/tenders", icon: Gavel, module: "tenders" },
+      { name: "Projects", href: "/projects", icon: FolderKanban, module: "projects" },
+      { name: user.role === "FIELD_WORKER" ? "My Jobs" : "Jobs", href: "/jobs", icon: ClipboardList, module: "jobs" },
+      { name: user.role === "FIELD_WORKER" ? "Schedule" : "Scheduling", href: "/scheduling", icon: Calendar, module: "scheduling" },
+      { name: "Variations", href: "/variations", icon: ArrowLeftRight, module: "variations" },
+      { name: "RFIs", href: "/rfis", icon: HelpCircle, module: "rfis" },
+      { name: "Sites", href: "/sites", icon: MapPin, module: "sites" },
+      { name: "Contractors", href: "/contractors", icon: HardHat, module: "suppliers" },
+      { name: "Crew / People", href: "/crew", icon: Users2, module: "crew" },
+      { name: "Documents", href: "/documents", icon: FileText, module: "documents" },
+      { name: "Timesheets", href: "/timesheets", icon: Clock, module: "timesheets" },
+      { name: "Safety & Incidents", href: "/safety", icon: ShieldAlert, module: "safety" },
+      { name: "Punch Lists", href: "/punch-lists", icon: ListChecks, module: "punchLists" },
+      { name: "Photos", href: "/photos", icon: Camera, module: "jobs" },
+      { name: "Invoices", href: "/finance?tab=invoices", icon: FileText, module: "financial" },
+      { name: "Reports", href: user.role === "SITE_MANAGER" ? "/site-reports" : "/reports", icon: BarChart3, module: "reports" },
+    ];
 
-  const ownerNavItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Company", href: "/company", icon: Building },
-    { name: "Subscription", href: "/subscription", icon: CreditCard },
-    { name: "Team & Admins", href: "/team", icon: Users },
-    { name: "Customers", href: "/customers", icon: Layers },
-    { name: "Leads", href: "/leads", icon: Target },
-    { name: "Quotations", href: "/quotations", icon: FileCheck2 },
-    { name: "Tenders", href: "/tenders", icon: Gavel },
-    { name: "Projects", href: "/projects", icon: FolderKanban },
-    { name: "Jobs", href: "/jobs", icon: Briefcase },
-    { name: "Contractors", href: "/contractors", icon: HardHat },
-    { name: "Reports", href: "/reports", icon: BarChart3 },
-  ];
+    return catalog.filter((item) => {
+      // Dashboard is accessible to all authenticated team members
+      if (!item.module) return true;
 
-  const adminNavItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Users & Roles", href: "/users", icon: Users },
-    { name: "Customers", href: "/customers", icon: Layers },
-    { name: "Leads", href: "/leads", icon: Target },
-    { name: "Quotations", href: "/quotations", icon: FileCheck2 },
-    { name: "Tenders", href: "/tenders", icon: Gavel },
-    { name: "Projects", href: "/projects", icon: FolderKanban },
-    { name: "Jobs", href: "/jobs", icon: Briefcase },
-    { name: "Contractors", href: "/contractors", icon: HardHat },
-    { name: "Reports", href: "/reports", icon: BarChart3 },
-  ];
+      // Sensitive company governance tabs are strictly reserved for primary Owner
+      if (item.ownerOnly && !isOwner) return false;
 
-  const salesmanagerNavItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Customers", href: "/customers", icon: Layers },
-    { name: "Leads", href: "/leads", icon: Target },
-    { name: "Quotations", href: "/quotations", icon: FileCheck2 },
-    { name: "Tenders", href: "/tenders", icon: FolderKanban },
-    { name: "Pipeline", href: "/pipeline", icon: Briefcase },
-    { name: "Reports", href: "/reports", icon: BarChart3 },
-  ];
-
-  // Project Manager Menubar Items (Matching PDF / Screenshot Flow)
-  const projectManagerNavItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Projects", href: "/projects", icon: Building2 },
-    { name: "Tenders", href: "/tenders", icon: Gavel },
-    { name: "Jobs", href: "/jobs", icon: ClipboardList },
-    { name: "Scheduling", href: "/scheduling", icon: Calendar },
-    { name: "Variations", href: "/variations", icon: ArrowLeftRight },
-    { name: "RFIs", href: "/rfis", icon: HelpCircle },
-    { name: "Sites", href: "/sites", icon: MapPin },
-    { name: "Contractors", href: "/contractors", icon: HardHat },
-    { name: "Crew / People", href: "/crew", icon: Users2 },
-    { name: "Documents", href: "/documents", icon: FileText },
-    { name: "Timesheets", href: "/timesheets", icon: Clock },
-    { name: "Reports", href: "/reports", icon: BarChart3 },
-  ];
-
-  const financeManagerNavItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Invoices", href: "/finance?tab=invoices", icon: FileText },
-    { name: "Purchase Orders", href: "/finance?tab=purchase-orders", icon: ClipboardList },
-    { name: "Bills & Supplier Invoices", href: "/finance?tab=bills", icon: FileCheck2 },
-    { name: "Payments", href: "/finance?tab=payments", icon: CreditCard },
-    { name: "Job Costs", href: "/finance?tab=job-costs", icon: Briefcase },
-    { name: "Budgets", href: "/finance?tab=budgets", icon: BarChart3 },
-    { name: "Financial Reports", href: "/finance?tab=reports", icon: BarChart3 },
-    { name: "People & Suppliers", href: "/finance?tab=people-suppliers", icon: Users },
-    { name: "Settings", href: "/finance?tab=settings", icon: Settings },
-  ];
-
-  const isProjectManager =
-    user.role === "PROJECT_MANAGER" ||
-    (user.role !== "OWNER" && user.role !== "ACCOUNT_ADMIN" && user.role !== "SALES_MANAGER" && isPmRoute);
-
-  const isSiteManagerRoute =
-    pathname.startsWith("/site-reports") ||
-    pathname.startsWith("/safety") ||
-    pathname.startsWith("/punch-lists");
-
-  const navItems =
-    user.role === "FIELD_WORKER"
-      ? fieldWorkerNavItems
-      : user.role === "SITE_MANAGER" || (user.role !== "OWNER" && user.role !== "ACCOUNT_ADMIN" && isSiteManagerRoute)
-      ? siteManagerNavItems
-      : user.role === "FINANCE_MANAGER"
-      ? financeManagerNavItems
-      : user.role === "OWNER"
-      ? ownerNavItems
-      : user.role === "ACCOUNT_ADMIN"
-      ? adminNavItems
-      : user.role === "SALES_MANAGER"
-      ? salesmanagerNavItems
-      : user.role === "PROJECT_MANAGER"
-      ? projectManagerNavItems
-      : isPmRoute
-      ? projectManagerNavItems
-      : ownerNavItems;
+      // Granular View check from final effective permissions (handles both role defaults and custom user overrides)
+      return hasPermission(item.module, "view");
+    });
+  }, [user.role, isOwner, hasPermission]);
 
   return (
     <div className="min-h-screen bg-stone flex text-onyx font-sans antialiased">
@@ -480,7 +428,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                 type="button"
                 onClick={() => {
                   setSidebarMenuOpen(false);
-                  router.push("/setting");
+                  router.push("/profile");
                 }}
                 className="w-full flex items-center justify-between p-2 rounded-[10px] hover:bg-stone transition text-left cursor-pointer group"
               >
@@ -492,9 +440,21 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                     <p className="text-[13px] font-bold text-onyx truncate leading-tight group-hover:text-forest transition">
                       {displayName}
                     </p>
-                    <p className="text-[11px] text-ash font-medium leading-tight mt-0.5">
-                      Go
-                    </p>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                      <p className="text-[11px] text-ash font-medium leading-tight">
+                        {getFormattedRole(user.role)}
+                      </p>
+                      {user.role === "OWNER" && (
+                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                          Primary Owner
+                        </span>
+                      )}
+                      {(user.role === "ACCOUNT_ADMIN" || user.isAccountAdmin) && (
+                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-purple-100 text-purple-900 border border-purple-300">
+                          Account Admin
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-ash group-hover:text-onyx transition shrink-0 ml-1" />
@@ -522,7 +482,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                 type="button"
                 onClick={() => {
                   setSidebarMenuOpen(false);
-                  router.push("/setting");
+                  router.push("/profile");
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2 rounded-[10px] text-xs font-medium text-onyx hover:bg-mist/70 transition text-left cursor-pointer group"
               >
@@ -595,7 +555,7 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                   {displayName}
                 </p>
                 <p className="text-[11px] text-ash font-medium leading-tight mt-0.5">
-                  Go
+                  {getFormattedRole(user.role)}
                 </p>
               </div>
             </div>
@@ -661,9 +621,33 @@ export default function FirmaLayout({ children, activeNav }: FirmaLayoutProps) {
                       {user.name || currentUser?.name || "User"}
                     </p>
                     <p className="text-[10px] text-ash capitalize">
-                      {user.role === "SITE_MANAGER" ? "Site Manager" : user.role?.toLowerCase().replace("_", " ") || "owner"}
+                      {getFormattedRole(user.role)}
                     </p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserDropdownOpen(false);
+                      router.push("/profile");
+                    }}
+                    className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-onyx hover:bg-stone transition cursor-pointer"
+                  >
+                    <UserCircle className="h-3.5 w-3.5 text-ash" />
+                    My Profile
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserDropdownOpen(false);
+                      router.push("/setting");
+                    }}
+                    className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-onyx hover:bg-stone transition cursor-pointer"
+                  >
+                    <Settings className="h-3.5 w-3.5 text-ash" />
+                    Settings
+                  </button>
 
                   {/* Only show 'Add Admin' if current logged in user is OWNER and no admin has been created yet */}
                   {user.role === "OWNER" && !hasAdmin && (

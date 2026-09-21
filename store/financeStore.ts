@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { persist } from "zustand/middleware";
+import {
+  getActiveCompanyId,
+  createTenantStorage,
+  registerStoreRehydrator,
+} from "@/lib/tenantContext";
 import type { JobTimesheetEntry, JobVariation } from "./tenderFlowStore";
 
 export type CostCategory =
@@ -920,38 +925,42 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: "mini-firma-finance-store-v2",
-      storage: {
-        getItem: (name: string) => {
-          if (typeof window === "undefined") return null;
-          try {
-            const localVal = localStorage.getItem(name);
-            if (localVal) return JSON.parse(localVal);
-            const sessionVal = sessionStorage.getItem(name);
-            if (sessionVal) {
-              localStorage.setItem(name, sessionVal);
-              return JSON.parse(sessionVal);
-            }
-            return null;
-          } catch {
-            return null;
+      storage: createTenantStorage("mini-firma-finance-store-v2"),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const currentCompany = getActiveCompanyId();
+        if (currentCompany === "ORG-DEFAULT") {
+          if (!state.budgets || state.budgets.length === 0) {
+            state.budgets = [...defaultBudgets];
           }
-        },
-        setItem: (name: string, value: unknown) => {
-          if (typeof window === "undefined") return;
-          try {
-            const str = JSON.stringify(value);
-            localStorage.setItem(name, str);
-            sessionStorage.setItem(name, str);
-          } catch {}
-        },
-        removeItem: (name: string) => {
-          if (typeof window === "undefined") return;
-          try {
-            localStorage.removeItem(name);
-            sessionStorage.removeItem(name);
-          } catch {}
-        },
+          if (!state.purchaseOrders || state.purchaseOrders.length === 0) {
+            state.purchaseOrders = [...defaultPurchaseOrders];
+          }
+        } else {
+          if (!state.invoices) state.invoices = [];
+          if (!state.purchaseOrders) state.purchaseOrders = [];
+          if (!state.supplierBills) state.supplierBills = [];
+          if (!state.payments) state.payments = [];
+          if (!state.budgets) state.budgets = [];
+        }
       },
     }
   )
 );
+
+// Register store for automatic tenant rehydration
+if (typeof window !== "undefined") {
+  registerStoreRehydrator(() => {
+    const cId = getActiveCompanyId();
+    if (cId !== "ORG-DEFAULT") {
+      useFinanceStore.setState({
+        budgets: [],
+        purchaseOrders: [],
+        invoices: [],
+        supplierBills: [],
+        payments: [],
+      });
+    }
+    useFinanceStore.persist.rehydrate();
+  });
+}

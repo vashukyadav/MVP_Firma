@@ -1,10 +1,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  getActiveCompanyId,
+  createTenantStorage,
+  registerStoreRehydrator,
+} from "@/lib/tenantContext";
 
 export type OpportunityStage = "Won" | "Proposal" | "Negotiation" | "Lost" | "Open";
 
 export interface ProjectOpportunity {
   id: string;
+  companyId?: string;
   projectName: string;
   client: string;
   value: number;
@@ -16,6 +22,7 @@ export interface ProjectOpportunity {
 
 export interface SupplierItem {
   id: string;
+  companyId?: string;
   name: string;
   trade: string;
   email: string;
@@ -25,6 +32,7 @@ export interface SupplierItem {
 
 export interface BidItem {
   id: string;
+  companyId?: string;
   tenderId: string;
   supplierId: string;
   supplierName: string;
@@ -41,6 +49,7 @@ export type TenderStatus = "Draft" | "Open" | "Awarded" | "Cancelled";
 
 export interface TenderItem {
   id: string;
+  companyId?: string;
   opportunityId: string;
   projectName: string;
   title: string;
@@ -62,6 +71,7 @@ export type TenderFlowStep = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export interface AwardedContractor {
   id: string; // e.g. "CON-SUP-01"
+  companyId?: string;
   supplierId: string;
   name: string;
   trade: string;
@@ -126,6 +136,7 @@ export interface CrewMemberAssignment {
 
 export interface JobRFI {
   id: string;
+  companyId?: string;
   rfiNumber: string; // e.g. "RFI-001"
   organizationId?: string;
   projectId: string;
@@ -154,6 +165,7 @@ export interface JobRFI {
 
 export interface JobVariation {
   id: string;
+  companyId?: string;
   variationNumber: string; // e.g. "V-0012"
   organizationId?: string;
   projectId: string;
@@ -230,6 +242,7 @@ export interface JobTimesheetEntry {
 
 export interface JobItem {
   id: string; // e.g. "JOB-401" or "J-001"
+  companyId?: string;
   title: string;
   projectName: string;
   location: string;
@@ -301,6 +314,7 @@ interface TenderFlowState {
   // Flow actions
   createOpportunity: (opp: Omit<ProjectOpportunity, "id">) => string;
   createTender: (data: {
+    companyId?: string;
     opportunityId: string;
     projectName: string;
     title: string;
@@ -309,12 +323,13 @@ interface TenderFlowState {
     estimatedValue: number;
     submissionDeadline: string;
   }) => string;
-  addSupplier: (data: { name: string; trade: string; email: string; phone?: string }) => string;
+  addSupplier: (data: { companyId?: string; name: string; trade: string; email: string; phone?: string }) => string;
   toggleSupplierSelection: (supplierId: string) => void;
   sendRfqToSelectedSuppliers: (tenderId: string) => void;
   awardTenderToSupplier: (tenderId: string, supplierId: string, awardAmount?: number) => void;
   assignJobToContractor: (data: {
     id?: string;
+    companyId?: string;
     jobId?: string;
     title: string;
     projectName: string;
@@ -330,9 +345,10 @@ interface TenderFlowState {
     client?: string;
     description?: string;
     tenderId?: string;
-    photos?: JobPhoto[];
-    siteManagerId?: string;
     siteManagerName?: string;
+    siteManagerId?: string;
+    photos?: any[];
+    materials?: any[];
   }) => string;
   toggleJob: (id: string) => void;
   updateJobStatus: (
@@ -527,12 +543,12 @@ export const useTenderFlowStore = create<TenderFlowState>()(
       activeOpportunityId: "",
       activeTenderId: "",
 
-      opportunities: defaultOpportunities,
-      tenders: defaultTenders,
-      suppliers: defaultSuppliers,
-      bids: defaultBids,
-      contractors: defaultContractors,
-      jobs: defaultJobs,
+      opportunities: getActiveCompanyId() === "ORG-DEFAULT" ? defaultOpportunities : [],
+      tenders: getActiveCompanyId() === "ORG-DEFAULT" ? defaultTenders : [],
+      suppliers: getActiveCompanyId() === "ORG-DEFAULT" ? defaultSuppliers : [],
+      bids: getActiveCompanyId() === "ORG-DEFAULT" ? defaultBids : [],
+      contractors: getActiveCompanyId() === "ORG-DEFAULT" ? defaultContractors : [],
+      jobs: getActiveCompanyId() === "ORG-DEFAULT" ? defaultJobs : [],
       rfis: [],
       variations: [],
 
@@ -551,6 +567,7 @@ export const useTenderFlowStore = create<TenderFlowState>()(
         const newOpp: ProjectOpportunity = {
           ...data,
           id,
+          companyId: data.companyId || getActiveCompanyId(),
         };
         set((state) => ({
           opportunities: [newOpp, ...state.opportunities],
@@ -563,6 +580,7 @@ export const useTenderFlowStore = create<TenderFlowState>()(
         const id = `T-00${get().tenders.length + 1}`;
         const newTender: TenderItem = {
           id,
+          companyId: data.companyId || getActiveCompanyId(),
           opportunityId: data.opportunityId,
           projectName: data.projectName,
           title: data.title,
@@ -586,6 +604,7 @@ export const useTenderFlowStore = create<TenderFlowState>()(
         const id = `SUP-${String(get().suppliers.length + 1).padStart(2, "0")}`;
         const newSupplier: SupplierItem = {
           id,
+          companyId: data.companyId || getActiveCompanyId(),
           name: data.name,
           trade: data.trade,
           email: data.email,
@@ -736,6 +755,7 @@ export const useTenderFlowStore = create<TenderFlowState>()(
 
         const newJob: JobItem = {
           id: jobId,
+          companyId: data.companyId || getActiveCompanyId(),
           title: data.title,
           projectName: data.projectName,
           location: data.location,
@@ -1428,12 +1448,15 @@ export const useTenderFlowStore = create<TenderFlowState>()(
         }));
       },
 
-      addContractor: (data) => {
+      addContractor: (data: any) => {
         const id = `CON-${Date.now()}`;
         const supId = `SUP-${Date.now()}`;
+        const supplier = data.supplier || { id: supId };
+        const tender = data.tender;
         const newContractor: AwardedContractor = {
-          id,
-          supplierId: supId,
+          id: `CON-${supplier.id}`,
+          companyId: tender?.companyId || getActiveCompanyId(),
+          supplierId: supplier.id,
           name: data.name,
           trade: data.trade,
           email: data.email,
@@ -1577,153 +1600,58 @@ export const useTenderFlowStore = create<TenderFlowState>()(
     }),
     {
       name: "mini-firma-tender-flow-v3",
-      storage: {
-        getItem: (name: string) => {
-          if (typeof window === "undefined") return null;
-          try {
-            const raw =
-              localStorage.getItem(name) ||
-              sessionStorage.getItem(name) ||
-              sessionStorage.getItem("mini-firma-tender-flow-v2");
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              if (parsed?.state?.jobs && Array.isArray(parsed.state.jobs)) {
-                // Keep all real user jobs
-                parsed.state.jobs = parsed.state.jobs.filter(
-                  (j: JobItem) => j && j.id && j.id !== "dummy-test-seed"
-                );
-              }
-              return parsed;
-            }
-          } catch (e) {
-            console.error("Failed to read tender store:", e);
-          }
-          return null;
-        },
-        setItem: (name: string, value: unknown) => {
-          if (typeof window === "undefined") return;
-          try {
-            localStorage.setItem(name, JSON.stringify(value));
-          } catch (e) {
-            console.error("Failed to save tender store:", e);
-          }
-        },
-        removeItem: (name: string) => {
-          if (typeof window === "undefined") return;
-          try {
-            localStorage.removeItem(name);
-          } catch (e) {
-            console.error("Failed to remove tender store:", e);
-          }
-        },
-      },
+      storage: createTenantStorage("mini-firma-tender-flow-v3"),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        if (!state.jobs) {
-          state.jobs = [...defaultJobs];
+        const currentCompany = getActiveCompanyId();
+        if (currentCompany === "ORG-DEFAULT") {
+          if (!state.jobs || state.jobs.length === 0) {
+            state.jobs = [...defaultJobs];
+          }
+          if (!state.suppliers || state.suppliers.length === 0) {
+            state.suppliers = [...defaultSuppliers];
+          }
+          if (!state.tenders || state.tenders.length === 0) {
+            state.tenders = [...defaultTenders];
+          }
+          if (!state.bids || state.bids.length === 0) {
+            state.bids = [...defaultBids];
+          }
+          if (!state.contractors || state.contractors.length === 0) {
+            state.contractors = [...defaultContractors];
+          }
         } else {
-          state.jobs = state.jobs
-            .filter((j) => j && j.id && j.id !== "dummy-test-seed" && j.id !== "JOB-403")
-            .map((j) => {
-              return {
-                ...j,
-                photos: j.photos || [],
-                materials: j.materials || [],
-                notes: j.notes || [],
-                rfis: j.rfis || [],
-                variations: j.variations || [],
-              };
-            });
-          for (const dj of defaultJobs) {
-            if (!state.jobs.some((j) => j.id === dj.id)) {
-              state.jobs.push(dj);
-            }
-          }
-        }
-
-        if (!state.rfis) state.rfis = [];
-        if (!state.variations) state.variations = [];
-
-        // Synchronize any RFIs and Variations from jobs into state.rfis and state.variations
-        for (const job of state.jobs) {
-          if (job.rfis && job.rfis.length > 0) {
-            for (const r of job.rfis) {
-              if (
-                !state.rfis.some(
-                  (sr) => sr.id === r.id || sr.rfiNumber === r.rfiNumber
-                )
-              ) {
-                state.rfis.push(r);
-              }
-            }
-          }
-          if (job.variations && job.variations.length > 0) {
-            for (const v of job.variations) {
-              if (
-                !state.variations.some(
-                  (sv) =>
-                    sv.id === v.id || sv.variationNumber === v.variationNumber
-                )
-              ) {
-                state.variations.push(v);
-              }
-            }
-          }
-        }
-        if (state.tenders && state.tenders.length > 0) {
-          const awardedTenders = state.tenders.filter(
-            (t) => t.status === "Awarded" && t.awardedSupplierId
-          );
-          const currentTenderIds = new Set(
-            (state.contractors || []).map((c) => c.tenderId)
-          );
-          const missing: AwardedContractor[] = [];
-
-          for (const tender of awardedTenders) {
-            if (!currentTenderIds.has(tender.id)) {
-              const supplier = (state.suppliers || []).find(
-                (s) => s.id === tender.awardedSupplierId
-              );
-              const bid = (state.bids || []).find(
-                (b) =>
-                  b.tenderId === tender.id &&
-                  b.supplierId === tender.awardedSupplierId
-              );
-              missing.push({
-                id: `CON-${tender.awardedSupplierId}`,
-                supplierId: tender.awardedSupplierId!,
-                name:
-                  tender.awardedSupplierName ||
-                  supplier?.name ||
-                  "Contractor Partner",
-                trade: supplier?.trade || tender.category || "Specialty Trade",
-                email:
-                  supplier?.email ||
-                  `${(tender.awardedSupplierName || "contractor")
-                    .toLowerCase()
-                    .replace(/\s+/g, ".")}@crew-firma.com`,
-                phone: supplier?.phone || "+91 98102 34567",
-                tenderId: tender.id,
-                tenderTitle: tender.title,
-                projectName: tender.projectName,
-                opportunityId: tender.opportunityId,
-                awardedAmount: tender.awardedAmount || tender.estimatedValue,
-                awardDate: tender.awardDate || "14 Sep 2026",
-                deliveryTime: bid?.deliveryTime || "20 days",
-                paymentTerms: bid?.paymentTerms || "20% advance",
-                status: "Awarded",
-                assignedJobsCount: (state.jobs || []).filter(
-                  (j) => j.contractorId === `CON-${tender.awardedSupplierId}`
-                ).length,
-              });
-            }
-          }
-
-          if (missing.length > 0) {
-            state.contractors = [...missing, ...(state.contractors || [])];
-          }
+          // Specific registered tenants start completely clean
+          if (!state.jobs) state.jobs = [];
+          if (!state.suppliers) state.suppliers = [];
+          if (!state.tenders) state.tenders = [];
+          if (!state.bids) state.bids = [];
+          if (!state.contractors) state.contractors = [];
+          if (!state.opportunities) state.opportunities = [];
+          if (!state.rfis) state.rfis = [];
+          if (!state.variations) state.variations = [];
         }
       },
     }
   )
 );
+
+// Register store for automatic tenant rehydration
+if (typeof window !== "undefined") {
+  registerStoreRehydrator(() => {
+    const cId = getActiveCompanyId();
+    if (cId !== "ORG-DEFAULT") {
+      useTenderFlowStore.setState({
+        opportunities: [],
+        tenders: [],
+        suppliers: [],
+        bids: [],
+        contractors: [],
+        jobs: [],
+        rfis: [],
+        variations: [],
+      });
+    }
+    useTenderFlowStore.persist.rehydrate();
+  });
+}

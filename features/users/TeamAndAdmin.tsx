@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { db, type User } from "@/lib/db";
+import { useAuthStore } from "@/store/authStore";
 import FirmaLayout from "@/components/layout/FirmaLayout";
 import {
   Users,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 
 export default function TeamAndAdmins() {
+  const { currentUser } = useAuthStore();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -22,7 +24,11 @@ export default function TeamAndAdmins() {
 
   const loadUsers = async () => {
     try {
-      const data = await db.users.toArray();
+      const companyId = currentUser?.companyId || "ORG-DEFAULT";
+      const data = await db.users
+        .where("companyId")
+        .equals(companyId)
+        .toArray();
       setUsers(data);
     } catch (error) {
       console.error("Failed to load users:", error);
@@ -33,7 +39,7 @@ export default function TeamAndAdmins() {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [currentUser?.companyId]);
 
   const getRoleBadge = (role: User["role"]) => {
     switch (role) {

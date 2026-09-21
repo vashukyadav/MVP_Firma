@@ -3,6 +3,7 @@
 import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
 import InvoicesView from "@/features/finance/InvoicesView";
 import PurchaseOrdersView from "@/features/finance/PurchaseOrdersView";
 import SupplierBillsView from "@/features/finance/SupplierBillsView";
@@ -60,18 +61,20 @@ function FinanceContent() {
 
   return (
     <FirmaLayout activeNav={activeTabMeta.navName}>
-      <div className="mt-4 pb-8">
-        {activeTab === "dashboard" && <FinanceManagerDashboard />}
-        {activeTab === "invoices" && <InvoicesView initialJobFilter={initialJob} />}
-        {activeTab === "purchase-orders" && <PurchaseOrdersView initialJobFilter={initialJob} />}
-        {activeTab === "bills" && <SupplierBillsView initialJobFilter={initialJob} />}
-        {activeTab === "payments" && <PaymentsView initialJobFilter={initialJob} />}
-        {activeTab === "job-costs" && <JobCostsView initialJobFilter={initialJob} />}
-        {activeTab === "budgets" && <BudgetsView initialJobFilter={initialJob} />}
-        {activeTab === "reports" && <FinancialReportsView />}
-        {activeTab === "people-suppliers" && <PeopleSuppliersView />}
-        {activeTab === "settings" && <FinanceSettingsView />}
-      </div>
+      <PermissionGuard module="financial" action="view">
+        <div className="mt-4 pb-8">
+          {activeTab === "dashboard" && <FinanceManagerDashboard />}
+          {activeTab === "invoices" && <InvoicesView initialJobFilter={initialJob} />}
+          {activeTab === "purchase-orders" && <PurchaseOrdersView initialJobFilter={initialJob} />}
+          {activeTab === "bills" && <SupplierBillsView initialJobFilter={initialJob} />}
+          {activeTab === "payments" && <PaymentsView initialJobFilter={initialJob} />}
+          {activeTab === "job-costs" && <JobCostsView initialJobFilter={initialJob} />}
+          {activeTab === "budgets" && <BudgetsView initialJobFilter={initialJob} />}
+          {activeTab === "reports" && <FinancialReportsView />}
+          {activeTab === "people-suppliers" && <PeopleSuppliersView />}
+          {activeTab === "settings" && <FinanceSettingsView />}
+        </div>
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

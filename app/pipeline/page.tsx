@@ -3,6 +3,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
+import { usePermissions } from "@/lib/permissions";
 import {
   useLeadFlowStore,
   type Opportunity,
@@ -34,12 +36,16 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCrewStore } from "@/store/crewStore";
+import { useAuthStore } from "@/store/authStore";
 import { db } from "@/lib/db";
 import { useMemo } from "react";
 
 function PipelineContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { hasPermission } = usePermissions();
+  const canCreateOpp = hasPermission("leads", "create");
+  const currentUser = useAuthStore((state) => state.currentUser);
   const {
     opportunities,
     handoverToProject,
@@ -77,7 +83,11 @@ function PipelineContent() {
     setMounted(true);
     async function loadManagers() {
       try {
-        const users = await db.users.toArray();
+        const companyId = currentUser?.companyId || "ORG-DEFAULT";
+        const users = await db.users
+          .where("companyId")
+          .equals(companyId)
+          .toArray();
         const siteMgrs = users
           .filter((u) => u.role === "SITE_MANAGER")
           .map((u) => ({
@@ -90,7 +100,7 @@ function PipelineContent() {
       } catch (err) {}
     }
     loadManagers();
-  }, []);
+  }, [currentUser?.companyId]);
 
   const availableSiteManagers = useMemo(() => {
     const list = [...dbManagers];
@@ -231,16 +241,18 @@ function PipelineContent() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setShowNewOppModal(true)}
-              className="flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4.5 py-2.5 text-sm font-medium shadow-xs transition cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              <span>New Opportunity</span>
-            </button>
-          </div>
+          {canCreateOpp && (
+            <div className="flex items-center gap-3 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setShowNewOppModal(true)}
+                className="flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4.5 py-2.5 text-sm font-medium shadow-xs transition cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                <span>New Opportunity</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Top KPI Banner */}
@@ -816,9 +828,11 @@ function PipelineContent() {
 export default function PipelinePage() {
   return (
     <FirmaLayout activeNav="Pipeline">
-      <Suspense fallback={<div className="p-8 text-center text-xs text-ash">Loading pipeline...</div>}>
-        <PipelineContent />
-      </Suspense>
+      <PermissionGuard module="leads" action="view">
+        <Suspense fallback={<div className="p-8 text-center text-xs text-ash">Loading pipeline...</div>}>
+          <PipelineContent />
+        </Suspense>
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

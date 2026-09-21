@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
+import { usePermissions } from "@/lib/permissions";
 import {
   useLeadFlowStore,
   type ProjectItem,
@@ -84,7 +86,11 @@ export default function ProjectsPage() {
     setMounted(true);
     async function loadManagers() {
       try {
-        const users = await db.users.toArray();
+        const companyId = currentUser?.companyId || "ORG-DEFAULT";
+        const users = await db.users
+          .where("companyId")
+          .equals(companyId)
+          .toArray();
         const siteMgrs = users
           .filter((u) => u.role === "SITE_MANAGER")
           .map((u) => ({
@@ -99,7 +105,7 @@ export default function ProjectsPage() {
       }
     }
     loadManagers();
-  }, []);
+  }, [currentUser?.companyId]);
 
   const availableSiteManagers = useMemo(() => {
     const list = [...dbManagers];
@@ -233,8 +239,10 @@ export default function ProjectsPage() {
   const [projectSiteManagerId, setProjectSiteManagerId] = useState("");
   const [projectSiteManagerName, setProjectSiteManagerName] = useState("");
 
+  const { hasPermission } = usePermissions();
   const isSM = isSiteManager(currentUser);
-  const canCreateProject = !isSM; // Only PM / Owner create projects
+  const canCreateProject = hasPermission("projects", "create");
+  const canDeleteProject = hasPermission("projects", "delete");
   const canAssignSM = isAdminOrOwner(currentUser) || isProjectManager(currentUser);
 
   // Compute Assigned Projects list based on current user role & assignment
@@ -348,7 +356,8 @@ export default function ProjectsPage() {
 
   return (
     <FirmaLayout activeNav="Projects">
-      {/* Page Header */}
+      <PermissionGuard module="projects" action="view">
+        {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4 pb-2">
         <div>
           <span className="text-eyebrow text-ash uppercase tracking-wider font-semibold">
@@ -1467,6 +1476,7 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

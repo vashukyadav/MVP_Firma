@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
 import { db, type Customer } from "@/lib/db";
+import { useAuthStore } from "@/store/authStore";
 import {
   useLeadFlowStore,
   type Lead,
@@ -45,6 +46,7 @@ import {
 
 export default function LeadsPage() {
   const router = useRouter();
+  const currentUser = useAuthStore((state) => state.currentUser);
   const {
     leads,
     addLead,
@@ -99,7 +101,8 @@ export default function LeadsPage() {
 
   const loadCustomers = async () => {
     try {
-      const data = await db.customer.toArray();
+      const companyId = currentUser?.companyId || "ORG-DEFAULT";
+      const data = await db.customer.where("companyId").equals(companyId).toArray();
       setCustomers(data);
     } catch (err) {
       console.error("Failed to load customers:", err);
@@ -108,7 +111,7 @@ export default function LeadsPage() {
 
   useEffect(() => {
     loadCustomers();
-  }, []);
+  }, [currentUser?.companyId]);
 
   useEffect(() => {
     if (showAddModal) {

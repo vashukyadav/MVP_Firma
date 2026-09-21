@@ -35,9 +35,11 @@ export default function DashboardPage() {
   useEffect(() => {
     async function checkAdminStatus() {
       try {
+        const companyId = currentUser?.companyId || "ORG-DEFAULT";
         const count = await db.users
-          .where("role")
-          .equals("ACCOUNT_ADMIN")
+          .where("companyId")
+          .equals(companyId)
+          .filter((u) => u.role === "ACCOUNT_ADMIN")
           .count();
         setHasAdmin(count > 0);
       } catch {
@@ -53,12 +55,16 @@ export default function DashboardPage() {
     return () => {
       window.removeEventListener("admin-created", handleAdminCreated);
     };
-  }, [currentUser?.role]);
+  }, [currentUser?.role, currentUser?.companyId]);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const allUsers = await db.users.toArray();
+        const companyId = currentUser?.companyId || "ORG-DEFAULT";
+        const allUsers = await db.users
+          .where("companyId")
+          .equals(companyId)
+          .toArray();
         setTeamCount(allUsers.length);
 
         const counts = {
@@ -78,7 +84,10 @@ export default function DashboardPage() {
         }
         setRoleCounts(counts);
 
-        const customers = await db.customer.count();
+        const customers = await db.customer
+          .where("companyId")
+          .equals(companyId)
+          .count();
         setCustomerCount(customers);
       } catch {
         setTeamCount(0);
@@ -101,7 +110,7 @@ export default function DashboardPage() {
       }
     }
     loadData();
-  }, [currentUser?.id, currentUser?.name]);
+  }, [currentUser?.id, currentUser?.name, currentUser?.companyId]);
 
   const userRole = currentUser?.role;
 

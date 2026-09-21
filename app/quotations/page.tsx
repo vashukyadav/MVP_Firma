@@ -3,6 +3,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
+import { usePermissions } from "@/lib/permissions";
 import {
   useLeadFlowStore,
   type Quote,
@@ -39,6 +41,11 @@ function QuotationsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialOppId = searchParams.get("opportunityId");
+  const { hasPermission } = usePermissions();
+  const canCreateQuote = hasPermission("quotes", "create");
+  const canApproveQuote = hasPermission("quotes", "approve");
+  const canSendQuote = hasPermission("quotes", "send");
+  const canDeleteQuote = hasPermission("quotes", "delete");
 
   const {
     quotes,
@@ -238,14 +245,16 @@ function QuotationsContent() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4.5 py-2.5 text-sm font-medium shadow-xs transition cursor-pointer self-start sm:self-auto"
-        >
-          <Plus className="h-4 w-4 text-breath" />
-          <span>New Quotation</span>
-        </button>
+        {canCreateQuote && (
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-4.5 py-2.5 text-sm font-medium shadow-xs transition cursor-pointer self-start sm:self-auto"
+          >
+            <Plus className="h-4 w-4 text-breath" />
+            <span>New Quotation</span>
+          </button>
+        )}
       </div>
 
       {/* 3 KPI Summary Cards */}
@@ -352,7 +361,7 @@ function QuotationsContent() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {/* Step 7: Mark as Accepted Action */}
-                        {item.status === "SENT" && (
+                        {item.status === "SENT" && canApproveQuote && (
                           <Button
                             type="button"
                             onClick={() => handleAcceptQuote(item)}
@@ -383,18 +392,20 @@ function QuotationsContent() {
                           <Eye className="h-4 w-4" />
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (confirm(`Delete quote #${item.quoteNo}?`)) {
-                              deleteQuote(item.id);
-                            }
-                          }}
-                          className="p-1.5 rounded-[6px] text-ash hover:bg-hazard-bg/20 hover:text-hazard-text transition cursor-pointer"
-                          title="Delete Quote"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canDeleteQuote && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Delete quote #${item.quoteNo}?`)) {
+                                deleteQuote(item.id);
+                              }
+                            }}
+                            className="p-1.5 rounded-[6px] text-ash hover:bg-hazard-bg/20 hover:text-hazard-text transition cursor-pointer"
+                            title="Delete Quote"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -797,9 +808,11 @@ function QuotationsContent() {
 export default function QuotationsPage() {
   return (
     <FirmaLayout activeNav="Quotations">
-      <Suspense fallback={<div className="p-8 text-center text-xs text-ash">Loading quotations...</div>}>
-        <QuotationsContent />
-      </Suspense>
+      <PermissionGuard module="quotes" action="view">
+        <Suspense fallback={<div className="p-8 text-center text-xs text-ash">Loading quotations...</div>}>
+          <QuotationsContent />
+        </Suspense>
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

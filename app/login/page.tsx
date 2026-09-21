@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,6 +26,7 @@ export default function LoginPage() {
     const {
         register,
         handleSubmit,
+        setValue,
         formState: { errors },
     } = useForm<LoginFormData>({
         resolver: zodResolver(loginSchema),
@@ -33,42 +34,74 @@ export default function LoginPage() {
 
     const setUser = useAuthStore((state) => state.setUser);
 
-    // ── ALL ORIGINAL LOGIC PRESERVED ───────────────────────────────────────
+    // ── ROBUST AUTHENTICATION LOGIC ───────────────────────────────────────
     const onSubmit = async (data: LoginFormData) => {
         setIsLoading(true);
-        const user = await db.users
-            .where("email")
-            .equals(data.email)
-            .first();
+        try {
+            const cleanEmail = data.email.trim().toLowerCase();
+            const cleanPassword = data.password.trim();
 
-        if (!user || user.password !== data.password) {
-            toast.error("Invalid email or password");
-            setIsLoading(false);
-            return;
-        }
+            // Find user case-insensitively to prevent typo/casing lockout
+            const allUsers = await db.users.toArray();
+            const user = allUsers.find(
+                (u) => u.email.trim().toLowerCase() === cleanEmail && u.password === cleanPassword
+            );
 
-        const { password, ...safeUser } = user;
-        setUser(safeUser);
-
-        if (user.role === "OWNER") {
-            const onboarding = await db.onboarding.get(user.id!);
-
-            if (!onboarding) {
-                router.push("/onboarding/welcome");
+            if (!user) {
+                toast.error("Invalid email or password");
+                setIsLoading(false);
                 return;
             }
 
-            if (!onboarding.billingCompleted) {
-                router.push("/onboarding/billing");
+            const { password, ...safeUser } = user;
+            setUser(safeUser);
+            toast.success(`Welcome back, ${user.name || "User"}!`);
+
+            if (user.role === "OWNER") {
+                const onboarding = await db.onboarding.get(user.id!);
+
+                if (!onboarding) {
+                    router.push("/onboarding/welcome");
+                    return;
+                }
+
+                if (!onboarding.billingCompleted) {
+                    router.push("/onboarding/billing");
+                    return;
+                }
+
+                router.push("/dashboard");
                 return;
             }
 
             router.push("/dashboard");
-            return;
+        } catch (err) {
+            console.error("Login failed:", err);
+            toast.error("Failed to sign in. Please try again.");
+        } finally {
+            setIsLoading(false);
         }
-
-        router.push("/dashboard");
     };
+
+    // Auto-detect and clean if user navigated with query params in URL
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const queryEmail = params.get("email");
+            const queryPassword = params.get("password");
+
+            if (queryEmail && queryPassword) {
+                // Clear credentials from URL bar immediately for security
+                window.history.replaceState({}, document.title, window.location.pathname);
+                setValue("email", queryEmail);
+                setValue("password", queryPassword);
+                onSubmit({ email: queryEmail, password: queryPassword });
+            }
+        } catch (e) {
+            console.error("URL params auth detection failed:", e);
+        }
+    }, [setValue]);
     // ───────────────────────────────────────────────────────────────────────
 
     return (
@@ -170,7 +203,15 @@ export default function LoginPage() {
 
                     {/* Form Card */}
                     <div className="rounded-[20px] bg-white border border-pebble shadow-2xs p-8">
-                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                        <form
+                            action="#"
+                            method="POST"
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                handleSubmit(onSubmit)(e);
+                            }}
+                            className="space-y-5"
+                        >
                             {/* Email */}
                             <div className="space-y-1.5">
                                 <label htmlFor="email" className="text-xs font-semibold text-onyx">

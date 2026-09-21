@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
 import { db } from "@/lib/db";
 import {
   useSiteStore,
@@ -441,7 +442,8 @@ export default function SitesPage() {
 
   return (
     <FirmaLayout activeNav="Sites">
-      <div className="space-y-5 mt-2">
+      <PermissionGuard module="sites" action="view">
+        <div className="space-y-5 mt-2">
         {/* ========================================================================= */}
         {/* TOP SUMMARY KPI STATS                                                     */}
         {/* ========================================================================= */}
@@ -1743,6 +1745,7 @@ export default function SitesPage() {
           </div>
         </div>
       )}
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

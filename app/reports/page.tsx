@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
 import { useLeadFlowStore } from "@/store/leadFlowStore";
 import { useTenderFlowStore } from "@/store/tenderFlowStore";
 import { toast } from "@/components/ui/toast";
@@ -50,7 +51,8 @@ export default function ReportsPage() {
 
   return (
     <FirmaLayout activeNav="Reports">
-      {/* Header */}
+      <PermissionGuard module="reports" action="view">
+        {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4 pb-2">
         <div>
           <span className="text-eyebrow font-semibold tracking-wider text-ash uppercase">
@@ -253,6 +255,7 @@ export default function ReportsPage() {
           </div>
         </div>
       </div>
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

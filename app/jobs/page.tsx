@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
 import {
   useTenderFlowStore,
   AwardedContractor,
@@ -227,28 +228,38 @@ function JobsContent() {
   const [dateValidationError, setDateValidationError] = useState<string | null>(null);
 
   useEffect(() => {
-    db.users.toArray().then((users) => {
-      setTeamUsers(users);
-      if (users.length > 0) {
-        setInternalAssignee(users[0].name);
-      }
-      const smUsers = users
-        .filter((u) => u.role === "SITE_MANAGER")
-        .map((u) => ({ id: `user-${u.id}`, name: u.name, role: "Site Manager" }));
-      if (!smUsers.some((u) => u.name.toLowerCase() === "sm")) {
-        smUsers.unshift({ id: "user-sm-default", name: "SM", role: "Site Manager" });
-      }
-      setAvailableSiteManagers(smUsers);
-      if (smUsers.length > 0) {
-        setJobSiteManagerName((prev) => prev || smUsers[0].name);
-        setJobSiteManagerId((prev) => prev || smUsers[0].id);
-      }
-    }).catch(() => {
-      setAvailableSiteManagers([{ id: "user-sm-default", name: "SM", role: "Site Manager" }]);
-      setJobSiteManagerName("SM");
-      setJobSiteManagerId("user-sm-default");
-    });
-  }, []);
+    const companyId = currentUser?.companyId || "ORG-DEFAULT";
+    db.users
+      .where("companyId")
+      .equals(companyId)
+      .toArray()
+      .then((users) => {
+        setTeamUsers(users);
+        if (users.length > 0) {
+          setInternalAssignee(users[0].name);
+        }
+        const smUsers = users
+          .filter((u) => u.role === "SITE_MANAGER")
+          .map((u) => ({ id: `user-${u.id}`, name: u.name, role: "Site Manager" }));
+        if (companyId === "ORG-DEFAULT" && !smUsers.some((u) => u.name.toLowerCase() === "sm")) {
+          smUsers.unshift({ id: "user-sm-default", name: "SM", role: "Site Manager" });
+        }
+        setAvailableSiteManagers(smUsers);
+        if (smUsers.length > 0) {
+          setJobSiteManagerName((prev) => prev || smUsers[0].name);
+          setJobSiteManagerId((prev) => prev || smUsers[0].id);
+        }
+      })
+      .catch(() => {
+        if (companyId === "ORG-DEFAULT") {
+          setAvailableSiteManagers([{ id: "user-sm-default", name: "SM", role: "Site Manager" }]);
+          setJobSiteManagerName("SM");
+          setJobSiteManagerId("user-sm-default");
+        } else {
+          setAvailableSiteManagers([]);
+        }
+      });
+  }, [currentUser?.companyId]);
 
   // Reassign Modal State
   const [showReassignModal, setShowReassignModal] = useState(false);
@@ -1702,7 +1713,9 @@ export default function JobsPage() {
         </FirmaLayout>
       }
     >
-      <JobsContent />
+      <PermissionGuard module="jobs" action="view">
+        <JobsContent />
+      </PermissionGuard>
     </Suspense>
   );
 }

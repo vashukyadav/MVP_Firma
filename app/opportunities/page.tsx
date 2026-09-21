@@ -11,13 +11,9 @@ export default function OpportunitiesPage() {
   const currentUser = useAuthStore((state) => state.currentUser);
 
   useEffect(() => {
-    if (currentUser?.role === "SITE_MANAGER" || currentUser?.role === "FIELD_WORKER") {
-      router.replace("/dashboard");
-      return;
-    }
     setStep(1);
     router.replace("/tenders");
-  }, [router, setStep, currentUser]);
+  }, [router, setStep]);
 
   return (
     <div className="min-h-screen bg-stone flex items-center justify-center">

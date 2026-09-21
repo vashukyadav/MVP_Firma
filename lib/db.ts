@@ -18,6 +18,72 @@ export interface User {
   password: string;
   role: UserRole;
   size: number;
+  isAccountAdmin?: boolean;
+}
+
+export type PermissionAction =
+  | "view"
+  | "create"
+  | "edit"
+  | "archive"
+  | "delete"
+  | "approve"
+  | "send"
+  | "voidCredit";
+
+export type ModuleKey =
+  | "customers"
+  | "sites"
+  | "suppliers"
+  | "crew"
+  | "leads"
+  | "quotes"
+  | "projects"
+  | "jobs"
+  | "scheduling"
+  | "timesheets"
+  | "variations"
+  | "rfis"
+  | "documents"
+  | "tenders"
+  | "financial"
+  | "reports"
+  | "safety"
+  | "punchLists"
+  | "userManagement"
+  | "auditLog";
+
+export type OverrideState = "INHERIT" | "ALLOW" | "DENY";
+
+export interface RolePermissionTemplate {
+  id?: number;
+  companyId: string;
+  role: UserRole;
+  module: ModuleKey;
+  permissions: Record<PermissionAction, boolean>;
+}
+
+export interface UserPermissionOverride {
+  id?: number;
+  companyId: string;
+  userId: number;
+  module: ModuleKey;
+  overrides: Record<PermissionAction, OverrideState>;
+}
+
+export interface AuditLogRecord {
+  id?: number;
+  companyId: string;
+  performedByUserId: number;
+  performedByUserName: string;
+  targetUserId: number;
+  targetUserName: string;
+  targetRole: string;
+  module: string;
+  permission: string;
+  oldValue: string;
+  newValue: string;
+  timestamp: string;
 }
 export type PlanType =
   | "STARTER"
@@ -123,6 +189,9 @@ class FirmaDB extends Dexie {
   customer!: Table<Customer, number>;
   enquiry!: Table<Enquiry, number>;
   crew!: Table<CrewMemberRecord, number>;
+  role_permissions!: Table<RolePermissionTemplate, number>;
+  user_permissions!: Table<UserPermissionOverride, number>;
+  audit_logs!: Table<AuditLogRecord, number>;
 
   constructor() {
     super("MiniFIRMA");
@@ -168,6 +237,18 @@ class FirmaDB extends Dexie {
       customer: "++id,companyId,phone,email,companyName",
       enquiry: "++id,companyId,customerId,status,assignedTo,createdAt",
       crew: "++id,companyId,name,role,status,trade,site",
+    });
+
+    this.version(5).stores({
+      users: "++id,email,companyId,size,role,isAccountAdmin",
+      onboarding: "userId,companyId,plan",
+      company: "userId,companyId",
+      customer: "++id,companyId,phone,email,companyName",
+      enquiry: "++id,companyId,customerId,status,assignedTo,createdAt",
+      crew: "++id,companyId,name,role,status,trade,site",
+      role_permissions: "++id,companyId,role,module,[companyId+role+module]",
+      user_permissions: "++id,companyId,userId,module,[companyId+userId+module]",
+      audit_logs: "++id,companyId,performedByUserId,targetUserId,timestamp",
     });
   }
 }

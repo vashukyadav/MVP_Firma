@@ -69,6 +69,7 @@ export default function PlanPage() {
 
     await db.onboarding.put({
       userId: currentUser.id,
+      companyId: currentUser.companyId || "ORG-DEFAULT",
       plan: selectedPlan,
       companyCompleted: false,
       billingCompleted: false,

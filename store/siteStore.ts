@@ -1,10 +1,16 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { persist } from "zustand/middleware";
+import {
+  getActiveCompanyId,
+  createTenantStorage,
+  registerStoreRehydrator,
+} from "@/lib/tenantContext";
 
 export type SiteStatus = "Active" | "Mobilizing" | "Completed" | "On Hold";
 
 export interface ConstructionSite {
   id: string; // e.g. "SITE-01"
+  companyId?: string;
   name: string; // e.g. "Skyline Apartments • Main Tower"
   projectName: string; // e.g. "Skyline Apartments"
   address: string; // e.g. "Plot 42, Sector 62, Golf Course Ext Road"
@@ -33,6 +39,7 @@ interface SiteState {
 export const defaultSitesList: ConstructionSite[] = [
   {
     id: "SITE-BHP",
+    companyId: "ORG-DEFAULT",
     name: "Bhopal Site",
     projectName: "ABC Commercial Building",
     address: "Hoshangabad Road, Zone II",
@@ -48,6 +55,7 @@ export const defaultSitesList: ConstructionSite[] = [
   },
   {
     id: "SITE-SKY",
+    companyId: "ORG-DEFAULT",
     name: "Skyline Apartments Main Yard",
     projectName: "Skyline Apartments • Phase 1",
     address: "Plot 42, Sector 62, Golf Course Ext Road",
@@ -63,6 +71,7 @@ export const defaultSitesList: ConstructionSite[] = [
   },
   {
     id: "SITE-APX",
+    companyId: "ORG-DEFAULT",
     name: "Apex Tech Park Site Yard",
     projectName: "Apex Tech Park & Corporate Towers",
     address: "Plot 14, Sector 63, Electronic City",
@@ -81,7 +90,7 @@ export const defaultSitesList: ConstructionSite[] = [
 export const useSiteStore = create<SiteState>()(
   persist(
     (set, get) => ({
-      sites: defaultSitesList,
+      sites: getActiveCompanyId() === "ORG-DEFAULT" ? defaultSitesList : [],
 
       addSite: (data) => {
         const nextNum = get().sites.length + 1;
@@ -89,6 +98,7 @@ export const useSiteStore = create<SiteState>()(
         const newSite: ConstructionSite = {
           ...data,
           id,
+          companyId: (data as any).companyId || getActiveCompanyId(),
           createdAt: new Date().toISOString().split("T")[0],
         };
         set((state) => ({
@@ -117,56 +127,29 @@ export const useSiteStore = create<SiteState>()(
     }),
     {
       name: "mini-firma-sites-store-v2",
-      storage: {
-        getItem: (name: string) => {
-          if (typeof window === "undefined") return null;
-          try {
-            const localVal = localStorage.getItem(name);
-            if (localVal) return JSON.parse(localVal);
-            const sessionVal = sessionStorage.getItem(name);
-            if (sessionVal) {
-              localStorage.setItem(name, sessionVal);
-              return JSON.parse(sessionVal);
-            }
-          } catch (e) {
-            console.error("Failed to read site store:", e);
-          }
-          return null;
-        },
-        setItem: (name: string, value: unknown) => {
-          if (typeof window === "undefined") return;
-          try {
-            localStorage.setItem(name, JSON.stringify(value));
-          } catch (e) {
-            console.error("Failed to save site store:", e);
-          }
-        },
-        removeItem: (name: string) => {
-          if (typeof window === "undefined") return;
-          try {
-            localStorage.removeItem(name);
-            sessionStorage.removeItem(name);
-          } catch (e) {}
-        },
-      },
+      storage: createTenantStorage("mini-firma-sites-store-v2"),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        if (!state.sites || state.sites.length === 0) {
-          state.sites = [...defaultSitesList];
-        } else if (state.sites.length < 3) {
-          defaultSitesList.forEach((ds) => {
-            if (
-              !state.sites.some(
-                (s) =>
-                  s.id === ds.id ||
-                  s.name.toLowerCase() === ds.name.toLowerCase()
-              )
-            ) {
-              state.sites.push(ds);
-            }
-          });
+        const currentCompany = getActiveCompanyId();
+        if (currentCompany === "ORG-DEFAULT") {
+          if (!state.sites || state.sites.length === 0) {
+            state.sites = [...defaultSitesList];
+          }
+        } else {
+          if (!state.sites) state.sites = [];
         }
       },
     }
   )
 );
+
+// Register store for automatic tenant rehydration
+if (typeof window !== "undefined") {
+  registerStoreRehydrator(() => {
+    const cId = getActiveCompanyId();
+    if (cId !== "ORG-DEFAULT") {
+      useSiteStore.setState({ sites: [] });
+    }
+    useSiteStore.persist.rehydrate();
+  });
+}

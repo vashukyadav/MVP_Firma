@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
+import { usePermissions } from "@/lib/permissions";
 import {
   useTenderFlowStore,
   type TenderFlowStep,
@@ -51,14 +53,19 @@ import {
 
 export default function TenderPage() {
   const router = useRouter();
+  const { hasPermission } = usePermissions();
+  const canCreateTender = hasPermission("tenders", "create");
+  const canSendTender = hasPermission("tenders", "send");
+  const canApproveTender = hasPermission("tenders", "approve");
+
   const {
     currentStep,
     activeOpportunityId,
     activeTenderId,
-    opportunities,
-    tenders,
-    suppliers,
-    bids,
+    opportunities = [],
+    tenders = [],
+    suppliers = [],
+    bids = [],
     setStep,
     setActiveOpportunity,
     setActiveTender,
@@ -92,12 +99,6 @@ export default function TenderPage() {
 
   // Registered Clients and Pipeline Opportunities for auto-filling
   const currentUser = useAuthStore((state) => state.currentUser);
-
-  useEffect(() => {
-    if (currentUser && (currentUser.role === "SITE_MANAGER" || currentUser.role === "FIELD_WORKER")) {
-      router.replace("/dashboard");
-    }
-  }, [currentUser, router]);
 
   const leadOpportunities = useLeadFlowStore((state) => state.opportunities || []);
   const leadList = useLeadFlowStore((state) => state.leads || []);
@@ -513,25 +514,10 @@ export default function TenderPage() {
       ? Math.min(100, Math.round((tenderAwardedAmount / projectTotalValue) * 100))
       : 0;
 
-  if (currentUser?.role === "SITE_MANAGER" || currentUser?.role === "FIELD_WORKER") {
-    return (
-      <FirmaLayout activeNav="Dashboard">
-        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center space-y-3">
-          <div className="h-12 w-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
-            <Eye className="h-6 w-6" />
-          </div>
-          <h2 className="text-lg font-bold text-onyx">Access Restricted</h2>
-          <p className="text-xs text-ash max-w-md">
-            Tenders, bidding, and procurement workflows are restricted to Project Managers and Administrators. Redirecting to Dashboard...
-          </p>
-        </div>
-      </FirmaLayout>
-    );
-  }
-
   return (
     <FirmaLayout activeNav="Tenders">
-      <div className="space-y-6 mt-1">
+      <PermissionGuard module="tenders" action="view">
+        <div className="space-y-6 mt-1">
 
         {/* ========================================================================= */}
         {/* FLOW STEPPER PROGRESS BAR (8 Steps from user diagram)                     */}
@@ -2513,7 +2499,8 @@ export default function TenderPage() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

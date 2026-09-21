@@ -3,6 +3,8 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
+import { usePermissions } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import {
   useCrewStore,
@@ -75,41 +77,51 @@ export default function CrewPage() {
 
   const loadDbCrew = useCallback(async () => {
     try {
-      // Check if db.crew is empty; if so, migrate any non-system crew members from useCrewStore
-      const count = await db.crew.count();
-      if (count === 0) {
-        const storeMembers = useCrewStore.getState().members || [];
-        const dummyIds = new Set([
-          "crew-1", "crew-2", "crew-3", "crew-4", "crew-5", "crew-6",
-          "crew-7", "crew-8", "crew-9", "crew-10", "crew-11", "crew-12"
-        ]);
-        const validStoreMembers = storeMembers.filter(
-          (m) => !dummyIds.has(m.id) && !m.id.startsWith("user-")
-        );
-        if (validStoreMembers.length > 0) {
-          for (const sm of validStoreMembers) {
-            await db.crew.add({
-              companyId: "ORG-DEFAULT",
-              name: sm.name,
-              role: sm.role,
-              contact: sm.contact || "+91 98000 00000",
-              status: sm.status || "Active",
-              trade: sm.trade || "General Construction",
-              site: sm.site || "Main Site",
-              email: sm.email,
-              wageRate: sm.wageRate,
-              avatarBg: sm.avatarBg,
-              joinedDate: sm.joinedDate,
-              createdAt: new Date().toISOString(),
-            });
+      const activeCompanyId = currentUser?.companyId || "ORG-DEFAULT";
+
+      // For demo tenant (ORG-DEFAULT), migrate any non-system crew members from useCrewStore if empty
+      if (activeCompanyId === "ORG-DEFAULT") {
+        const count = await db.crew.where("companyId").equals("ORG-DEFAULT").count();
+        if (count === 0) {
+          const storeMembers = useCrewStore.getState().members || [];
+          const dummyIds = new Set([
+            "crew-1", "crew-2", "crew-3", "crew-4", "crew-5", "crew-6",
+            "crew-7", "crew-8", "crew-9", "crew-10", "crew-11", "crew-12"
+          ]);
+          const validStoreMembers = storeMembers.filter(
+            (m) => !dummyIds.has(m.id) && !m.id.startsWith("user-")
+          );
+          if (validStoreMembers.length > 0) {
+            for (const sm of validStoreMembers) {
+              await db.crew.add({
+                companyId: "ORG-DEFAULT",
+                name: sm.name,
+                role: sm.role,
+                contact: sm.contact || "+91 98000 00000",
+                status: sm.status || "Active",
+                trade: sm.trade || "General Construction",
+                site: sm.site || "Main Site",
+                email: sm.email,
+                wageRate: sm.wageRate,
+                avatarBg: sm.avatarBg,
+                joinedDate: sm.joinedDate,
+                createdAt: new Date().toISOString(),
+              });
+            }
           }
         }
       }
 
-      const records = await db.crew.toArray();
+      const records = await db.crew
+        .where("companyId")
+        .equals(activeCompanyId)
+        .toArray();
 
-      // Automatically sync any FIELD_WORKER or SITE_MANAGER users created by Admin in db.users
-      const allDbUsers = await db.users.toArray();
+      // Automatically sync any FIELD_WORKER or SITE_MANAGER users created by Admin in db.users for this company
+      const allDbUsers = await db.users
+        .where("companyId")
+        .equals(activeCompanyId)
+        .toArray();
       const relevantUsers = allDbUsers.filter(
         (u) => u.role === "FIELD_WORKER" || u.role === "SITE_MANAGER"
       );
@@ -213,7 +225,7 @@ export default function CrewPage() {
     } catch (e) {
       console.error("Failed to load crew from IndexedDB:", e);
     }
-  }, []);
+  }, [currentUser?.companyId]);
 
   useEffect(() => {
     loadDbCrew();
@@ -740,9 +752,13 @@ export default function CrewPage() {
 
   const isSiteManager = currentUser?.role === "SITE_MANAGER";
 
+  const { hasPermission } = usePermissions();
+  const canCreateCrew = hasPermission("crew", "create");
+
   return (
     <FirmaLayout activeNav="Crew / People">
-      <div className="space-y-5 mt-3">
+      <PermissionGuard module="crew" action="view">
+        <div className="space-y-5 mt-3">
         {/* Site Manager Allocation Notice */}
         {isSiteManager && (
           <div className="rounded-[12px] bg-emerald-50 border border-emerald-200 p-3.5 flex items-center justify-between text-xs text-emerald-900 shadow-2xs">
@@ -1936,7 +1952,8 @@ export default function CrewPage() {
             </form>
           </div>
         </div>
-      )}
+        )}
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import FirmaLayout from "@/components/layout/FirmaLayout";
 import { Customer, db } from "@/lib/db";
 import { useAuthStore } from "@/store/authStore";
+import { usePermissions } from "@/lib/permissions";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +59,11 @@ type CustomerFormData = z.infer<typeof customerSchema>;
 
 export default function Customers() {
   const currentUser = useAuthStore((state) => state.currentUser);
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission("customers", "create");
+  const canEdit = hasPermission("customers", "edit");
+  const canDelete = hasPermission("customers", "delete");
+
   const [customers, setCustomers] = useState<Customer[]>([]);
 
   const [showForm, setShowForm] = useState(false);
@@ -97,6 +103,11 @@ export default function Customers() {
   ======================================================= */
 
   const handleDelete = async (id: number) => {
+    if (!canDelete) {
+      toast.error("You do not have permission to delete customers.");
+      return;
+    }
+
     const confirmDelete = confirm(
       "Are you sure you want to delete this customer?"
     );
@@ -140,6 +151,10 @@ export default function Customers() {
     ------------------------------------------------------- */
 
     if (editingCustomer?.id) {
+      if (!canEdit) {
+        toast.error("You do not have permission to edit customers.");
+        return;
+      }
       await db.customer.update(editingCustomer.id, {
         companyName: data.companyName,
         contactPerson: data.contactPerson,
@@ -184,6 +199,11 @@ export default function Customers() {
        CREATE
     ------------------------------------------------------- */
 
+    if (!canCreate) {
+      toast.error("You do not have permission to create customers.");
+      return;
+    }
+
     await db.customer.add({
       companyId,
       companyName: data.companyName,
@@ -225,17 +245,19 @@ export default function Customers() {
             </p>
           </div>
 
-          <Button
-            onClick={() => {
-              setEditingCustomer(null);
-              reset();
-              setShowForm(true);
-            }}
-            className="bg-forest hover:bg-forest-hover text-white rounded-[10px] px-4.5 py-2.5 text-sm font-medium flex items-center gap-2 shadow-xs"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Customer</span>
-          </Button>
+          {canCreate && (
+            <Button
+              onClick={() => {
+                setEditingCustomer(null);
+                reset();
+                setShowForm(true);
+              }}
+              className="bg-forest hover:bg-forest-hover text-white rounded-[10px] px-4.5 py-2.5 text-sm font-medium flex items-center gap-2 shadow-xs cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Customer</span>
+            </Button>
+          )}
         </div>
 
         {/* ADD / EDIT CUSTOMER FORM */}
@@ -409,7 +431,7 @@ export default function Customers() {
                 <th className="p-4">Phone</th>
                 <th className="p-4">Industry</th>
                 <th className="p-4">Address</th>
-                <th className="p-4 text-right">Actions</th>
+                {(canEdit || canDelete) && <th className="p-4 text-right">Actions</th>}
               </tr>
             </thead>
 
@@ -426,27 +448,33 @@ export default function Customers() {
                     </span>
                   </td>
                   <td className="p-4 text-ash text-eyebrow">{customer.address}</td>
-                  <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-pebble rounded-[6px] text-onyx bg-white hover:bg-mist text-eyebrow"
-                        onClick={() => handleEdit(customer)}
-                      >
-                        Edit
-                      </Button>
+                  {(canEdit || canDelete) && (
+                    <td className="p-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {canEdit && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-pebble rounded-[6px] text-onyx bg-white hover:bg-mist text-eyebrow cursor-pointer"
+                            onClick={() => handleEdit(customer)}
+                          >
+                            Edit
+                          </Button>
+                        )}
 
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="rounded-[6px] bg-hazard-bg text-hazard-text border border-pebble hover:bg-hazard hover:text-white text-eyebrow"
-                        onClick={() => customer.id && handleDelete(customer.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </td>
+                        {canDelete && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="rounded-[6px] bg-hazard-bg text-hazard-text border border-pebble hover:bg-hazard hover:text-white text-eyebrow cursor-pointer"
+                            onClick={() => customer.id && handleDelete(customer.id)}
+                          >
+                            Delete
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
 

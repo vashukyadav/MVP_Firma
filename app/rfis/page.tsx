@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
 import { useTenderFlowStore, JobRFI } from "@/store/tenderFlowStore";
 import { useAuthStore } from "@/store/authStore";
 import { isFieldWorker, isJobAssignedToUser, isRfiVisibleToUser, canReviewRfi } from "@/lib/roleAccess";
@@ -144,7 +145,8 @@ export default function RfisPage() {
 
   return (
     <FirmaLayout activeNav="RFIs">
-      <div className="space-y-6 mt-2">
+      <PermissionGuard module="rfis" action="view">
+        <div className="space-y-6 mt-2">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
           <div>
@@ -586,6 +588,7 @@ export default function RfisPage() {
           </form>
         </div>
       )}
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

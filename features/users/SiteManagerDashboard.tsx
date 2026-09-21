@@ -100,10 +100,14 @@ export default function SiteManagerDashboard({ companyName }: SiteDashboardProps
   const [teamCount, setTeamCount] = useState<number>(0);
 
   useEffect(() => {
-    db.users.count()
+    const companyId = currentUser?.companyId || "ORG-DEFAULT";
+    db.users
+      .where("companyId")
+      .equals(companyId)
+      .count()
       .then((count) => setTeamCount(count))
       .catch(() => {});
-  }, []);
+  }, [currentUser?.companyId]);
 
   // Compute metrics from live store data
   const totalJobs = jobs.length;

@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
+import { usePermissions } from "@/lib/permissions";
 import {
   useTenderFlowStore,
   AwardedContractor,
@@ -407,10 +409,14 @@ export default function ContractorsPage() {
 
   const currentUser = useAuthStore((state) => state.currentUser);
   const isSiteManager = currentUser?.role === "SITE_MANAGER";
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission("suppliers", "create");
+  const canDelete = hasPermission("suppliers", "delete");
 
   return (
     <FirmaLayout activeNav="Contractors">
-      <div className="space-y-6 mt-4 pb-12">
+      <PermissionGuard module="suppliers" action="view">
+        <div className="space-y-6 mt-4 pb-12">
         {/* Site Manager Coordination Notice */}
         {isSiteManager && (
           <div className="rounded-[12px] bg-blue-50 border border-blue-200 p-3.5 flex items-center justify-between text-xs text-blue-900 shadow-2xs">
@@ -444,17 +450,19 @@ export default function ContractorsPage() {
           </div>
 
           <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
-            <button
-              type="button"
-              onClick={() => {
-                setNewConProject(opportunities[0]?.projectName || "Skyline Corporate Tower");
-                setShowAddContractorModal(true);
-              }}
-              className="flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-3.5 py-2 text-xs font-semibold shadow-xs transition cursor-pointer"
-            >
-              <Plus className="h-4 w-4 stroke-[2.5]" />
-              <span>+ Add Contractor / Partner</span>
-            </button>
+            {canCreate && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNewConProject(opportunities[0]?.projectName || "Skyline Corporate Tower");
+                  setShowAddContractorModal(true);
+                }}
+                className="flex items-center gap-2 rounded-[10px] bg-forest hover:bg-forest-hover text-white px-3.5 py-2 text-xs font-semibold shadow-xs transition cursor-pointer"
+              >
+                <Plus className="h-4 w-4 stroke-[2.5]" />
+                <span>+ Add Contractor / Partner</span>
+              </button>
+            )}
             {allBidders.length === 0 && (
               <button
                 type="button"
@@ -1589,7 +1597,8 @@ export default function ContractorsPage() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

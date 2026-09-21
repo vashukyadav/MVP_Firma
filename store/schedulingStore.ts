@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { persist } from "zustand/middleware";
+import {
+  getActiveCompanyId,
+  createTenantStorage,
+  registerStoreRehydrator,
+} from "@/lib/tenantContext";
 import type { JobPhoto, JobMaterial, JobNote } from "./tenderFlowStore";
 
 export interface ScheduledJob {
@@ -291,54 +296,7 @@ export const useSchedulingStore = create<SchedulingState>()(
     }),
     {
       name: "mini-firma-scheduling-store-v3",
-      storage: {
-        getItem: (name: string) => {
-          if (typeof window === "undefined") return null;
-          try {
-            const raw = localStorage.getItem(name) || sessionStorage.getItem(name);
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              if (parsed?.state?.scheduledJobs && Array.isArray(parsed.state.scheduledJobs)) {
-                const dummyJobIds = new Set([
-                  "JOB-101", "JOB-102", "JOB-103", "JOB-104", "JOB-105", "JOB-106", "JOB-107",
-                  "JOB-201", "JOB-202", "JOB-203", "J-001", "J-002", "J-003", "J-004", "J-005"
-                ]);
-                parsed.state.scheduledJobs = parsed.state.scheduledJobs.filter(
-                  (j: ScheduledJob) => !dummyJobIds.has(j.id) && !/^J-00\d/.test(j.id)
-                );
-              }
-              if (parsed?.state?.unscheduledJobs && Array.isArray(parsed.state.unscheduledJobs)) {
-                const dummyJobIds = new Set([
-                  "JOB-101", "JOB-102", "JOB-103", "JOB-104", "JOB-105", "JOB-106", "JOB-107",
-                  "JOB-201", "JOB-202", "JOB-203", "J-001", "J-002", "J-003", "J-004", "J-005"
-                ]);
-                parsed.state.unscheduledJobs = parsed.state.unscheduledJobs.filter(
-                  (j: UnscheduledJob) => !dummyJobIds.has(j.id) && !/^J-00\d/.test(j.id)
-                );
-              }
-              return parsed;
-            }
-          } catch (e) {
-            console.error("Failed to read scheduling store:", e);
-          }
-          return null;
-        },
-        setItem: (name: string, value: unknown) => {
-          if (typeof window === "undefined") return;
-          try {
-            localStorage.setItem(name, JSON.stringify(value));
-          } catch (e) {
-            console.error("Failed to save scheduling store:", e);
-          }
-        },
-        removeItem: (name: string) => {
-          if (typeof window === "undefined") return;
-          try {
-            localStorage.removeItem(name);
-            sessionStorage.removeItem(name);
-          } catch (e) {}
-        },
-      },
+      storage: createTenantStorage("mini-firma-scheduling-store-v3"),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         const dummyJobIds = new Set([
@@ -384,3 +342,19 @@ export const useSchedulingStore = create<SchedulingState>()(
     }
   )
 );
+
+// Register store for automatic tenant rehydration
+if (typeof window !== "undefined") {
+  registerStoreRehydrator(() => {
+    const cId = getActiveCompanyId();
+    if (cId !== "ORG-DEFAULT") {
+      useSchedulingStore.setState({
+        scheduledJobs: [],
+        unscheduledJobs: [],
+        workers: [],
+        sites: [],
+      });
+    }
+    useSchedulingStore.persist.rehydrate();
+  });
+}

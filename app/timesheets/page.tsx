@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
 import { useAuthStore } from "@/store/authStore";
 import { useTenderFlowStore } from "@/store/tenderFlowStore";
 import { isJobAssignedToUser } from "@/lib/roleAccess";
@@ -154,7 +155,8 @@ export default function TimesheetsPage() {
 
   return (
     <FirmaLayout activeNav="Timesheets">
-      <div className="space-y-6 mt-2 pb-16 font-sans">
+      <PermissionGuard module="timesheets" action="view">
+        <div className="space-y-6 mt-2 pb-16 font-sans">
         {/* ========================================================================= */}
         {/* 1. HEADER & WEEK SELECTOR (Screen 5)                                      */}
         {/* ========================================================================= */}
@@ -540,7 +542,8 @@ export default function TimesheetsPage() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </PermissionGuard>
     </FirmaLayout>
   );
 }

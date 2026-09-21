@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import FirmaLayout from "@/components/layout/FirmaLayout";
+import PermissionGuard from "@/components/auth/PermissionGuard";
 import {
   useSchedulingStore,
   ScheduledJob,
@@ -80,8 +81,15 @@ function SchedulingContent() {
   useEffect(() => {
     async function loadIndexedDbCrew() {
       try {
-        const crewList = await db.crew.toArray();
-        const allUsers = await db.users.toArray();
+        const companyId = currentUser?.companyId || "ORG-DEFAULT";
+        const crewList = await db.crew
+          .where("companyId")
+          .equals(companyId)
+          .toArray();
+        const allUsers = await db.users
+          .where("companyId")
+          .equals(companyId)
+          .toArray();
         const workerUsers = allUsers.filter(
           (u) => u.role === "FIELD_WORKER" || u.role === "SITE_MANAGER"
         );
@@ -99,7 +107,7 @@ function SchedulingContent() {
             const roleLabel = u.role === "SITE_MANAGER" ? "Site Manager" : "Field Worker";
             try {
               const newId = await db.crew.add({
-                companyId: u.companyId || "ORG-DEFAULT",
+                companyId: u.companyId || companyId,
                 name: u.name,
                 role: roleLabel,
                 contact: "+91 98000 00000",
@@ -113,7 +121,7 @@ function SchedulingContent() {
               });
               crewList.push({
                 id: newId as number,
-                companyId: u.companyId || "ORG-DEFAULT",
+                companyId: u.companyId || companyId,
                 name: u.name,
                 role: roleLabel,
                 contact: "+91 98000 00000",
@@ -155,7 +163,7 @@ function SchedulingContent() {
       }
     }
     loadIndexedDbCrew();
-  }, []);
+  }, [currentUser?.companyId]);
 
   // Active Navigation Tab
   const [activeTab, setActiveTab] = useState<ViewTab>("CALENDAR");
@@ -2014,7 +2022,9 @@ function SchedulingContent() {
 export default function SchedulingPage() {
   return (
     <Suspense fallback={<div className="p-8 text-center text-ash text-sm">Loading schedule...</div>}>
-      <SchedulingContent />
+      <PermissionGuard module="scheduling" action="view">
+        <SchedulingContent />
+      </PermissionGuard>
     </Suspense>
   );
 }

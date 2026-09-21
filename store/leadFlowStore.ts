@@ -1,10 +1,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  getActiveCompanyId,
+  createTenantStorage,
+  registerStoreRehydrator,
+} from "@/lib/tenantContext";
 
 export type LeadStatus = "NEW" | "CONTACTED" | "QUALIFIED" | "LOST" | "CONVERTED";
 
 export interface Lead {
   id: string;
+  companyId?: string;
   companyName: string;
   contactPerson: string;
   phone: string;
@@ -27,6 +33,7 @@ export type OpportunityStage = "NEW" | "QUALIFIED" | "PROPOSAL" | "NEGOTIATION" 
 
 export interface Opportunity {
   id: string;
+  companyId?: string;
   title: string;
   leadId?: string;
   customerName: string;
@@ -58,6 +65,7 @@ export type QuoteStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED";
 
 export interface Quote {
   id: string;
+  companyId?: string;
   quoteNo: string;
   opportunityId: string;
   opportunityTitle: string;
@@ -72,6 +80,7 @@ export interface Quote {
 
 export interface ProjectItem {
   id: string;
+  companyId?: string;
   name: string;
   location: string;
   client: string;
@@ -207,16 +216,17 @@ export const defaultProjects: ProjectItem[] = [
 export const useLeadFlowStore = create<LeadFlowState>()(
   persist(
     (set, get) => ({
-      leads: defaultLeads,
-      opportunities: defaultOpportunities,
-      quotes: defaultQuotes,
-      projects: defaultProjects,
+      leads: getActiveCompanyId() === "ORG-DEFAULT" ? defaultLeads : [],
+      opportunities: getActiveCompanyId() === "ORG-DEFAULT" ? defaultOpportunities : [],
+      quotes: getActiveCompanyId() === "ORG-DEFAULT" ? defaultQuotes : [],
+      projects: getActiveCompanyId() === "ORG-DEFAULT" ? defaultProjects : [],
 
       addLead: (leadData) => {
         const id = `LEAD-${Math.floor(1000 + Math.random() * 9000)}`;
         const newLead: Lead = {
           ...leadData,
           id,
+          companyId: leadData.companyId || getActiveCompanyId(),
           createdAt: new Date().toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
@@ -264,6 +274,7 @@ export const useLeadFlowStore = create<LeadFlowState>()(
 
         const newOpp: Opportunity = {
           id: oppId,
+          companyId: lead?.companyId || getActiveCompanyId(),
           title: data.opportunityName,
           leadId,
           customerName: lead?.companyName || "New Customer",
@@ -321,6 +332,7 @@ export const useLeadFlowStore = create<LeadFlowState>()(
 
         const newQuote: Quote = {
           id: quoteNo,
+          companyId: opp?.companyId || getActiveCompanyId(),
           quoteNo,
           opportunityId,
           opportunityTitle: opp?.title || "New Opportunity",
@@ -420,6 +432,7 @@ export const useLeadFlowStore = create<LeadFlowState>()(
 
         const newProject: ProjectItem = {
           id: projectId,
+          companyId: opp?.companyId || getActiveCompanyId(),
           name: opp?.title || "New Project",
           location: opp?.customerName ? `${opp.customerName} Site` : "Project Site",
           client: opp?.customerName || "Client",
@@ -459,8 +472,12 @@ export const useLeadFlowStore = create<LeadFlowState>()(
       },
 
       addProject: (project) => {
+        const withCompany: ProjectItem = {
+          ...project,
+          companyId: project.companyId || getActiveCompanyId(),
+        };
         set((state) => ({
-          projects: [project, ...state.projects],
+          projects: [withCompany, ...state.projects],
         }));
       },
 
@@ -522,52 +539,51 @@ export const useLeadFlowStore = create<LeadFlowState>()(
     }),
     {
       name: "mini-firma-lead-flow",
-      version: 4,
-      migrate: (persistedState: any, version: number) => {
-        if (!persistedState) {
-          return {
-            leads: [],
-            opportunities: [],
-            quotes: [],
-            projects: [],
-          };
-        }
-        return {
-          leads: Array.isArray(persistedState.leads)
-            ? persistedState.leads.filter((l: any) => !isDummyLead(l))
-            : [],
-          opportunities: Array.isArray(persistedState.opportunities)
-            ? persistedState.opportunities.filter((o: any) => !isDummyOpportunity(o))
-            : [],
-          quotes: Array.isArray(persistedState.quotes)
-            ? persistedState.quotes.filter((q: any) => !isDummyQuote(q))
-            : [],
-          projects: Array.isArray(persistedState.projects)
-            ? persistedState.projects.filter((p: any) => !isDummyProject(p))
-            : [],
-        };
-      },
+      version: 5,
+      storage: createTenantStorage("mini-firma-lead-flow"),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        if (!state.projects || state.projects.length === 0) {
-          state.projects = [...defaultProjects];
-        } else if (state.projects.length < 3) {
-          defaultProjects.forEach((dp) => {
-            if (
-              !state.projects.some(
-                (p) =>
-                  p.name.toLowerCase() === dp.name.toLowerCase() ||
-                  p.id === dp.id
-              )
-            ) {
-              state.projects.push(dp);
-            }
-          });
+        const currentCompany = getActiveCompanyId();
+        if (currentCompany === "ORG-DEFAULT") {
+          if (!state.projects || state.projects.length === 0) {
+            state.projects = [...defaultProjects];
+          }
+          if (!state.leads || state.leads.length === 0) {
+            state.leads = [...defaultLeads];
+          }
+          if (!state.opportunities || state.opportunities.length === 0) {
+            state.opportunities = [...defaultOpportunities];
+          }
+          if (!state.quotes || state.quotes.length === 0) {
+            state.quotes = [...defaultQuotes];
+          }
+        } else {
+          // For any specific registered tenant, ensure empty clean state if fresh
+          if (!state.projects) state.projects = [];
+          if (!state.leads) state.leads = [];
+          if (!state.opportunities) state.opportunities = [];
+          if (!state.quotes) state.quotes = [];
         }
       },
     }
   )
 );
+
+// Register store for automatic tenant rehydration
+if (typeof window !== "undefined") {
+  registerStoreRehydrator(() => {
+    const cId = getActiveCompanyId();
+    if (cId !== "ORG-DEFAULT") {
+      useLeadFlowStore.setState({
+        leads: [],
+        opportunities: [],
+        quotes: [],
+        projects: [],
+      });
+    }
+    useLeadFlowStore.persist.rehydrate();
+  });
+}
 
 // Dummy detection helper functions (only exact matching specific historical dummy test names)
 export const isDummyLead = (l: any): boolean => {
